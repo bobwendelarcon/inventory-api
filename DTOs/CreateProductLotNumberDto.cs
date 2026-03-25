@@ -6,8 +6,8 @@
         public string product_id { get; set; } = string.Empty;
         public string manufacturing_date { get; set; } = string.Empty;
         public string expiration_date { get; set; } = string.Empty; // IN / OUT
-        public string quantity { get; set; } = string.Empty;
-        public double branch_id { get; set; }
-      
+        public double quantity { get; set; }
+        public string branch_id { get; set; } = string.Empty;
+
     }
 }

@@ -38,5 +38,19 @@ namespace inventory_api.Controllers
             var result = await _service.GetAllAsync();
             return Ok(result);
         }
+
+        [HttpDelete("reset")]
+        public async Task<IActionResult> ResetAll()
+        {
+            try
+            {
+                await _service.ClearAllDataAsync();
+                return Ok(new { success = true, message = "All data cleared" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
     }
 }
