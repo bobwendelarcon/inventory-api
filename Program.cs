@@ -8,29 +8,27 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-string firebaseKeyPath = Environment.GetEnvironmentVariable("FIREBASE_KEY_PATH");
+string firebaseJson = Environment.GetEnvironmentVariable("FIREBASE_KEY");
 
-if (string.IsNullOrEmpty(firebaseKeyPath))
+if (string.IsNullOrEmpty(firebaseJson))
 {
-    firebaseKeyPath = "firebase-key.json";
+    throw new Exception("FIREBASE_KEY environment variable is missing.");
 }
 
 if (FirebaseApp.DefaultInstance == null)
 {
     FirebaseApp.Create(new AppOptions
     {
-        Credential = GoogleCredential.FromFile(firebaseKeyPath)
+        Credential = GoogleCredential.FromJson(firebaseJson)
     });
 }
-
-Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", firebaseKeyPath);
-
 
 builder.Services.AddSingleton(provider =>
 {
     string projectId = builder.Configuration["Firebase:ProjectId"]!;
     return FirestoreDb.Create(projectId);
 });
+
 builder.Services.AddScoped<inventory_api.Services.CategoryService>();
 builder.Services.AddScoped<inventory_api.Services.ProductService>();
 builder.Services.AddScoped<inventory_api.Services.InventoryTransactionService>();
@@ -39,8 +37,8 @@ builder.Services.AddScoped<inventory_api.Services.ProductLotNumberService>();
 builder.Services.AddScoped<inventory_api.Services.UserService>();
 builder.Services.AddScoped<inventory_api.Services.PartnerService>();
 builder.Services.AddScoped<inventory_api.Services.InventoryDisplayService>();
-var app = builder.Build();
 
+var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
