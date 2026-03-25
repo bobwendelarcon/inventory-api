@@ -154,6 +154,31 @@ namespace inventory_api.Services
 
             List<Dictionary<string, object>> result = new();
 
+            //foreach (var doc in snapshot.Documents)
+            //{
+            //    if (doc.Exists)
+            //    {
+            //        var data = doc.ToDictionary();
+
+            //        if (data.ContainsKey("timestamp") && data["timestamp"] is Timestamp timestamp)
+            //        {
+            //            data["timestamp"] = timestamp.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
+            //        }
+
+            //        if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
+            //        {
+            //            data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
+            //        }
+
+            //        if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
+            //        {
+            //            data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
+            //        }
+
+            //        data["doc_id"] = doc.Id;
+            //        result.Add(data);
+            //    }
+            //}
             foreach (var doc in snapshot.Documents)
             {
                 if (doc.Exists)
@@ -162,17 +187,25 @@ namespace inventory_api.Services
 
                     if (data.ContainsKey("timestamp") && data["timestamp"] is Timestamp timestamp)
                     {
-                        data["timestamp"] = timestamp.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
+                        var utcDate = timestamp.ToDateTime();
 
-                    if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
-                    {
-                        data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
+                        TimeZoneInfo phTimeZone;
 
-                    if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
-                    {
-                        data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
+                        try
+                        {
+                            phTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+                        }
+                        catch
+                        {
+                            phTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+                        }
+
+                        var phDate = TimeZoneInfo.ConvertTimeFromUtc(
+                            DateTime.SpecifyKind(utcDate, DateTimeKind.Utc),
+                            phTimeZone
+                        );
+
+                        data["timestamp"] = phDate.ToString("yyyy-MM-dd HH:mm:ss");
                     }
 
                     data["doc_id"] = doc.Id;
