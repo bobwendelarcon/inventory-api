@@ -6,6 +6,7 @@ namespace inventory_api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Tags("Inventory Transaction")]
     public class InventoryController : ControllerBase
     {
         private readonly InventoryTransactionService _service;

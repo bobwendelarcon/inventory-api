@@ -38,6 +38,7 @@ builder.Services.AddScoped<inventory_api.Services.BranchesService>();
 builder.Services.AddScoped<inventory_api.Services.ProductLotNumberService>();
 builder.Services.AddScoped<inventory_api.Services.UserService>();
 builder.Services.AddScoped<inventory_api.Services.PartnerService>();
+builder.Services.AddScoped<inventory_api.Services.InventoryDisplayService>();
 var app = builder.Build();
 
 

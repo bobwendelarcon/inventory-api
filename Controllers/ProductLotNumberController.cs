@@ -33,12 +33,12 @@ namespace inventory_api.Controllers
             return Ok(result);
         }
 
-        //[HttpPost]
-        //public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
-        //{
-        //    await _productLotNumberService.AddAsync(dto);
-        //    return Ok(new { message = "Product added successfully" });
-        //}
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] CreateProductLotNumberDto dto)
+        {
+            await _productLotNumberService.AddAsync(dto);
+            return Ok(new { message = "Lot No added successfully" });
+        }
 
         //[HttpDelete("{productId}")]
         //public async Task<IActionResult> Delete(string productId)
