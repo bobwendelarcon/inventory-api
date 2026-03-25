@@ -150,7 +150,11 @@ namespace inventory_api.Services
         }
         public async Task<List<Dictionary<string, object>>> GetAllAsync()
         {
-            QuerySnapshot snapshot = await _firestoreDb.Collection(_transactionCollection).GetSnapshotAsync();
+            //  QuerySnapshot snapshot = await _firestoreDb.Collection(_transactionCollection).GetSnapshotAsync();
+            QuerySnapshot snapshot = await _firestoreDb
+      .Collection(_transactionCollection)
+      .OrderByDescending("timestamp")
+      .GetSnapshotAsync();
 
             List<Dictionary<string, object>> result = new();
 
