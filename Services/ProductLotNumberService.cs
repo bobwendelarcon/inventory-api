@@ -83,6 +83,26 @@ namespace inventory_api.Services
         //        return true;
         //    }
 
+        private string? GetDateString(Dictionary<string, object> data, string fieldName, string format = "yyyy-MM-dd")
+        {
+            if (data.ContainsKey(fieldName) && data[fieldName] is Timestamp ts)
+            {
+                return ts.ToDateTime().ToString(format);
+            }
+
+            return null;
+        }
+
+        private string? GetDateTimeString(Dictionary<string, object> data, string fieldName, string format = "yyyy-MM-dd HH:mm:ss")
+        {
+            if (data.ContainsKey(fieldName) && data[fieldName] is Timestamp ts)
+            {
+                return ts.ToDateTime().ToString(format);
+            }
+
+            return null;
+        }
+
         public async Task<Dictionary<string, object>?> GetByLotNoAsync(string lot_no)
         {
             Query query = _firestoreDb.Collection(_collectionName)
@@ -96,7 +116,13 @@ namespace inventory_api.Services
                 return null;
 
             var data = doc.ToDictionary();
+
             data["doc_id"] = doc.Id;
+            data["manufacturing_date"] = GetDateString(data, "manufacturing_date") ?? "";
+            data["expiration_date"] = GetDateString(data, "expiration_date") ?? "";
+            data["created_at"] = GetDateTimeString(data, "created_at") ?? "";
+            data["updated_at"] = GetDateTimeString(data, "updated_at") ?? "";
+
             return data;
         }
 
@@ -116,7 +142,11 @@ namespace inventory_api.Services
                     var data = doc.ToDictionary();
                     data["doc_id"] = doc.Id;
 
-                    // optional: convert timestamp (same as your other method)
+                    data["manufacturing_date"] = GetDateString(data, "manufacturing_date") ?? "";
+                    data["expiration_date"] = GetDateString(data, "expiration_date") ?? "";
+                    data["created_at"] = GetDateTimeString(data, "created_at") ?? "";
+                    data["updated_at"] = GetDateTimeString(data, "updated_at") ?? "";
+
                     if (data.ContainsKey("timestamp") && data["timestamp"] is Timestamp timestamp)
                     {
                         data["timestamp"] = timestamp.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
