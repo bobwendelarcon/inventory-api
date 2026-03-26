@@ -83,7 +83,7 @@ namespace inventory_api.Services
         //        return true;
         //    }
 
-        public async Task<Dictionary<string, object>?> GetByBarcodeAsync(string lot_no)
+        public async Task<Dictionary<string, object>?> GetByLotNoAsync(string lot_no)
         {
             Query query = _firestoreDb.Collection(_collectionName)
                                       .WhereEqualTo("lot_no", lot_no)
@@ -99,6 +99,36 @@ namespace inventory_api.Services
             data["doc_id"] = doc.Id;
             return data;
         }
+
+        public async Task<List<Dictionary<string, object>>> GetByProductIDAsync(string product_id)
+        {
+            Query query = _firestoreDb.Collection(_collectionName)
+                                      .WhereEqualTo("product_id", product_id);
+
+            QuerySnapshot snapshot = await query.GetSnapshotAsync();
+
+            List<Dictionary<string, object>> result = new();
+
+            foreach (var doc in snapshot.Documents)
+            {
+                if (doc.Exists)
+                {
+                    var data = doc.ToDictionary();
+                    data["doc_id"] = doc.Id;
+
+                    // optional: convert timestamp (same as your other method)
+                    if (data.ContainsKey("timestamp") && data["timestamp"] is Timestamp timestamp)
+                    {
+                        data["timestamp"] = timestamp.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
+                    }
+
+                    result.Add(data);
+                }
+            }
+
+            return result;
+        }
+
 
         public async Task ResetAllAsync()
         {

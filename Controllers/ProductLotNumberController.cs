@@ -22,13 +22,24 @@ namespace inventory_api.Controllers
             return Ok(result);
         }
 
-        [HttpGet("LotNumber/{LotNo}")]
-        public async Task<IActionResult> GetByBarcode(string LotNo)
+        [HttpGet("LotNumber/{lotNo}")]
+        public async Task<IActionResult> GetByLotNo(string lotNo)
         {
-            var result = await _productLotNumberService.GetByBarcodeAsync(LotNo);
+            var result = await _productLotNumberService.GetByLotNoAsync(lotNo);
 
             if (result == null)
                 return NotFound(new { message = "Lot Number not found" });
+
+            return Ok(result);
+        }
+
+        [HttpGet("ProductID/{productId}")]
+        public async Task<IActionResult> GetByProductID(string productId)
+        {
+            var result = await _productLotNumberService.GetByProductIDAsync(productId);
+
+            if (result == null || result.Count == 0)
+                return NotFound(new { message = "Product ID not found" });
 
             return Ok(result);
         }
