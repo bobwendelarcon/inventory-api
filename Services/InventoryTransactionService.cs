@@ -82,17 +82,29 @@ namespace inventory_api.Services
                     double newQty = existingQty + dto.quantity;
 
                     var lotData = new Dictionary<string, object>
-                    {
-                        { "lot_no", dto.lot_no },
-                        { "product_id", dto.product_id },
-                        { "branch_id", dto.branch_id },
-                        { "quantity", newQty },
-                        { "updated_at", Timestamp.GetCurrentTimestamp() }
-                    };
+    {
+        { "lot_no", dto.lot_no },
+        { "product_id", dto.product_id },
+        { "branch_id", dto.branch_id },
+        { "quantity", newQty },
+        { "updated_at", Timestamp.GetCurrentTimestamp() }
+    };
 
                     if (!lotSnapshot.Exists)
                     {
                         lotData["created_at"] = Timestamp.GetCurrentTimestamp();
+
+                        if (dto.manufacturing_date.HasValue)
+                        {
+                            lotData["manufacturing_date"] =
+                                Timestamp.FromDateTime(DateTime.SpecifyKind(dto.manufacturing_date.Value.Date, DateTimeKind.Utc));
+                        }
+
+                        if (dto.expiration_date.HasValue)
+                        {
+                            lotData["expiration_date"] =
+                                Timestamp.FromDateTime(DateTime.SpecifyKind(dto.expiration_date.Value.Date, DateTimeKind.Utc));
+                        }
                     }
 
                     transaction.Set(lotRef, lotData, SetOptions.MergeAll);
