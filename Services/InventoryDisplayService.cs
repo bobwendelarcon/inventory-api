@@ -41,23 +41,42 @@ namespace inventory_api.Services
                 int qty = 0;
                 int.TryParse(lot["quantity"]?.ToString(), out qty);
 
+                string manufacturingDate = "";
+                string expirationDate = "";
+                string date = "";
+
+                if (lot.ContainsKey("manufacturing_date") && lot["manufacturing_date"] is Timestamp mfgTimestamp)
+                {
+                    manufacturingDate = mfgTimestamp.ToDateTime().ToString("yyyy-MM-dd");
+                }
+
+                if (lot.ContainsKey("expiration_date") && lot["expiration_date"] is Timestamp expTimestamp)
+                {
+                    expirationDate = expTimestamp.ToDateTime().ToString("yyyy-MM-dd");
+                }
+
+                if (lot.ContainsKey("created_at") && lot["created_at"] is Timestamp createdTimestamp)
+                {
+                    date = createdTimestamp.ToDateTime().ToString("yyyy-MM-dd");
+                }
+
                 result.Add(new InventoryDisplayDto
                 {
                     product_id = productId,
                     description = product != null && product.ContainsKey("product_description")
-                        ? product["product_description"].ToString()
+                        ? product["product_description"]?.ToString() ?? ""
                         : "",
                     uom = product != null && product.ContainsKey("uom")
-                        ? product["uom"].ToString()
+                        ? product["uom"]?.ToString() ?? ""
                         : "",
-                    lot_no = lot["lot_no"]?.ToString(),
+                    lot_no = lot["lot_no"]?.ToString() ?? "",
                     warehouse = branch != null && branch.ContainsKey("branch_name")
-                        ? branch["branch_name"].ToString()
+                        ? branch["branch_name"]?.ToString() ?? ""
                         : branchId,
                     qty = qty,
-                    date = lot.ContainsKey("manufacturing_date")
-                        ? lot["manufacturing_date"].ToString()
-                        : ""
+                    date = date,
+                    manufacturing_date = manufacturingDate,
+                    expiration_date = expirationDate
                 });
             }
 
