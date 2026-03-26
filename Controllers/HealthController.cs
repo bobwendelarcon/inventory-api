@@ -6,47 +6,17 @@ namespace inventory_api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class BranchesController : ControllerBase
+    public class HealthController : ControllerBase
     {
-        private readonly BranchesService _branchesService;
-
-        public BranchesController(BranchesService branchesService)
-        {
-            _branchesService = branchesService;
-        }
-
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public IActionResult Get()
         {
-            var result = await _branchesService.GetAllAsync();
-            return Ok(result);
+            return Ok(new
+            {
+                status = "ok",
+                message = "API is running",
+                timestamp = DateTime.Now
+            });
         }
-
-       
-
-        [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateBranchesDto dto)
-        {
-            await _branchesService.AddAsync(dto);
-            return Ok(new { message = "Branches added successfully" });
-        }
-
-        [HttpDelete("{productId}")]
-        public async Task<IActionResult> Delete(string productId)
-        {
-            var result = await _branchesService.SoftDeleteAsync(productId);
-
-            if (!result)
-                return NotFound(new { message = "Branches not found" });
-
-            return Ok(new { message = "Branches deleted successfully" });
-        }
-
-        [HttpDelete("reset")]
-public async Task<IActionResult> ResetAll()
-{
-    await _branchesService.ResetAllAsync();
-    return Ok(new { message = "All Branches deleted" });
-}
     }
 }
