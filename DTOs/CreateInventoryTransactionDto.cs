@@ -12,5 +12,8 @@
         public string scanned_by { get; set; } = string.Empty;
         public string remarks { get; set; } = string.Empty;
         public string partner { get; set; } = string.Empty;
+        // ✅ ADD THESE
+        public DateTime? manufacturing_date { get; set; }
+        public DateTime? expiration_date { get; set; }
     }
 }
