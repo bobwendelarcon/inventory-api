@@ -32,11 +32,31 @@ namespace inventory_api.Controllers
             return Ok("Stock OUT saved");
         }
 
+        //[HttpGet]
+        //public async Task<IActionResult> GetAll()
+        //{
+        //    var result = await _service.GetAllAsync();
+        //    return Ok(result);
+        //}
+
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int page =1, int pageSize=50)
         {
             var result = await _service.GetAllAsync();
-            return Ok(result);
+           // return Ok(result);
+
+            var total = result.Count;
+            var pagedData = result.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            return Ok(new
+            {
+                total = total,
+                page = page,
+                pageSize = pageSize,
+                result = pagedData
+            });
+
+
         }
 
         [HttpDelete("reset")]
