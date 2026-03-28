@@ -53,7 +53,7 @@ namespace inventory_api.Controllers
                 total = total,
                 page = page,
                 pageSize = pageSize,
-                result = pagedData
+                data = pagedData
             });
 
 
