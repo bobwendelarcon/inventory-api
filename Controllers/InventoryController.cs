@@ -40,13 +40,18 @@ namespace inventory_api.Controllers
         //}
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(int page =1, int pageSize=50)
+        public async Task<IActionResult> GetAll(int page = 1, int pageSize = 50)
         {
             var result = await _service.GetAllAsync();
-           // return Ok(result);
+
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 50;
 
             var total = result.Count;
-            var pagedData = result.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            var pagedData = result
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
 
             return Ok(new
             {
@@ -55,8 +60,6 @@ namespace inventory_api.Controllers
                 pageSize = pageSize,
                 data = pagedData
             });
-
-
         }
 
         [HttpDelete("reset")]
