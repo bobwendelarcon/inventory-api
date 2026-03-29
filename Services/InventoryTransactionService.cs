@@ -170,31 +170,16 @@ namespace inventory_api.Services
 
             List<Dictionary<string, object>> result = new();
 
-            //foreach (var doc in snapshot.Documents)
-            //{
-            //    if (doc.Exists)
-            //    {
-            //        var data = doc.ToDictionary();
+            var productSnapshot = await _firestoreDb.Collection("products").GetSnapshotAsync();
 
-            //        if (data.ContainsKey("timestamp") && data["timestamp"] is Timestamp timestamp)
-            //        {
-            //            data["timestamp"] = timestamp.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-            //        }
+            var productDict = productSnapshot.Documents
+                .Where(d => d.Exists)
+                .Select(d => d.ToDictionary())
+                .ToDictionary(
+                    x => x["product_id"].ToString(),
+                    x => x
+                );
 
-            //        if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
-            //        {
-            //            data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-            //        }
-
-            //        if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
-            //        {
-            //            data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-            //        }
-
-            //        data["doc_id"] = doc.Id;
-            //        result.Add(data);
-            //    }
-            //}
             foreach (var doc in snapshot.Documents)
             {
                 if (doc.Exists)
@@ -222,6 +207,29 @@ namespace inventory_api.Services
                         );
 
                         data["timestamp"] = phDate.ToString("yyyy-MM-dd HH:mm:ss");
+                    }
+
+                    if (data.ContainsKey("product_id"))
+                    {
+                        var productId = data["product_id"].ToString();
+
+                        if (productDict.ContainsKey(productId))
+                        {
+                            var product = productDict[productId];
+
+                            data["product_name"] = product.ContainsKey("product_name")
+                                ? product["product_name"]
+                                : "";
+
+                            data["product_description"] = product.ContainsKey("description")
+                                ? product["description"]
+                                : "";
+                        }
+                        else
+                        {
+                            data["product_name"] = "";
+                            data["product_description"] = "";
+                        }
                     }
 
                     data["doc_id"] = doc.Id;
