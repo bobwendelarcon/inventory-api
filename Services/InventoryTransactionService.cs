@@ -259,7 +259,7 @@ namespace inventory_api.Services
             { "quantity", dto.quantity },
             { "scanned_by", dto.scanned_by ?? "" },
             { "remarks", dto.remarks ?? "" },
-            { "partner", dto.partner_id ?? "" },
+            { "partner_id", dto.partner_id ?? "" },
             { "dr_no", dto.dr_no ?? "" },
             { "inv_no", dto.inv_no ?? "" },
             { "po_no", dto.po_no ?? "" },
