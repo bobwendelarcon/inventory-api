@@ -20,81 +20,46 @@ namespace inventory_api.Services
 
             foreach (DocumentSnapshot doc in snapshot.Documents)
             {
-               
-                    if (doc.Exists)
+                if (doc.Exists)
+                {
+                    var data = doc.ToDictionary();
+
+                    if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
                     {
-                        var data = doc.ToDictionary();
-
-                        if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
-                        {
-                            data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                        }
-
-                        if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
-                        {
-                            data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                        }
-
-                        data["doc_id"] = doc.Id;
-                    partners.Add(data);
+                        data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
                     }
-                
+
+                    if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
+                    {
+                        data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
+                    }
+
+                    data["doc_id"] = doc.Id;
+                    partners.Add(data);
+                }
             }
 
             return partners;
         }
 
-        //public async Task<Dictionary<string, object>?> GetByBarcodeAsync(string product_sku)
-        //{
-        //    Query query = _firestoreDb.Collection(_collectionName)
-        //                              .WhereEqualTo("product_sku", product_sku)
-        //                              .Limit(1);
-
-        //    QuerySnapshot snapshot = await query.GetSnapshotAsync();
-        //    DocumentSnapshot? doc = snapshot.Documents.FirstOrDefault();
-
-        //    if (doc == null || !doc.Exists)
-        //        return null;
-
-        //    var data = doc.ToDictionary();
-        //    data["doc_id"] = doc.Id;
-        //    return data;
-        //}
-
         public async Task AddAsync(CreatePartnerDto dto)
         {
             var data = new Dictionary<string, object>
             {
-                { "partners_id", dto.partner_id },
-                { "partners_name", dto.partner_name },
+                { "partner_id", dto.partner_id },
+                { "partner_name", dto.partner_name },
                 { "address", dto.address },
-                 { "contact_no", dto.contact_no },
-                 { "partner_type", dto.partner_type },
+                { "contact_no", dto.contact_no },
+                { "partner_type", dto.partner_type },
+                { "is_active", dto.is_active },
                 { "created_at", Timestamp.GetCurrentTimestamp() },
-                 { "updated_at", Timestamp.GetCurrentTimestamp() }
+                { "updated_at", Timestamp.GetCurrentTimestamp() }
             };
 
             await _firestoreDb.Collection(_collectionName)
                               .Document(dto.partner_id)
                               .SetAsync(data);
-  
         }
-    //    public async Task<bool> SoftDeleteAsync(string productId)
-    //    {
-    //        var docRef = _firestoreDb.Collection(_collectionName).Document(productId);
-    //        var snapshot = await docRef.GetSnapshotAsync();
-
-    //        if (!snapshot.Exists)
-    //            return false;
-
-    //        var updates = new Dictionary<string, object>
-    //{
-    //    { "is_deleted", true }
-    //};
-
-    //        await docRef.UpdateAsync(updates);
-    //        return true;
-    //    }
 
         public async Task ResetAllAsync()
         {
@@ -106,4 +71,4 @@ namespace inventory_api.Services
             }
         }
     }
-}
+}   
