@@ -12,7 +12,13 @@
         public double quantity { get; set; }
         public string scanned_by { get; set; } = string.Empty;
         public string remarks { get; set; } = string.Empty;
-        public string partner { get; set; } = string.Empty;
+        public string? partner_id { get; set; }
+
+        //transaction out 
+        public string? dr_no { get; set; }
+        public string? inv_no { get; set; }
+        public string? po_no { get; set; }
+
         // ✅ ADD THESE
         public DateTime? manufacturing_date { get; set; }
         public DateTime? expiration_date { get; set; }

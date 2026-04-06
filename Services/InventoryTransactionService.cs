@@ -14,13 +14,141 @@ namespace inventory_api.Services
             _firestoreDb = firestoreDb;
         }
 
+        //    public async Task AddAsync(CreateInventoryTransactionDto dto)
+        //    {
+        //        if (dto == null)
+        //            throw new Exception("Invalid request.");
+
+        //        //if (string.IsNullOrWhiteSpace(dto.transaction_id))
+        //        //    throw new Exception("transaction_id is required.");
+
+        //        if (string.IsNullOrWhiteSpace(dto.product_id))
+        //            throw new Exception("product_id is required.");
+
+        //        if (string.IsNullOrWhiteSpace(dto.branch_id))
+        //            throw new Exception("branch_id is required.");
+
+        //        if (string.IsNullOrWhiteSpace(dto.lot_no))
+        //            throw new Exception("lot_no is required.");
+
+        //        if (string.IsNullOrWhiteSpace(dto.transaction_type))
+        //            throw new Exception("transaction_type is required.");
+
+        //        if (dto.quantity <= 0)
+        //            throw new Exception("quantity must be greater than 0.");
+
+        //        string transactionType = dto.transaction_type.Trim().ToUpper();
+
+        //        if (transactionType != "IN" && transactionType != "OUT")
+        //            throw new Exception("transaction_type must be IN or OUT.");
+
+        //        string lotDocId = $"{dto.product_id}_{dto.branch_id}_{dto.lot_no}";
+
+        //        //DocumentReference transactionRef = _firestoreDb
+        //        //    .Collection(_transactionCollection)
+        //        //    .Document(dto.transaction_id);
+
+        //        //auto
+        //        DocumentReference transactionRef = _firestoreDb
+        //.Collection(_transactionCollection)
+        //.Document(); // auto ID
+
+        //        DocumentReference lotRef = _firestoreDb
+        //            .Collection(_lotCollection)
+        //            .Document(lotDocId);
+
+        //        await _firestoreDb.RunTransactionAsync(async transaction =>
+        //        {
+        //            DocumentSnapshot lotSnapshot = await transaction.GetSnapshotAsync(lotRef);
+
+        //            double existingQty = 0;
+
+        //            if (lotSnapshot.Exists && lotSnapshot.ContainsField("quantity"))
+        //            {
+        //                object qtyObj = lotSnapshot.GetValue<object>("quantity");
+
+        //                if (qtyObj is long longQty)
+        //                    existingQty = longQty;
+        //                else if (qtyObj is int intQty)
+        //                    existingQty = intQty;
+        //                else if (qtyObj is double doubleQty)
+        //                    existingQty = doubleQty;
+        //                else if (qtyObj is string stringQty && double.TryParse(stringQty, out double parsedQty))
+        //                    existingQty = parsedQty;
+        //            }
+
+        //            if (transactionType == "IN")
+        //            {
+        //                double newQty = existingQty + dto.quantity;
+
+        //                var lotData = new Dictionary<string, object>
+        //{
+        //    { "lot_no", dto.lot_no },
+        //    { "product_id", dto.product_id },
+        //    { "branch_id", dto.branch_id },
+        //    { "quantity", newQty },
+        //    { "updated_at", Timestamp.GetCurrentTimestamp() }
+        //};
+
+        //                if (!lotSnapshot.Exists)
+        //                {
+        //                    lotData["created_at"] = Timestamp.GetCurrentTimestamp();
+
+        //                    if (dto.manufacturing_date.HasValue)
+        //                    {
+        //                        lotData["manufacturing_date"] =
+        //                            Timestamp.FromDateTime(DateTime.SpecifyKind(dto.manufacturing_date.Value.Date, DateTimeKind.Utc));
+        //                    }
+
+        //                    if (dto.expiration_date.HasValue)
+        //                    {
+        //                        lotData["expiration_date"] =
+        //                            Timestamp.FromDateTime(DateTime.SpecifyKind(dto.expiration_date.Value.Date, DateTimeKind.Utc));
+        //                    }
+        //                }
+
+        //                transaction.Set(lotRef, lotData, SetOptions.MergeAll);
+        //            }
+        //            else if (transactionType == "OUT")
+        //            {
+        //                if (!lotSnapshot.Exists)
+        //                    throw new Exception("Lot not found.");
+
+        //                if (existingQty < dto.quantity)
+        //                    throw new Exception("Insufficient stock.");
+
+        //                double newQty = existingQty - dto.quantity;
+
+        //                transaction.Update(lotRef, new Dictionary<string, object>
+        //                {
+        //                    { "quantity", newQty },
+        //                    { "updated_at", Timestamp.GetCurrentTimestamp() }
+        //                });
+        //            }
+
+        //            var transactionData = new Dictionary<string, object>
+        //            {
+        //                { "transaction_id", transactionRef.Id },
+        //                { "product_id", dto.product_id },
+        //                { "branch_id", dto.branch_id },
+        //                { "transaction_type", transactionType },
+        //                { "lot_no", dto.lot_no },
+        //                { "quantity", dto.quantity },
+        //                { "scanned_by", dto.scanned_by },
+        //                { "remarks", dto.remarks },
+        //                { "partner", dto.partner },
+        //                { "timestamp", Timestamp.GetCurrentTimestamp() },
+        //                { "is_deleted", false }
+        //            };
+
+        //            transaction.Set(transactionRef, transactionData);
+        //        });
+        //    }
+
         public async Task AddAsync(CreateInventoryTransactionDto dto)
         {
             if (dto == null)
                 throw new Exception("Invalid request.");
-
-            //if (string.IsNullOrWhiteSpace(dto.transaction_id))
-            //    throw new Exception("transaction_id is required.");
 
             if (string.IsNullOrWhiteSpace(dto.product_id))
                 throw new Exception("product_id is required.");
@@ -44,14 +172,9 @@ namespace inventory_api.Services
 
             string lotDocId = $"{dto.product_id}_{dto.branch_id}_{dto.lot_no}";
 
-            //DocumentReference transactionRef = _firestoreDb
-            //    .Collection(_transactionCollection)
-            //    .Document(dto.transaction_id);
-
-            //auto
             DocumentReference transactionRef = _firestoreDb
-    .Collection(_transactionCollection)
-    .Document(); // auto ID
+                .Collection(_transactionCollection)
+                .Document();
 
             DocumentReference lotRef = _firestoreDb
                 .Collection(_lotCollection)
@@ -82,13 +205,13 @@ namespace inventory_api.Services
                     double newQty = existingQty + dto.quantity;
 
                     var lotData = new Dictionary<string, object>
-    {
-        { "lot_no", dto.lot_no },
-        { "product_id", dto.product_id },
-        { "branch_id", dto.branch_id },
-        { "quantity", newQty },
-        { "updated_at", Timestamp.GetCurrentTimestamp() }
-    };
+            {
+                { "lot_no", dto.lot_no },
+                { "product_id", dto.product_id },
+                { "branch_id", dto.branch_id },
+                { "quantity", newQty },
+                { "updated_at", Timestamp.GetCurrentTimestamp() }
+            };
 
                     if (!lotSnapshot.Exists)
                     {
@@ -120,26 +243,29 @@ namespace inventory_api.Services
                     double newQty = existingQty - dto.quantity;
 
                     transaction.Update(lotRef, new Dictionary<string, object>
-                    {
-                        { "quantity", newQty },
-                        { "updated_at", Timestamp.GetCurrentTimestamp() }
-                    });
+            {
+                { "quantity", newQty },
+                { "updated_at", Timestamp.GetCurrentTimestamp() }
+            });
                 }
 
                 var transactionData = new Dictionary<string, object>
-                {
-                    { "transaction_id", transactionRef.Id },
-                    { "product_id", dto.product_id },
-                    { "branch_id", dto.branch_id },
-                    { "transaction_type", transactionType },
-                    { "lot_no", dto.lot_no },
-                    { "quantity", dto.quantity },
-                    { "scanned_by", dto.scanned_by },
-                    { "remarks", dto.remarks },
-                    { "partner", dto.partner },
-                    { "timestamp", Timestamp.GetCurrentTimestamp() },
-                    { "is_deleted", false }
-                };
+        {
+            { "transaction_id", transactionRef.Id },
+            { "product_id", dto.product_id },
+            { "branch_id", dto.branch_id },
+            { "transaction_type", transactionType },
+            { "lot_no", dto.lot_no },
+            { "quantity", dto.quantity },
+            { "scanned_by", dto.scanned_by ?? "" },
+            { "remarks", dto.remarks ?? "" },
+            { "partner", dto.partner_id ?? "" },
+            { "dr_no", dto.dr_no ?? "" },
+            { "inv_no", dto.inv_no ?? "" },
+            { "po_no", dto.po_no ?? "" },
+            { "timestamp", Timestamp.GetCurrentTimestamp() },
+            { "is_deleted", false }
+        };
 
                 transaction.Set(transactionRef, transactionData);
             });
