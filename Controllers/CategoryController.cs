@@ -39,5 +39,19 @@ namespace inventory_api.Controllers
             await _categoryService.AddAsync(dto);
             return Ok(new { message = "Category added successfully" });
         }
+
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(string id, [FromBody] CreateCategoryDto dto)
+        {
+            if (dto == null)
+                return BadRequest("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Category ID is required.");
+
+            await _categoryService.UpdateAsync(id, dto);
+            return Ok(new { message = "Category updated successfully." });
+        }
     }
 }
