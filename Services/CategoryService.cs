@@ -58,5 +58,27 @@ namespace inventory_api.Services
                               .SetAsync(data);
    
         }
+
+        public async Task UpdateAsync(string id, CreateCategoryDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            DocumentReference docRef = _firestoreDb.Collection(_collectionName).Document(id);
+            DocumentSnapshot snapshot = await docRef.GetSnapshotAsync();
+
+            if (!snapshot.Exists)
+                throw new Exception("Category not found.");
+
+            var updates = new Dictionary<string, object>
+    {
+        { "catg_name", dto.catg_name },
+        { "catg_desc", dto.catg_desc ?? "" },
+       // { "is_deleted", dto.is_deleted },
+        { "updated_at", Timestamp.GetCurrentTimestamp() }
+    };
+
+            await docRef.UpdateAsync(updates);
+        }
     }
 }
