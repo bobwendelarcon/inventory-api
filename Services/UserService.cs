@@ -1,109 +1,81 @@
-﻿using Google.Cloud.Firestore;
+﻿using inventory_api.Data;
 using inventory_api.DTOs;
+using inventory_api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services
 {
     public class UserService
     {
-        private readonly FirestoreDb _firestoreDb;
-        private readonly string _collectionName = "users";
+        private readonly AppDbContext _context;
 
-        public UserService(FirestoreDb firestoreDb)
+        public UserService(AppDbContext context)
         {
-            _firestoreDb = firestoreDb;
+            _context = context;
         }
 
         public async Task<List<Dictionary<string, object>>> GetAllAsync()
         {
-            QuerySnapshot snapshot = await _firestoreDb.Collection(_collectionName).GetSnapshotAsync();
-            List<Dictionary<string, object>> user = new();
+            var users = await _context.Users.ToListAsync();
 
-            foreach (DocumentSnapshot doc in snapshot.Documents)
+            return users.Select(x => new Dictionary<string, object>
             {
-               
-                    if (doc.Exists)
-                    {
-                        var data = doc.ToDictionary();
-
-                        if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
-                        {
-                            data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                        }
-
-                        if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
-                        {
-                            data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                        }
-
-                        data["doc_id"] = doc.Id;
-                        user.Add(data);
-                    }
-                
-            }
-
-            return user;
+                { "user_id", x.user_id },
+                   { "full_name", x.full_name },
+                { "username", x.username },
+                { "password_hash", x.password_hash },
+                { "role_name", x.role_name },
+                // { "branch_id", x.branch_id ?? "" },
+                { "is_deleted",x.is_deleted },
+                { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+                { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
+            }).ToList();
         }
-
-        //public async Task<Dictionary<string, object>?> GetByBarcodeAsync(string product_sku)
-        //{
-        //    Query query = _firestoreDb.Collection(_collectionName)
-        //                              .WhereEqualTo("product_sku", product_sku)
-        //                              .Limit(1);
-
-        //    QuerySnapshot snapshot = await query.GetSnapshotAsync();
-        //    DocumentSnapshot? doc = snapshot.Documents.FirstOrDefault();
-
-        //    if (doc == null || !doc.Exists)
-        //        return null;
-
-        //    var data = doc.ToDictionary();
-        //    data["doc_id"] = doc.Id;
-        //    return data;
-        //}
 
         public async Task AddAsync(CreateUserDto dto)
         {
-            var data = new Dictionary<string, object>
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(dto.user_id))
+                throw new Exception("user_id is required.");
+            if (string.IsNullOrWhiteSpace(dto.full_name))
+                throw new Exception("fullname is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.username))
+                throw new Exception("username is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.password_hash))
+                throw new Exception("password is required.");
+
+            bool exists = await _context.Users.AnyAsync(x => x.user_id == dto.user_id);
+
+            if (exists)
+                throw new Exception("User already exists.");
+
+            var user = new User
             {
-                { "user_id", dto.user_id },
-                { "username", dto.username },
-                { "password_hash", dto.password_hash },
-                 { "role", dto.role },
-                 { "branch_id", dto.branch_id },
-                { "created_at", Timestamp.GetCurrentTimestamp() },
-                 { "updated_at", Timestamp.GetCurrentTimestamp() }
+                user_id = dto.user_id,
+                full_name = dto.full_name,
+                username = dto.username,
+                password_hash = dto.password_hash,
+                role_name = dto.role_name,
+                is_deleted = dto.is_deleted,
+              //  branch_id = string.IsNullOrWhiteSpace(dto.branch_id) ? null : dto.branch_id,
+                created_at = DateTime.Now,
+                updated_at = DateTime.Now
             };
 
-            await _firestoreDb.Collection(_collectionName)
-                              .Document(dto.user_id)
-                              .SetAsync(data);
-  
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
         }
-    //    public async Task<bool> SoftDeleteAsync(string productId)
-    //    {
-    //        var docRef = _firestoreDb.Collection(_collectionName).Document(productId);
-    //        var snapshot = await docRef.GetSnapshotAsync();
-
-    //        if (!snapshot.Exists)
-    //            return false;
-
-    //        var updates = new Dictionary<string, object>
-    //{
-    //    { "is_deleted", true }
-    //};
-
-    //        await docRef.UpdateAsync(updates);
-    //        return true;
-    //    }
 
         public async Task ResetAllAsync()
         {
-            var snapshot = await _firestoreDb.Collection(_collectionName).GetSnapshotAsync();
+            var users = await _context.Users.ToListAsync();
 
-            foreach (var doc in snapshot.Documents)
-            {
-                await doc.Reference.DeleteAsync();
-            }
+            _context.Users.RemoveRange(users);
+            await _context.SaveChangesAsync();
         }
     }
 }

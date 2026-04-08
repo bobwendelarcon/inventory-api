@@ -12,7 +12,8 @@
         public double quantity { get; set; }
         public string scanned_by { get; set; } = string.Empty;
         public string remarks { get; set; } = string.Empty;
-        public string? partner_id { get; set; }
+        public string? supplier_id { get; set; }
+        public string? customer_id { get; set; }
 
         //transaction out 
         public string? dr_no { get; set; }

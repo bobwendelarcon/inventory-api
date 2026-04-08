@@ -1,74 +1,76 @@
-﻿using Google.Cloud.Firestore;
+﻿using inventory_api.Data;
 using inventory_api.DTOs;
+using inventory_api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services
 {
     public class PartnerService
     {
-        private readonly FirestoreDb _firestoreDb;
-        private readonly string _collectionName = "partners";
+        private readonly AppDbContext _context;
 
-        public PartnerService(FirestoreDb firestoreDb)
+        public PartnerService(AppDbContext context)
         {
-            _firestoreDb = firestoreDb;
+            _context = context;
         }
 
         public async Task<List<Dictionary<string, object>>> GetAllAsync()
         {
-            QuerySnapshot snapshot = await _firestoreDb.Collection(_collectionName).GetSnapshotAsync();
-            List<Dictionary<string, object>> partners = new();
+            var partners = await _context.Partners
+                .OrderBy(x => x.partner_name)
+                .ToListAsync();
 
-            foreach (DocumentSnapshot doc in snapshot.Documents)
+            return partners.Select(x => new Dictionary<string, object>
             {
-                if (doc.Exists)
-                {
-                    var data = doc.ToDictionary();
-
-                    if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
-                    {
-                        data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
-
-                    if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
-                    {
-                        data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
-
-                    data["doc_id"] = doc.Id;
-                    partners.Add(data);
-                }
-            }
-
-            return partners;
+                { "partner_id", x.partner_id },
+                { "partner_name", x.partner_name },
+                { "address", x.address ?? "" },
+                { "contact_no", x.contact ?? "" },
+                { "partner_type", x.partner_type ?? "" },
+                { "is_deleted", x.is_deleted },
+                { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+                { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
+            }).ToList();
         }
 
         public async Task AddAsync(CreatePartnerDto dto)
         {
-            var data = new Dictionary<string, object>
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(dto.partner_id))
+                throw new Exception("partner_id is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.partner_name))
+                throw new Exception("partner_name is required.");
+
+            bool exists = await _context.Partners.AnyAsync(x => x.partner_id == dto.partner_id);
+
+            if (exists)
+                throw new Exception("Partner already exists.");
+
+            var partner = new Partner
             {
-                { "partner_id", dto.partner_id },
-                { "partner_name", dto.partner_name },
-                { "address", dto.address },
-                { "contact_no", dto.contact_no },
-                { "partner_type", dto.partner_type },
-                { "is_active", dto.is_active },
-                { "created_at", Timestamp.GetCurrentTimestamp() },
-                { "updated_at", Timestamp.GetCurrentTimestamp() }
+                partner_id = dto.partner_id,
+                partner_name = dto.partner_name,
+                address = dto.address,
+                contact = dto.contact,
+                partner_type = dto.partner_type,
+                is_deleted = dto.is_deleted,
+                created_at = DateTime.Now,
+                updated_at = DateTime.Now
             };
 
-            await _firestoreDb.Collection(_collectionName)
-                              .Document(dto.partner_id)
-                              .SetAsync(data);
+            _context.Partners.Add(partner);
+            await _context.SaveChangesAsync();
         }
 
         public async Task ResetAllAsync()
         {
-            var snapshot = await _firestoreDb.Collection(_collectionName).GetSnapshotAsync();
+            var partners = await _context.Partners.ToListAsync();
 
-            foreach (var doc in snapshot.Documents)
-            {
-                await doc.Reference.DeleteAsync();
-            }
+            _context.Partners.RemoveRange(partners);
+            await _context.SaveChangesAsync();
         }
     }
-}   
+}

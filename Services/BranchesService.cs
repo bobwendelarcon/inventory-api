@@ -1,91 +1,81 @@
-﻿using Google.Cloud.Firestore;
+﻿using inventory_api.Data;
 using inventory_api.DTOs;
+using inventory_api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services
 {
     public class BranchesService
     {
-        private readonly FirestoreDb _firestoreDb;
-        private readonly string _collectionName = "branches";
+        private readonly AppDbContext _context;
 
-        public BranchesService(FirestoreDb firestoreDb)
+        public BranchesService(AppDbContext context)
         {
-            _firestoreDb = firestoreDb;
+            _context = context;
         }
 
         public async Task<List<Dictionary<string, object>>> GetAllAsync()
         {
-            QuerySnapshot snapshot = await _firestoreDb.Collection(_collectionName).GetSnapshotAsync();
-            List<Dictionary<string, object>> branches = new();
+            var branches = await _context.Branches
+                .OrderBy(x => x.branch_name)
+                .ToListAsync();
 
-            foreach (DocumentSnapshot doc in snapshot.Documents)
+            return branches.Select(x => new Dictionary<string, object>
             {
-                if (doc.Exists)
-                {
-                    var data = doc.ToDictionary();
-
-                    if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
-                    {
-                        data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
-
-                    if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
-                    {
-                        data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
-
-                    data["doc_id"] = doc.Id;
-                    branches.Add(data);
-                }
-            }
-
-            return branches;
+                { "branch_id", x.branch_id },
+                { "branch_name", x.branch_name },
+                { "branch_loc", x.branch_loc ?? "" },
+                { "is_deleted", x.is_deleted },
+                { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+                { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
+               // { "doc_id", x.branch_id }
+            }).ToList();
         }
-
-       
 
         public async Task AddAsync(CreateBranchesDto dto)
         {
-            var data = new Dictionary<string, object>
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            bool exists = await _context.Branches.AnyAsync(x => x.branch_id == dto.branch_id);
+
+            if (exists)
+                throw new Exception("Branch already exists.");
+
+            var branch = new Branch
             {
-                { "branch_id", dto.branch_id },
-                { "branch_name", dto.branch_name },
-                { "branch_loc", dto.branch_loc },
-               
-                { "created_at", Timestamp.GetCurrentTimestamp() },
-                 { "updated_at", Timestamp.GetCurrentTimestamp() }
+                branch_id = dto.branch_id,
+                branch_name = dto.branch_name,
+                branch_loc = dto.branch_loc,
+                is_deleted = false,
+                created_at = DateTime.Now,
+                updated_at = DateTime.Now
             };
 
-            await _firestoreDb.Collection(_collectionName)
-                              .Document(dto.branch_id)
-                              .SetAsync(data);
-  
+            _context.Branches.Add(branch);
+            await _context.SaveChangesAsync();
         }
-        public async Task<bool> SoftDeleteAsync(string productId)
-        {
-            var docRef = _firestoreDb.Collection(_collectionName).Document(productId);
-            var snapshot = await docRef.GetSnapshotAsync();
 
-            if (!snapshot.Exists)
+        public async Task<bool> SoftDeleteAsync(string branchId)
+        {
+            var branch = await _context.Branches.FirstOrDefaultAsync(x => x.branch_id == branchId);
+
+            if (branch == null)
                 return false;
 
-            var updates = new Dictionary<string, object>
-    {
-        { "is_deleted", true }
-    };
+            branch.is_deleted = true;
+            branch.updated_at = DateTime.Now;
 
-            await docRef.UpdateAsync(updates);
+            await _context.SaveChangesAsync();
             return true;
         }
 
         public async Task ResetAllAsync()
         {
-            var snapshot = await _firestoreDb.Collection(_collectionName).GetSnapshotAsync();
+            var branches = await _context.Branches.ToListAsync();
 
-            foreach (var doc in snapshot.Documents)
-            {
-                await doc.Reference.DeleteAsync();
-            }
+            _context.Branches.RemoveRange(branches);
+            await _context.SaveChangesAsync();
         }
     }
 }

@@ -1,84 +1,47 @@
-﻿using Google.Cloud.Firestore;
+﻿using inventory_api.Data;
 using inventory_api.DTOs;
+using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services
 {
     public class InventoryDisplayService
     {
-        private readonly FirestoreDb _firestoreDb;
+        private readonly AppDbContext _context;
 
-        public InventoryDisplayService(FirestoreDb firestoreDb)
+        public InventoryDisplayService(AppDbContext context)
         {
-            _firestoreDb = firestoreDb;
+            _context = context;
         }
 
         public async Task<List<InventoryDisplayDto>> GetAllAsync()
         {
-            var lotSnapshot = await _firestoreDb.Collection("product_lot_number").GetSnapshotAsync();
-            var productSnapshot = await _firestoreDb.Collection("products").GetSnapshotAsync();
-            var branchSnapshot = await _firestoreDb.Collection("branches").GetSnapshotAsync();
+            var result = await (
+                from lot in _context.ProductLotNumbers
+                join product in _context.Products
+                    on lot.product_id equals product.product_id into productJoin
+                from product in productJoin.DefaultIfEmpty()
 
-            var productDict = productSnapshot.Documents
-                .Select(d => d.ToDictionary())
-                .ToDictionary(x => x["product_id"].ToString(), x => x);
+                join branch in _context.Branches
+                    on lot.branch_id equals branch.branch_id into branchJoin
+                from branch in branchJoin.DefaultIfEmpty()
 
-            var branchDict = branchSnapshot.Documents
-                .Select(d => d.ToDictionary())
-                .ToDictionary(x => x["branch_id"].ToString(), x => x);
-
-            var result = new List<InventoryDisplayDto>();
-
-            foreach (var doc in lotSnapshot.Documents)
-            {
-                var lot = doc.ToDictionary();
-
-                var productId = lot["product_id"].ToString();
-                var branchId = lot["branch_id"].ToString();
-
-                productDict.TryGetValue(productId, out var product);
-                branchDict.TryGetValue(branchId, out var branch);
-
-                int qty = 0;
-                int.TryParse(lot["quantity"]?.ToString(), out qty);
-
-                string manufacturingDate = "";
-                string expirationDate = "";
-                string date = "";
-
-                if (lot.ContainsKey("manufacturing_date") && lot["manufacturing_date"] is Timestamp mfgTimestamp)
+                select new InventoryDisplayDto
                 {
-                    manufacturingDate = mfgTimestamp.ToDateTime().ToString("yyyy-MM-dd");
-                }
-
-                if (lot.ContainsKey("expiration_date") && lot["expiration_date"] is Timestamp expTimestamp)
-                {
-                    expirationDate = expTimestamp.ToDateTime().ToString("yyyy-MM-dd");
-                }
-
-                if (lot.ContainsKey("created_at") && lot["created_at"] is Timestamp createdTimestamp)
-                {
-                    date = createdTimestamp.ToDateTime().ToString("yyyy-MM-dd");
-                }
-
-                result.Add(new InventoryDisplayDto
-                {
-                    product_id = productId,
-                    description = product != null && product.ContainsKey("product_description")
-                        ? product["product_description"]?.ToString() ?? ""
+                    product_id = lot.product_id,
+                    description = product != null ? (product.product_description ?? "") : "",
+                    uom = product != null ? (product.uom ?? "") : "",
+                    lot_no = lot.lot_no ?? "",
+                    warehouse = branch != null ? (branch.branch_name ?? "") : lot.branch_id,
+                    qty = (int)lot.quantity,
+                    date = lot.created_at.ToString("yyyy-MM-dd"),
+                    manufacturing_date = lot.manufacturing_date.HasValue
+                        ? lot.manufacturing_date.Value.ToString("yyyy-MM-dd")
                         : "",
-                    uom = product != null && product.ContainsKey("uom")
-                        ? product["uom"]?.ToString() ?? ""
-                        : "",
-                    lot_no = lot["lot_no"]?.ToString() ?? "",
-                    warehouse = branch != null && branch.ContainsKey("branch_name")
-                        ? branch["branch_name"]?.ToString() ?? ""
-                        : branchId,
-                    qty = qty,
-                    date = date,
-                    manufacturing_date = manufacturingDate,
-                    expiration_date = expirationDate
-                });
-            }
+                    expiration_date = lot.expiration_date.HasValue
+                        ? lot.expiration_date.Value.ToString("yyyy-MM-dd")
+                        : ""
+                }
+            ).ToListAsync();
 
             return result;
         }

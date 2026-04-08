@@ -1,62 +1,59 @@
-﻿using Google.Cloud.Firestore;
+﻿using inventory_api.Data;
 using inventory_api.DTOs;
+using inventory_api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services
 {
     public class CategoryService
     {
-        private readonly FirestoreDb _firestoreDb;
-        private readonly string _collectionName = "categories";
+        private readonly AppDbContext _context;
 
-        public CategoryService(FirestoreDb firestoreDb)
+        public CategoryService(AppDbContext context)
         {
-            _firestoreDb = firestoreDb;
+            _context = context;
         }
 
         public async Task<List<Dictionary<string, object>>> GetAllAsync()
         {
-            QuerySnapshot snapshot = await _firestoreDb.Collection(_collectionName).GetSnapshotAsync();
-            List<Dictionary<string, object>> categories = new();
+            var categories = await _context.Categories
+                .OrderBy(x => x.catg_name)
+                .ToListAsync();
 
-            foreach (DocumentSnapshot doc in snapshot.Documents)
+            return categories.Select(x => new Dictionary<string, object>
             {
-                if (doc.Exists)
-                {
-                    var data = doc.ToDictionary();
-
-                    if (data.ContainsKey("created_at") && data["created_at"] is Timestamp createdAt)
-                    {
-                        data["created_at"] = createdAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
-
-                    if (data.ContainsKey("updated_at") && data["updated_at"] is Timestamp updatedAt)
-                    {
-                        data["updated_at"] = updatedAt.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
-                    }
-
-                    data["doc_id"] = doc.Id;
-                    categories.Add(data);
-                }
-            }
-
-            return categories;
+                { "catg_id", x.catg_id },
+                { "catg_name", x.catg_name },
+                { "catg_desc", x.catg_desc ?? "" },
+                { "is_deleted", x.is_deleted },
+                { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+                { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") },
+                { "doc_id", x.catg_id }
+            }).ToList();
         }
 
         public async Task AddAsync(CreateCategoryDto dto)
         {
-            var data = new Dictionary<string, object>
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            bool exists = await _context.Categories.AnyAsync(x => x.catg_id == dto.catg_id);
+
+            if (exists)
+                throw new Exception("Category already exists.");
+
+            var category = new Category
             {
-                { "catg_id", dto.catg_id },
-                { "catg_name", dto.catg_name },
-                { "catg_desc", dto.catg_desc },
-                { "created_at", Timestamp.GetCurrentTimestamp() },
-                 { "updated_at", Timestamp.GetCurrentTimestamp() }
+                catg_id = dto.catg_id,
+                catg_name = dto.catg_name,
+                catg_desc = dto.catg_desc,
+                is_deleted = false,
+                created_at = DateTime.Now,
+                updated_at = DateTime.Now
             };
 
-            await _firestoreDb.Collection(_collectionName)
-                              .Document(dto.catg_id)
-                              .SetAsync(data);
-   
+            _context.Categories.Add(category);
+            await _context.SaveChangesAsync();
         }
 
         public async Task UpdateAsync(string id, CreateCategoryDto dto)
@@ -64,21 +61,17 @@ namespace inventory_api.Services
             if (dto == null)
                 throw new Exception("Invalid request.");
 
-            DocumentReference docRef = _firestoreDb.Collection(_collectionName).Document(id);
-            DocumentSnapshot snapshot = await docRef.GetSnapshotAsync();
+            var category = await _context.Categories.FirstOrDefaultAsync(x => x.catg_id == id);
 
-            if (!snapshot.Exists)
+            if (category == null)
                 throw new Exception("Category not found.");
 
-            var updates = new Dictionary<string, object>
-    {
-        { "catg_name", dto.catg_name },
-        { "catg_desc", dto.catg_desc ?? "" },
-       // { "is_deleted", dto.is_deleted },
-        { "updated_at", Timestamp.GetCurrentTimestamp() }
-    };
+            category.catg_name = dto.catg_name;
+            category.catg_desc = dto.catg_desc ?? "";
+            category.is_deleted = dto.is_deleted;
+            category.updated_at = DateTime.Now;
 
-            await docRef.UpdateAsync(updates);
+            await _context.SaveChangesAsync();
         }
     }
 }
