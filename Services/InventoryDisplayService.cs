@@ -30,6 +30,8 @@ namespace inventory_api.Services
                     product_id = lot.product_id,
                     description = product != null ? (product.product_description ?? "") : "",
                     uom = product != null ? (product.uom ?? "") : "",
+                    pack_qty = product != null ? (int)(product.pack_qty ?? 0) : 0,
+                    pack_uom = product != null ? (product.pack_uom ?? "") : "",
                     lot_no = lot.lot_no ?? "",
                     warehouse = branch != null ? (branch.branch_name ?? "") : lot.branch_id,
                     qty = (int)lot.quantity,

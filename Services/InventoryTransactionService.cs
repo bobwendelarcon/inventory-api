@@ -90,9 +90,34 @@ namespace inventory_api.Services
                         lot.updated_at = DateTime.Now;
                     }
                 }
+                //else if (transactionType == "OUT")
+                //{
+                //    supplierId = null;
+                //    customerId = string.IsNullOrWhiteSpace(dto.customer_id) ? null : dto.customer_id;
+
+                //    if (lot == null)
+                //        throw new Exception("Lot not found.");
+
+                //    if (existingQty < (decimal)dto.quantity)
+                //        throw new Exception("Insufficient stock.");
+
+                //    lot.quantity = existingQty - (decimal)dto.quantity;
+                //    lot.updated_at = DateTime.Now;
+                //}
+
                 else if (transactionType == "OUT")
                 {
-                    supplierId = null;
+                    var lastInTransaction = await _context.InventoryTransactions
+                        .Where(x =>
+                            x.product_id == dto.product_id &&
+                            x.branch_id == dto.branch_id &&
+                            x.lot_no == dto.lot_no &&
+                            x.transaction_type == "IN" &&
+                            !x.is_deleted)
+                        .OrderByDescending(x => x.created_at)
+                        .FirstOrDefaultAsync();
+
+                    supplierId = lastInTransaction?.supplier_id;
                     customerId = string.IsNullOrWhiteSpace(dto.customer_id) ? null : dto.customer_id;
 
                     if (lot == null)
@@ -138,44 +163,191 @@ namespace inventory_api.Services
             }
         }
 
-        public async Task<List<Dictionary<string, object>>> GetAllAsync()
+        //    public async Task<List<Dictionary<string, object>>> GetAllAsync()
+        //    {
+        //        var transactions = await _context.InventoryTransactions
+        //            .OrderByDescending(x => x.created_at)
+        //            .ToListAsync();
+
+        //        var products = await _context.Products.ToListAsync();
+
+        //        var productDict = products.ToDictionary(x => x.product_id, x => x);
+
+        //        var partners = await _context.Partners.ToListAsync();
+        //        var partnerDict = partners.ToDictionary(x => x.partner_id, x => x.partner_name);
+
+        //        var result = new List<Dictionary<string, object>>();
+
+        //        foreach (var t in transactions)
+        //        {
+        //            productDict.TryGetValue(t.product_id, out var product);
+
+        //            string supplierName = "";
+        //            string customerName = "";
+
+        //            if (!string.IsNullOrEmpty(t.supplier_id) && partnerDict.ContainsKey(t.supplier_id))
+        //            {
+        //                supplierName = partnerDict[t.supplier_id];
+        //            }
+
+        //            if (!string.IsNullOrEmpty(t.customer_id) && partnerDict.ContainsKey(t.customer_id))
+        //            {
+        //                customerName = partnerDict[t.customer_id];
+        //            }
+
+        //            result.Add(new Dictionary<string, object>
+        //{
+        //    { "transaction_id", t.transaction_id },
+        //    { "product_id", t.product_id },
+        //    { "product_name", product?.product_name ?? "" },
+        //    { "product_description", product?.product_description ?? "" },
+        //    { "branch_id", t.branch_id },
+        //    { "transaction_type", t.transaction_type },
+        //    { "lot_no", t.lot_no },
+        //    { "quantity", t.quantity },
+        //    { "scanned_by", t.scanned_by },
+        //    { "remarks", t.remarks },
+
+        //    { "supplier_id", t.supplier_id },
+        //    { "customer_id", t.customer_id },
+
+        //    { "supplier_name", supplierName },   // 🔥 NEW
+        //    { "customer_name", customerName },   // 🔥 NEW
+
+        //    { "dr_no", t.dr_no },
+        //    { "inv_no", t.inv_no },
+        //    { "po_no", t.po_no },
+        //    { "created_at", t.created_at.ToString("yyyy-MM-dd HH:mm:ss") }
+        //});
+        //        }
+
+        //        return result;
+        //    }
+
+        public async Task<Dictionary<string, object>> GetAllAsync(
+    int page = 1,
+    int pageSize = 30,
+    string lot_no = "",
+    string product = "",
+    string type = "",
+    string from = "",
+    string to = "",
+    string scanned_by = "",
+    string reference = "",
+    string warehouse = "",
+    string order = "desc"
+)
         {
-            var transactions = await _context.InventoryTransactions
-                .OrderByDescending(x => x.created_at)
+            var query = _context.InventoryTransactions.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(lot_no))
+                query = query.Where(x => x.lot_no.Contains(lot_no));
+
+            if (!string.IsNullOrWhiteSpace(type))
+                query = query.Where(x => x.transaction_type == type);
+
+            if (!string.IsNullOrWhiteSpace(scanned_by))
+                query = query.Where(x => x.scanned_by.Contains(scanned_by));
+
+            if (!string.IsNullOrWhiteSpace(warehouse))
+                query = query.Where(x => x.branch_id == warehouse);
+
+            if (!string.IsNullOrWhiteSpace(reference))
+            {
+                query = query.Where(x =>
+                    (x.dr_no ?? "").Contains(reference) ||
+                    (x.inv_no ?? "").Contains(reference) ||
+                    (x.po_no ?? "").Contains(reference));
+            }
+
+            if (!string.IsNullOrWhiteSpace(from) && DateTime.TryParse(from, out var fromDate))
+                query = query.Where(x => x.created_at >= fromDate);
+
+            if (!string.IsNullOrWhiteSpace(to) && DateTime.TryParse(to, out var toDate))
+            {
+                toDate = toDate.AddDays(1);
+                query = query.Where(x => x.created_at < toDate);
+            }
+
+            if (!string.IsNullOrWhiteSpace(product))
+            {
+                var productIds = await _context.Products
+                    .Where(p => p.product_name.Contains(product))
+                    .Select(p => p.product_id)
+                    .ToListAsync();
+
+                query = query.Where(x => productIds.Contains(x.product_id));
+            }
+
+            query = order?.ToLower() == "asc"
+                ? query.OrderBy(x => x.created_at)
+                : query.OrderByDescending(x => x.created_at);
+
+            var total = await query.CountAsync();
+
+            var transactions = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
 
             var products = await _context.Products.ToListAsync();
-
             var productDict = products.ToDictionary(x => x.product_id, x => x);
+
+            var partners = await _context.Partners.ToListAsync();
+            var partnerDict = partners.ToDictionary(x => x.partner_id, x => x.partner_name);
 
             var result = new List<Dictionary<string, object>>();
 
             foreach (var t in transactions)
             {
-                productDict.TryGetValue(t.product_id, out var product);
+                productDict.TryGetValue(t.product_id, out var productData);
+
+                string supplierName = "";
+                string customerName = "";
+
+                if (!string.IsNullOrEmpty(t.supplier_id) && partnerDict.ContainsKey(t.supplier_id))
+                {
+                    supplierName = partnerDict[t.supplier_id];
+                }
+
+                if (!string.IsNullOrEmpty(t.customer_id) && partnerDict.ContainsKey(t.customer_id))
+                {
+                    customerName = partnerDict[t.customer_id];
+                }
 
                 result.Add(new Dictionary<string, object>
-                {
-                    { "transaction_id", t.transaction_id },
-                    { "product_id", t.product_id },
-                    { "product_name", product?.product_name ?? "" },
-                    { "product_description", product?.product_description ?? "" },
-                    { "branch_id", t.branch_id },
-                    { "transaction_type", t.transaction_type },
-                    { "lot_no", t.lot_no },
-                    { "quantity", t.quantity },
-                    { "scanned_by", t.scanned_by },
-                    { "remarks", t.remarks },
-                    { "supplier_id", t.supplier_id },
-{ "customer_id", t.customer_id },
-                    { "dr_no", t.dr_no },
-                    { "inv_no", t.inv_no },
-                    { "po_no", t.po_no },
-                   { "created_at", t.created_at.ToString("yyyy-MM-dd HH:mm:ss") }
-                });
+        {
+            { "transaction_id", t.transaction_id },
+            { "product_id", t.product_id },
+            { "product_name", productData?.product_name ?? "" },
+            { "product_description", productData?.product_description ?? "" },
+            { "branch_id", t.branch_id },
+            { "transaction_type", t.transaction_type },
+            { "lot_no", t.lot_no },
+            { "quantity", t.quantity },
+            { "scanned_by", t.scanned_by },
+            { "remarks", t.remarks },
+
+            { "supplier_id", t.supplier_id },
+            { "customer_id", t.customer_id },
+
+            { "supplier_name", supplierName },
+            { "customer_name", customerName },
+
+            { "dr_no", t.dr_no },
+            { "inv_no", t.inv_no },
+            { "po_no", t.po_no },
+            { "created_at", t.created_at.ToString("yyyy-MM-dd HH:mm:ss") }
+        });
             }
 
-            return result;
+            return new Dictionary<string, object>
+    {
+        { "data", result },
+        { "total", total },
+        { "page", page },
+        { "pageSize", pageSize }
+    };
         }
 
         public async Task ClearAllDataAsync()

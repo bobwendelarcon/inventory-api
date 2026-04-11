@@ -17,19 +17,51 @@ namespace inventory_api.Services
         public async Task<List<Dictionary<string, object>>> GetAllAsync()
         {
             var lots = await _context.ProductLotNumbers.ToListAsync();
+            var products = await _context.Products.ToListAsync();
 
-            return lots.Select(x => new Dictionary<string, object>
+            var productDict = products.ToDictionary(x => x.product_id, x => x);
+
+            return lots.Select(x =>
             {
-                { "product_id", x.product_id },
-                { "branch_id", x.branch_id },
-                { "lot_no", x.lot_no },
-                { "quantity", x.quantity },
-                { "manufacturing_date", x.manufacturing_date?.ToString("yyyy-MM-dd") ?? "" },
-                { "expiration_date", x.expiration_date?.ToString("yyyy-MM-dd") ?? "" },
-                { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
-                { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
+                productDict.TryGetValue(x.product_id, out var product);
+
+                return new Dictionary<string, object>
+        {
+            { "product_id", x.product_id },
+            { "branch_id", x.branch_id },
+            { "lot_no", x.lot_no },
+            { "qty", x.quantity }, // 🔥 rename to match frontend
+
+            { "pack_qty", product?.pack_qty ?? 0 },
+            { "pack_uom", product?.pack_uom ?? "" },
+            { "uom", product?.uom ?? "" }, // 🔥 IMPORTANT
+
+            { "manufacturing_date", x.manufacturing_date?.ToString("yyyy-MM-dd") ?? "" },
+            { "expiration_date", x.expiration_date?.ToString("yyyy-MM-dd") ?? "" },
+            { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+            { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
+        };
             }).ToList();
         }
+
+        //public async Task<List<Dictionary<string, object>>> GetAllAsync()
+        //{
+        //    var lots = await _context.ProductLotNumbers.ToListAsync();
+
+        //    return lots.Select(x => new Dictionary<string, object>
+        //    {
+        //        { "product_id", x.product_id },
+        //        { "branch_id", x.branch_id },
+        //        { "lot_no", x.lot_no },
+        //        { "quantity", x.quantity },
+        //        { "pack_qty", product?.pack_qty ?? 0 },
+        //         { "pack_uom", product?.pack_uom ?? "" },
+        //        { "manufacturing_date", x.manufacturing_date?.ToString("yyyy-MM-dd") ?? "" },
+        //        { "expiration_date", x.expiration_date?.ToString("yyyy-MM-dd") ?? "" },
+        //        { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+        //        { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
+        //    }).ToList();
+        //}
 
         public async Task AddAsync(CreateProductLotNumberDto dto)
         {

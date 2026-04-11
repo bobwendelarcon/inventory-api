@@ -40,27 +40,57 @@ namespace inventory_api.Controllers
         //}
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(int page = 1, int pageSize = 30)
+        public async Task<IActionResult> GetAll(
+    int page = 1,
+    int pageSize = 30,
+    string lot_no = "",
+    string product = "",
+    string type = "",
+    string from = "",
+    string to = "",
+    string scanned_by = "",
+    string reference = "",
+    string warehouse = "",
+    string order = "desc"
+)
         {
-            var result = await _service.GetAllAsync();
+            var result = await _service.GetAllAsync(
+                page,
+                pageSize,
+                lot_no,
+                product,
+                type,
+                from,
+                to,
+                scanned_by,
+                reference,
+                warehouse,
+                order
+            );
 
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 30;
-
-            var total = result.Count;
-            var pagedData = result
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
-
-            return Ok(new
-            {
-                total = total,
-                page = page,
-                pageSize = pageSize,
-                data = pagedData
-            });
+            return Ok(result);
         }
+        //public async Task<IActionResult> GetAll(int page = 1, int pageSize = 30)
+        //{
+        //    var result = await _service.GetAllAsync();
+
+        //    if (page < 1) page = 1;
+        //    if (pageSize < 1) pageSize = 30;
+
+        //    var total = result.Count;
+        //    var pagedData = result
+        //        .Skip((page - 1) * pageSize)
+        //        .Take(pageSize)
+        //        .ToList();
+
+        //    return Ok(new
+        //    {
+        //        total = total,
+        //        page = page,
+        //        pageSize = pageSize,
+        //        data = pagedData
+        //    });
+        //}
 
         [HttpDelete("reset")]
         public async Task<IActionResult> ResetAll()

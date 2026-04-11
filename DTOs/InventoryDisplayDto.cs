@@ -10,6 +10,9 @@
         public int qty { get; set; }
         public string date { get; set; }
 
+        public int pack_qty { get; set; }
+        public string pack_uom { get; set; } = "";
+
         // ✅ ADD THESE
         public string manufacturing_date { get; set; } = string.Empty;
         public string expiration_date { get; set; } = string.Empty;
