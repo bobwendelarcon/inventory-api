@@ -65,6 +65,38 @@ namespace inventory_api.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task UpdateAsync(string id, CreatePartnerDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(id))
+                throw new Exception("partner_id is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.partner_name))
+                throw new Exception("partner_name is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.partner_type))
+                throw new Exception("partner_type is required.");
+
+            if (dto.partner_type != "SUPPLIER" && dto.partner_type != "CUSTOMER")
+                throw new Exception("partner_type must be SUPPLIER or CUSTOMER.");
+
+            var partner = await _context.Partners.FirstOrDefaultAsync(x => x.partner_id == id);
+
+            if (partner == null)
+                throw new Exception("Partner not found.");
+
+            partner.partner_name = dto.partner_name;
+            partner.address = dto.address;
+            partner.contact = dto.contact;
+            partner.partner_type = dto.partner_type;
+            partner.is_deleted = dto.is_deleted;
+            partner.updated_at = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+        }
+
         public async Task ResetAllAsync()
         {
             var partners = await _context.Partners.ToListAsync();

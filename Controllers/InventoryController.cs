@@ -49,6 +49,7 @@ namespace inventory_api.Controllers
     string from = "",
     string to = "",
     string scanned_by = "",
+    string full_name="",
     string reference = "",
     string warehouse = "",
     string order = "desc"
@@ -63,6 +64,7 @@ namespace inventory_api.Controllers
                 from,
                 to,
                 scanned_by,
+                full_name,
                 reference,
                 warehouse,
                 order
@@ -70,28 +72,7 @@ namespace inventory_api.Controllers
 
             return Ok(result);
         }
-        //public async Task<IActionResult> GetAll(int page = 1, int pageSize = 30)
-        //{
-        //    var result = await _service.GetAllAsync();
-
-        //    if (page < 1) page = 1;
-        //    if (pageSize < 1) pageSize = 30;
-
-        //    var total = result.Count;
-        //    var pagedData = result
-        //        .Skip((page - 1) * pageSize)
-        //        .Take(pageSize)
-        //        .ToList();
-
-        //    return Ok(new
-        //    {
-        //        total = total,
-        //        page = page,
-        //        pageSize = pageSize,
-        //        data = pagedData
-        //    });
-        //}
-
+       
         [HttpDelete("reset")]
         public async Task<IActionResult> ResetAll()
         {
@@ -104,6 +85,27 @@ namespace inventory_api.Controllers
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
+        }
+
+        [HttpPut("UpdateReference")]
+        public async Task<IActionResult> UpdateReference([FromBody] UpdateTransactionReferenceDto dto)
+        {
+            try
+            {
+                await _service.UpdateReferenceAsync(dto);
+                return Ok(new { success = true, message = "Reference updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("transfer")]
+        public async Task<IActionResult> Transfer([FromBody] TransferDto dto)
+        {
+            await _service.TransferAsync(dto);
+            return Ok("Transfer successful");
         }
     }
 }

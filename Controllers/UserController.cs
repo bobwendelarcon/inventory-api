@@ -1,4 +1,5 @@
-﻿using inventory_api.DTOs;
+﻿using Google.Api;
+using inventory_api.DTOs;
 using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -57,5 +58,19 @@ public async Task<IActionResult> ResetAll()
     await _userService.ResetAllAsync();
     return Ok(new { message = "All User deleted" });
 }
+
+
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(string id, [FromBody] CreateUserDto dto)
+        {
+            await _userService.UpdateAsync(id, dto);
+            return Ok(new { message = "User updated successfully." });
+        }
+
+
+
+
     }
 }
+

@@ -15,12 +15,38 @@ namespace inventory_api.Controllers
             _inventoryDisplayService = inventoryDisplayService;
         }
 
+
         [HttpGet]
-        public async Task<IActionResult> GetInventoryDisplay()
+        public async Task<IActionResult> GetInventoryDisplay(
+    int page = 1,
+    int pageSize = 30,
+    string lot_no = "",
+    string product = "",
+    string warehouse = "",
+    string stockStatus = "",
+    string expiryStatus = "",
+    string months = "",
+    string from = "",
+    string to = "",
+    string order = "desc"
+)
         {
             try
             {
-                var result = await _inventoryDisplayService.GetAllAsync();
+                var result = await _inventoryDisplayService.GetAllAsync(
+                    page,
+                    pageSize,
+                    lot_no,
+                    product,
+                    warehouse,
+                    stockStatus,
+                    expiryStatus,
+                    months,
+                    from,
+                    to,
+                    order
+                );
+
                 return Ok(result);
             }
             catch (Exception ex)
@@ -32,5 +58,6 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
     }
 }

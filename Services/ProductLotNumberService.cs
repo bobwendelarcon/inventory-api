@@ -112,25 +112,31 @@ namespace inventory_api.Services
             await _context.SaveChangesAsync();
         }
 
-        public async Task<Dictionary<string, object>?> GetByLotNoAsync(string lot_no)
+        public async Task<List<Dictionary<string, object>>> GetByLotNoAsync(string lot_no)
         {
-            var lot = await _context.ProductLotNumbers
-                .FirstOrDefaultAsync(x => x.lot_no == lot_no);
+            var lots = await _context.ProductLotNumbers
+                .Where(x => x.lot_no == lot_no && !x.is_deleted)
+                .OrderBy(x => x.branch_id)
+                .ToListAsync();
 
-            if (lot == null)
-                return null;
+            var result = new List<Dictionary<string, object>>();
 
-            return new Dictionary<string, object>
+            foreach (var lot in lots)   
             {
-                { "product_id", lot.product_id },
-                { "branch_id", lot.branch_id },
-                { "lot_no", lot.lot_no },
-                { "quantity", lot.quantity },
-                { "manufacturing_date", lot.manufacturing_date?.ToString("yyyy-MM-dd") ?? "" },
-                { "expiration_date", lot.expiration_date?.ToString("yyyy-MM-dd") ?? "" },
-                { "created_at", lot.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
-                { "updated_at", lot.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
-            };
+                result.Add(new Dictionary<string, object>
+        {
+            { "product_id", lot.product_id },
+            { "branch_id", lot.branch_id },
+            { "lot_no", lot.lot_no },
+            { "quantity", lot.quantity },
+            { "manufacturing_date", lot.manufacturing_date?.ToString("yyyy-MM-dd") ?? "" },
+            { "expiration_date", lot.expiration_date?.ToString("yyyy-MM-dd") ?? "" },
+            { "created_at", lot.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+            { "updated_at", lot.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
+        });
+            }
+
+            return result;
         }
 
         public async Task<List<Dictionary<string, object>>> GetByProductIDAsync(string product_id)

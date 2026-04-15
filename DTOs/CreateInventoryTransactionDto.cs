@@ -11,6 +11,7 @@
         public string lot_no { get; set; } = string.Empty;
         public double quantity { get; set; }
         public string scanned_by { get; set; } = string.Empty;
+        
         public string remarks { get; set; } = string.Empty;
         public string? supplier_id { get; set; }
         public string? customer_id { get; set; }

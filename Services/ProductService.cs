@@ -28,8 +28,8 @@ namespace inventory_api.Services
                 { "product_description", x.product_description ?? "" },
                 { "product_price", x.product_price },
                 { "uom", x.uom ?? "" },
-                 { "pack_uom", x.pack_uom ?? "" },
-                  { "pack_qty", x.pack_qty },
+                { "pack_uom", x.pack_uom ?? "" },
+                { "pack_qty", x.pack_qty },
                 { "stock_level", x.stock_level },
                 { "catg_id", x.catg_id ?? "" },
                 { "is_deleted", x.is_deleted },
@@ -54,8 +54,8 @@ namespace inventory_api.Services
                 { "product_description", product.product_description ?? "" },
                 { "product_price", product.product_price },
                 { "uom", product.uom ?? "" },
-                  { "pack_uom", product.pack_uom ?? "" },
-                  { "pack_qty", product.pack_qty },
+                { "pack_uom", product.pack_uom ?? "" },
+                { "pack_qty", product.pack_qty },
                 { "stock_level", product.stock_level },
                 { "catg_id", product.catg_id ?? "" },
                 { "is_deleted", product.is_deleted },
@@ -88,8 +88,8 @@ namespace inventory_api.Services
                 product_description = dto.product_description,
                 product_price = dto.product_price,
                 uom = dto.uom,
-                pack_uom = dto.pack_uom,   // ✅
-                pack_qty = dto.pack_qty,   // ✅
+                pack_uom = dto.pack_uom,
+                pack_qty = dto.pack_qty,
                 stock_level = dto.stock_level,
                 catg_id = dto.catg_id,
                 is_deleted = false,
@@ -98,6 +98,37 @@ namespace inventory_api.Services
             };
 
             _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateAsync(string id, CreateProductDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(id))
+                throw new Exception("Product id is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.product_name))
+                throw new Exception("product_name is required.");
+
+            var product = await _context.Products.FirstOrDefaultAsync(x => x.product_id == id);
+
+            if (product == null)
+                throw new Exception("Product not found.");
+
+            product.product_sku = dto.product_sku;
+            product.product_name = dto.product_name;
+            product.product_description = dto.product_description;
+            product.product_price = dto.product_price;
+            product.uom = dto.uom;
+            product.pack_uom = dto.pack_uom;
+            product.pack_qty = dto.pack_qty;
+            product.stock_level = dto.stock_level;
+            product.catg_id = dto.catg_id;
+            product.is_deleted = dto.is_deleted;
+            product.updated_at = DateTime.Now;
+
             await _context.SaveChangesAsync();
         }
 

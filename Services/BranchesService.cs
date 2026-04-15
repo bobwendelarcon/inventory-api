@@ -70,6 +70,33 @@ namespace inventory_api.Services
             return true;
         }
 
+        public async Task UpdateAsync(string id, CreateBranchesDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(id))
+                throw new Exception("Branch id is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.branch_name))
+                throw new Exception("branch_name is required.");
+
+            var branch = await _context.Branches
+                .FirstOrDefaultAsync(x => x.branch_id == id);
+
+            if (branch == null)
+                throw new Exception("Branch not found.");
+
+            // 🔥 Update fields
+            branch.branch_name = dto.branch_name;
+            branch.branch_loc = dto.branch_loc;
+            branch.is_deleted = dto.is_deleted;
+
+            branch.updated_at = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+        }
+
         public async Task ResetAllAsync()
         {
             var branches = await _context.Branches.ToListAsync();

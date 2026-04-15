@@ -1,4 +1,5 @@
-﻿using inventory_api.DTOs;
+﻿using Google.Api;
+using inventory_api.DTOs;
 using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -57,5 +58,25 @@ public async Task<IActionResult> ResetAll()
     await _productService.ResetAllAsync();
     return Ok(new { message = "All products deleted" });
 }
+
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(string id, [FromBody] CreateProductDto dto)
+        {
+            try
+            {
+                await _productService.UpdateAsync(id, dto);
+                return Ok(new { message = "Product updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+
+
     }
+
+
 }

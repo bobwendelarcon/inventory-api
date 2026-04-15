@@ -1,4 +1,5 @@
-﻿using inventory_api.DTOs;
+﻿using Google.Api;
+using inventory_api.DTOs;
 using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,16 +41,13 @@ namespace inventory_api.Controllers
             return Ok(new { message = "Partner added successfully" });
         }
 
-        //[HttpDelete("{productId}")]
-        //public async Task<IActionResult> Delete(string productId)
-        //{
-        //    var result = await _userService.SoftDeleteAsync(productId);
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(string id, [FromBody] CreatePartnerDto dto)
+        {
+            await _partnerService.UpdateAsync(id, dto);
+            return Ok(new { message = "Partner updated successfully." });
+        }
 
-        //    if (!result)
-        //        return NotFound(new { message = "Product not found" });
-
-        //    return Ok(new { message = "Product deleted successfully" });
-        //}
 
         [HttpDelete("reset")]
 public async Task<IActionResult> ResetAll()

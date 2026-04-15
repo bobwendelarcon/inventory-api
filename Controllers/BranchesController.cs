@@ -1,4 +1,5 @@
-﻿using inventory_api.DTOs;
+﻿using Google.Api;
+using inventory_api.DTOs;
 using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -48,5 +49,22 @@ public async Task<IActionResult> ResetAll()
     await _branchesService.ResetAllAsync();
     return Ok(new { message = "All Branches deleted" });
 }
+
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateBranch(string id, [FromBody] CreateBranchesDto dto)
+        {
+            try
+            {
+                await _branchesService.UpdateAsync(id, dto);
+                return Ok(new { message = "Branch updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+
     }
 }

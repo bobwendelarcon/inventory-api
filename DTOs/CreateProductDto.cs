@@ -12,7 +12,7 @@
         // ✅ NEW (pack support)
         public string? pack_uom { get; set; }
         public decimal? pack_qty { get; set; }
-
+        public bool is_deleted { get; set; }
         public decimal stock_level { get; set; }
         public string? catg_id { get; set; }
     }
