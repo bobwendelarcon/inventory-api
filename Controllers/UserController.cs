@@ -1,5 +1,4 @@
-﻿using Google.Api;
-using inventory_api.DTOs;
+﻿using inventory_api.DTOs;
 using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,16 +22,27 @@ namespace inventory_api.Controllers
             return Ok(result);
         }
 
-        //[HttpGet("barcode/{barcode}")]
-        //public async Task<IActionResult> GetByBarcode(string barcode)
-        //{
-        //    var result = await _userService.GetByBarcodeAsync(barcode);
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.username) || string.IsNullOrWhiteSpace(dto.password))
+            {
+                return BadRequest(new { message = "Username and password are required." });
+            }
 
-        //    if (result == null)
-        //        return NotFound(new { message = "Product not found" });
+            var user = await _userService.LoginAsync(dto.username, dto.password);
 
-        //    return Ok(result);
-        //}
+            if (user == null)
+                return Unauthorized(new { message = "Invalid username or password" });
+
+            return Ok(new
+            {
+                user.user_id,
+                user.full_name,
+                user.username,
+                user.role_name
+            });
+        }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateUserDto dto)
@@ -41,25 +51,12 @@ namespace inventory_api.Controllers
             return Ok(new { message = "User added successfully" });
         }
 
-        //[HttpDelete("{productId}")]
-        //public async Task<IActionResult> Delete(string productId)
-        //{
-        //    var result = await _userService.SoftDeleteAsync(productId);
-
-        //    if (!result)
-        //        return NotFound(new { message = "Product not found" });
-
-        //    return Ok(new { message = "Product deleted successfully" });
-        //}
-
         [HttpDelete("reset")]
-public async Task<IActionResult> ResetAll()
-{
-    await _userService.ResetAllAsync();
-    return Ok(new { message = "All User deleted" });
-}
-
-
+        public async Task<IActionResult> ResetAll()
+        {
+            await _userService.ResetAllAsync();
+            return Ok(new { message = "All User deleted" });
+        }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] CreateUserDto dto)
@@ -67,10 +64,5 @@ public async Task<IActionResult> ResetAll()
             await _userService.UpdateAsync(id, dto);
             return Ok(new { message = "User updated successfully." });
         }
-
-
-
-
     }
 }
-

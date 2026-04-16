@@ -183,6 +183,7 @@ namespace inventory_api.Services
             transaction.dr_no = dto.dr_no ?? "";
             transaction.inv_no = dto.inv_no ?? "";
             transaction.po_no = dto.po_no ?? "";
+            transaction.remarks = dto.remarks ?? "";
 
             if (!string.IsNullOrWhiteSpace(dto.customer))
             {
@@ -214,6 +215,7 @@ namespace inventory_api.Services
             string reference = "",
             string warehouse = "",
             string order = "desc"
+           
         )
         {
             var query = _context.InventoryTransactions.AsQueryable();
@@ -235,7 +237,9 @@ namespace inventory_api.Services
                 query = query.Where(x =>
                     (x.dr_no ?? "").Contains(reference) ||
                     (x.inv_no ?? "").Contains(reference) ||
-                    (x.po_no ?? "").Contains(reference));
+                    (x.po_no ?? "").Contains(reference) ||
+                     (x.remarks ?? "").Contains(reference)
+                    );
             }
 
             if (!string.IsNullOrWhiteSpace(from) && DateTime.TryParse(from, out var fromDate))
