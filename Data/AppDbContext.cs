@@ -19,6 +19,15 @@ namespace inventory_api.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Partner> Partners { get; set; }
 
+
+
+        //daily order
+
+        public DbSet<DailyOrderHeader> DailyOrderHeaders { get; set; }
+        public DbSet<DailyOrderLine> DailyOrderLines { get; set; }
+        public DbSet<DailyOrderAllocation> DailyOrderAllocations { get; set; }
+
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -52,6 +61,32 @@ namespace inventory_api.Data
             modelBuilder.Entity<ProductLotNumber>()
                 .HasIndex(p => new { p.product_id, p.branch_id, p.lot_no })
                 .IsUnique();
+
+
+
+            // Daily Order tables
+            modelBuilder.Entity<DailyOrderHeader>().ToTable("daily_order_header");
+            modelBuilder.Entity<DailyOrderHeader>().HasKey(x => x.order_id);
+
+            modelBuilder.Entity<DailyOrderLine>().ToTable("daily_order_line");
+            modelBuilder.Entity<DailyOrderLine>().HasKey(x => x.order_line_id);
+
+            modelBuilder.Entity<DailyOrderAllocation>().ToTable("daily_order_allocation");
+            modelBuilder.Entity<DailyOrderAllocation>().HasKey(x => x.allocation_id);
+
+            // Relationships
+            modelBuilder.Entity<DailyOrderLine>()
+                .HasOne(x => x.Header)
+                .WithMany(h => h.Lines)
+                .HasForeignKey(x => x.order_id);
+
+            modelBuilder.Entity<DailyOrderAllocation>()
+                .HasOne(x => x.Line)
+                .WithMany(l => l.Allocations)
+                .HasForeignKey(x => x.order_line_id);
+
+
+
         }
     }
 }

@@ -153,5 +153,34 @@ namespace inventory_api.Services
             _context.Products.RemoveRange(products);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<List<ProductLookupDto>> GetProductsLookupAsync(string? categoryId, string? search)
+        {
+            var query = _context.Products
+                .Where(x => !x.is_deleted)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(categoryId))
+                query = query.Where(x => x.catg_id == categoryId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.Trim().ToLower();
+                query = query.Where(x => x.product_name.ToLower().Contains(keyword));
+            }
+
+            return await query
+                .OrderBy(x => x.product_name)
+                .Select(x => new ProductLookupDto
+                {
+                    ProductId = x.product_id,
+                    ProductName = x.product_name,
+                    CategoryId = x.catg_id,
+                    Uom = x.uom,
+                    PackUom = x.pack_uom,
+                    PackQty = x.pack_qty
+                })
+                .ToListAsync();
+        }
     }
 }

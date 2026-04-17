@@ -25,6 +25,7 @@ builder.Services.AddScoped<ProductLotNumberService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<PartnerService>();
 builder.Services.AddScoped<InventoryDisplayService>();
+builder.Services.AddScoped<DailyOrderService>();
 
 var app = builder.Build();
 

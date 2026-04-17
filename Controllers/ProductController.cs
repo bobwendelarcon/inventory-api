@@ -2,6 +2,7 @@
 using inventory_api.DTOs;
 using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Controllers
 {
@@ -52,6 +53,14 @@ namespace inventory_api.Controllers
             return Ok(new { message = "Product deleted successfully" });
         }
 
+        [HttpGet("lookup")]
+        public async Task<IActionResult> GetProductsLookup([FromQuery] string? categoryId, [FromQuery] string? search)
+        {
+            var result = await _productService.GetProductsLookupAsync(categoryId, search);
+            return Ok(result);
+        }
+
+
         [HttpDelete("reset")]
 public async Task<IActionResult> ResetAll()
 {
@@ -77,6 +86,8 @@ public async Task<IActionResult> ResetAll()
 
 
     }
+
+
 
 
 }
