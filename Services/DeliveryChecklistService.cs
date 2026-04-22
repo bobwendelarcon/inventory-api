@@ -16,6 +16,7 @@ namespace inventory_api.Services
         private class AllocationLotItem
         {
             public string lot_no { get; set; } = string.Empty;
+            public string? branch_id { get; set; }   // ✅ NEW
             public DateTime? manufacturing_date { get; set; }
             public DateTime? expiration_date { get; set; }
             public decimal allocated_qty { get; set; }
@@ -48,6 +49,14 @@ namespace inventory_api.Services
 
                     if (totalLotAllocatedQty <= 0)
                         throw new Exception($"Allocated lot qty is zero for order line {line.order_line_id}.");
+                    var distinctBranches = allocationLots
+    .Where(x => !string.IsNullOrWhiteSpace(x.branch_id))
+    .Select(x => x.branch_id)
+    .Distinct()
+    .ToList();
+
+                    if (distinctBranches.Count > 1)
+                        throw new Exception($"Mixed-branch allocation detected for order line {line.order_line_id}. This is not allowed.");
 
                     foreach (var lot in allocationLots)
                     {
@@ -73,15 +82,16 @@ namespace inventory_api.Services
         }
 
         private async Task<List<AllocationLotItem>> GetAllocationLotsAsync(
-     MySqlConnection conn,
-     MySqlTransaction transaction,
-     long orderLineId)
+      MySqlConnection conn,
+      MySqlTransaction transaction,
+      long orderLineId)
         {
             var result = new List<AllocationLotItem>();
 
             string sql = @"
         SELECT
             lot_no,
+            branch_id,
             manufacturing_date,
             expiration_date,
             allocated_qty
@@ -100,6 +110,7 @@ namespace inventory_api.Services
                 result.Add(new AllocationLotItem
                 {
                     lot_no = reader["lot_no"]?.ToString() ?? string.Empty,
+                    branch_id = reader["branch_id"] == DBNull.Value ? null : reader["branch_id"]?.ToString(),
                     manufacturing_date = reader["manufacturing_date"] == DBNull.Value
                         ? null
                         : Convert.ToDateTime(reader["manufacturing_date"]),
@@ -138,58 +149,60 @@ namespace inventory_api.Services
 
 
             string sql = @"
-        INSERT INTO delivery_checklist_line
-        (
-            checklist_id,
-            order_id,
-            order_no,
-            order_line_id,
-            customer_id,
-            customer_name,
-            product_id,
-            product_name,
-            lot_no,
-            manufacturing_date,
-            expiration_date,
-            uom,
-            pack_uom,
-            pack_qty,
-            required_qty,
-            allocated_qty,
-            checklist_qty,
-            released_qty,
-            remaining_qty,
-            status,
-            remarks,
-created_at,
-updated_at
-        )
-        VALUES
-        (
-            @checklist_id,
-            @order_id,
-            @order_no,
-            @order_line_id,
-            @customer_id,
-            @customer_name,
-            @product_id,
-            @product_name,
-            @lot_no,
-            @manufacturing_date,
-            @expiration_date,
-            @uom,
-            @pack_uom,
-            @pack_qty,
-            @required_qty,
-            @allocated_qty,
-            @checklist_qty,
-            @released_qty,
-            @remaining_qty,
-            @status,
-            @remarks,
-@created_at,
-@updated_at
-        );";
+    INSERT INTO delivery_checklist_line
+    (
+        checklist_id,
+        order_id,
+        order_no,
+        order_line_id,
+        customer_id,
+        customer_name,
+        product_id,
+        product_name,
+        branch_id,
+        lot_no,
+        manufacturing_date,
+        expiration_date,
+        uom,
+        pack_uom,
+        pack_qty,
+        required_qty,
+        allocated_qty,
+        checklist_qty,
+        released_qty,
+        remaining_qty,
+        status,
+        remarks,
+        created_at,
+        updated_at
+    )
+    VALUES
+    (
+        @checklist_id,
+        @order_id,
+        @order_no,
+        @order_line_id,
+        @customer_id,
+        @customer_name,
+        @product_id,
+        @product_name,
+        @branch_id,
+        @lot_no,
+        @manufacturing_date,
+        @expiration_date,
+        @uom,
+        @pack_uom,
+        @pack_qty,
+        @required_qty,
+        @allocated_qty,
+        @checklist_qty,
+        @released_qty,
+        @remaining_qty,
+        @status,
+        @remarks,
+        @created_at,
+        @updated_at
+    );";
 
             using var cmd = new MySqlCommand(sql, conn, transaction);
             var utcNow = DateTime.UtcNow;
@@ -206,6 +219,10 @@ updated_at
             cmd.Parameters.AddWithValue("@customer_name", (object?)line.customer_name ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@product_id", line.product_id);
             cmd.Parameters.AddWithValue("@product_name", line.product_name);
+            cmd.Parameters.AddWithValue("@branch_id",
+    string.IsNullOrWhiteSpace(lot.branch_id)
+        ? DBNull.Value
+        : lot.branch_id);
             cmd.Parameters.AddWithValue("@lot_no", lot.lot_no);
             cmd.Parameters.AddWithValue("@manufacturing_date", (object?)lot.manufacturing_date ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@expiration_date", (object?)lot.expiration_date ?? DBNull.Value);
@@ -676,29 +693,30 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
 
             // LINES
             string lineSql = @"
-    SELECT
-        checklist_line_id,
-        order_id,
-        order_no,
-        order_line_id,
-customer_id,
-        customer_name,
-        product_id,
-        product_name,
-        lot_no,
-        manufacturing_date,
-        expiration_date,
-        required_qty,
-        allocated_qty,
-        checklist_qty,
-        released_qty,
-        remaining_qty,
-        status,
-        remarks
-    FROM delivery_checklist_line
-    WHERE checklist_id = @checklist_id
-      AND is_deleted = 0
-    ORDER BY product_name ASC, expiration_date ASC, lot_no ASC;";
+   SELECT
+    checklist_line_id,
+    order_id,
+    order_no,
+    order_line_id,
+    customer_id,
+    customer_name,
+    product_id,
+    product_name,
+    branch_id,
+    lot_no,
+    manufacturing_date,
+    expiration_date,
+    required_qty,
+    allocated_qty,
+    checklist_qty,
+    released_qty,
+    remaining_qty,
+    status,
+    remarks
+FROM delivery_checklist_line
+WHERE checklist_id = @checklist_id
+  AND is_deleted = 0
+ORDER BY product_name ASC, expiration_date ASC, lot_no ASC;";
 
             using (var lineCmd = new MySqlCommand(lineSql, conn))
             {
@@ -718,7 +736,7 @@ customer_id,
                         customer_name = reader["customer_name"] == DBNull.Value ? null : reader["customer_name"]?.ToString(),
                         product_id = reader["product_id"]?.ToString() ?? string.Empty,
                         product_name = reader["product_name"]?.ToString() ?? string.Empty,
-
+                        branch_id = reader["branch_id"] == DBNull.Value ? null : reader["branch_id"]?.ToString(),
                         lot_no = reader["lot_no"] == DBNull.Value ? null : reader["lot_no"]?.ToString(),
                         manufacturing_date = reader["manufacturing_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["manufacturing_date"]),
                         expiration_date = reader["expiration_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["expiration_date"]),

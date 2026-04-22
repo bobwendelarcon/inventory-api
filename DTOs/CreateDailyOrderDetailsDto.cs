@@ -5,6 +5,8 @@
         public long OrderId { get; set; }
         public string OrderNo { get; set; } = string.Empty;
         public string CustomerName { get; set; } = string.Empty;
+        public string? SourceBranchId { get; set; }
+        public string? SourceBranchName { get; set; }
         public DateTime? DeliveryDate { get; set; }
         public string Status { get; set; } = string.Empty;
 
@@ -27,6 +29,7 @@
 
     public class DailyOrderAllocationDto
     {
+        public string? BranchId { get; set; }
         public string LotNo { get; set; } = string.Empty;
         public DateTime? ManufacturingDate { get; set; }
         public DateTime? ExpirationDate { get; set; }

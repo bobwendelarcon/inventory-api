@@ -27,6 +27,8 @@
         public string product_id { get; set; } = string.Empty;
         public string product_name { get; set; } = string.Empty;
 
+        public string? branch_id { get; set; }   // ✅ NEW
+
         public string? lot_no { get; set; }
         public DateTime? manufacturing_date { get; set; }
         public DateTime? expiration_date { get; set; }

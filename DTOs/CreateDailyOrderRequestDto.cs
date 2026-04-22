@@ -3,7 +3,10 @@
     public class CreateDailyOrderRequest
     {
         public string OrderNo { get; set; } = string.Empty;
+        public string? CustomerId { get; set; }      // ✅ NEW
         public string CustomerName { get; set; } = string.Empty;
+
+        public string? SourceBranchId { get; set; }  // ✅ NEW
         public string? ClassName { get; set; }
         public string? RouteName { get; set; }
         public DateTime? DateOrdered { get; set; }

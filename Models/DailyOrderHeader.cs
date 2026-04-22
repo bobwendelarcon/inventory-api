@@ -5,7 +5,10 @@
         public long order_id { get; set; }
         public string order_no { get; set; } = string.Empty;
 
+        public string? customer_id { get; set; }      // ✅ NEW
         public string customer_name { get; set; } = string.Empty;
+
+        public string? source_branch_id { get; set; } // ✅ NEW
         public string? class_name { get; set; }
         public string? route_name { get; set; }
 

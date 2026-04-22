@@ -12,7 +12,7 @@
 
         public string product_id { get; set; } = string.Empty;
         public string lot_no { get; set; } = string.Empty;
-
+        public string? branch_id { get; set; }   // ✅ NEW
         public decimal released_qty { get; set; }
         public decimal checklist_remaining_qty { get; set; }
         public decimal dispatched_qty { get; set; }

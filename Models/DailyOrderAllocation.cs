@@ -6,6 +6,7 @@
         public long order_line_id { get; set; }
 
         public string? product_id { get; set; }
+        public string? branch_id { get; set; }   // ✅ NEW
         public string lot_no { get; set; } = string.Empty;
 
         public DateTime? manufacturing_date { get; set; }

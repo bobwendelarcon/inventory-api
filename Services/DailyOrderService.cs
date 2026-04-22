@@ -212,10 +212,20 @@ namespace inventory_api.Services
             var order = await _context.DailyOrderHeaders
                 .Include(h => h.Lines)
                     .ThenInclude(l => l.Allocations)
-               .FirstOrDefaultAsync(x => x.order_id == orderId && !x.is_deleted);
+                .FirstOrDefaultAsync(x => x.order_id == orderId && !x.is_deleted);
 
             if (order == null)
                 throw new Exception("Order not found.");
+
+            string? sourceBranchName = null;
+
+            if (!string.IsNullOrWhiteSpace(order.source_branch_id))
+            {
+                sourceBranchName = await _context.Branches
+                    .Where(b => b.branch_id == order.source_branch_id)
+                    .Select(b => b.branch_name)
+                    .FirstOrDefaultAsync();
+            }
 
             var dto = new DailyOrderDetailsDto
             {
@@ -223,10 +233,11 @@ namespace inventory_api.Services
                 OrderNo = order.order_no,
                 CustomerName = order.customer_name,
                 ClassName = order.class_name,
+                SourceBranchId = order.source_branch_id,
+                SourceBranchName = sourceBranchName,
                 RouteName = order.route_name,
                 DeliveryDate = order.delivery_date,
                 SpecialInstructions = order.special_instructions,
-               
                 Status = order.status,
                 Lines = order.Lines.Select(l => new DailyOrderLineDto
                 {
@@ -234,12 +245,13 @@ namespace inventory_api.Services
                     ProductName = l.product_name,
                     RequiredQty = l.required_qty,
                     AllocatedQty = l.allocated_qty,
-                    AvailableBeforeAllocation = l.required_qty, // temporary placeholder
+                    AvailableBeforeAllocation = l.required_qty,
                     AllocationResult = l.allocation_status,
                     Allocations = l.Allocations
                         .OrderBy(a => a.priority_rank)
                         .Select(a => new DailyOrderAllocationDto
                         {
+                            BranchId = a.branch_id,
                             LotNo = a.lot_no,
                             ManufacturingDate = a.manufacturing_date,
                             ExpirationDate = a.expiration_date,
@@ -264,12 +276,26 @@ namespace inventory_api.Services
             if (request == null)
                 throw new Exception("Invalid request.");
 
+            if (string.IsNullOrWhiteSpace(request.CustomerId))
+                throw new Exception("Customer is required.");
+
+            if (string.IsNullOrWhiteSpace(request.CustomerName))
+                throw new Exception("Customer name is required.");
+
+            if (string.IsNullOrWhiteSpace(request.SourceBranchId))
+                throw new Exception("Source branch is required.");
+
+            if (request.Lines == null || !request.Lines.Any())
+                throw new Exception("At least one order line is required.");
+
             string orderNo = await GenerateOrderNoAsync();
 
             var header = new DailyOrderHeader
             {
                 order_no = orderNo,
+                customer_id = request.CustomerId,
                 customer_name = request.CustomerName,
+                source_branch_id = request.SourceBranchId,
                 class_name = request.ClassName,
                 route_name = request.RouteName,
                 date_ordered = request.DateOrdered,
@@ -293,7 +319,11 @@ namespace inventory_api.Services
                     required_qty = line.RequiredQty,
                     allocated_qty = 0,
                     remaining_qty = line.RequiredQty,
-                    allocation_status = "Not Allocated"
+                    allocation_status = "Not Allocated",
+                    created_at = DateTime.UtcNow,
+                    updated_at = DateTime.UtcNow,
+                    dispatched_qty = 0,
+                    status = "PENDING"
                 };
 
                 _context.DailyOrderLines.Add(entity);
@@ -312,6 +342,7 @@ namespace inventory_api.Services
         // =========================================
         // ALLOCATE (FEFO)
         // =========================================
+
         public async Task<object> AllocateAsync(long orderId)
         {
             var order = await _context.DailyOrderHeaders
@@ -345,13 +376,19 @@ namespace inventory_api.Services
                     continue;
                 }
 
-
                 // only allocate what is still undelivered
                 var required = line.remaining_qty;
                 decimal allocatedTotal = 0;
 
+                if (string.IsNullOrWhiteSpace(order.source_branch_id))
+                    throw new Exception("Order source branch is missing.");
+
                 var lots = await _context.ProductLotNumbers
-                    .Where(x => x.product_id == line.product_id && x.quantity > 0 && !x.is_deleted)
+                    .Where(x =>
+                        x.product_id == line.product_id &&
+                        x.branch_id == order.source_branch_id &&
+                        x.quantity > 0 &&
+                        !x.is_deleted)
                     .OrderBy(x => x.expiration_date)
                     .ThenBy(x => x.manufacturing_date)
                     .ThenBy(x => x.lot_no)
@@ -363,16 +400,16 @@ namespace inventory_api.Services
                 {
                     if (allocatedTotal >= required)
                         break;
+
                     decimal alreadyAllocated = await _context.DailyOrderAllocations
-    .Where(a =>
-        a.product_id == line.product_id &&
-        a.lot_no == lot.lot_no &&
-        a.order_line_id != line.order_line_id &&   // 🔥 IMPORTANT
-        a.allocated_qty > 0
-    )
-    .SumAsync(a => (decimal?)a.allocated_qty) ?? 0;
-                  
-     
+                        .Where(a =>
+                            a.product_id == line.product_id &&
+                            a.branch_id == lot.branch_id &&
+                            a.lot_no == lot.lot_no &&
+                            a.order_line_id != line.order_line_id &&
+                            a.allocated_qty > 0
+                        )
+                        .SumAsync(a => (decimal?)a.allocated_qty) ?? 0;
 
                     var available = lot.quantity - alreadyAllocated;
                     if (available <= 0)
@@ -386,6 +423,7 @@ namespace inventory_api.Services
                     {
                         order_line_id = line.order_line_id,
                         product_id = line.product_id,
+                        branch_id = lot.branch_id,
                         lot_no = lot.lot_no,
                         manufacturing_date = lot.manufacturing_date,
                         expiration_date = lot.expiration_date,
@@ -439,6 +477,143 @@ namespace inventory_api.Services
 
             return new { Message = "Allocation completed." };
         }
+
+
+        //    public async Task<object> AllocateAsync(long orderId)
+        //    {
+        //        var order = await _context.DailyOrderHeaders
+        //            .Include(h => h.Lines)
+        //            .FirstOrDefaultAsync(x => x.order_id == orderId);
+
+        //        if (order == null)
+        //            throw new Exception("Order not found.");
+
+        //        foreach (var line in order.Lines)
+        //        {
+        //            // clear old allocations for this line before re-running FEFO
+        //            var existingAllocations = await _context.DailyOrderAllocations
+        //                .Where(a => a.order_line_id == line.order_line_id)
+        //                .ToListAsync();
+
+        //            if (existingAllocations.Any())
+        //            {
+        //                _context.DailyOrderAllocations.RemoveRange(existingAllocations);
+        //                await _context.SaveChangesAsync();
+        //            }
+
+        //            // remaining balance still to deliver
+        //            line.remaining_qty = Math.Max(0, line.required_qty - line.dispatched_qty);
+
+        //            if (line.remaining_qty <= 0)
+        //            {
+        //                line.allocated_qty = 0;
+        //                line.allocation_status = "Completed";
+        //                line.updated_at = DateTime.UtcNow;
+        //                continue;
+        //            }
+
+
+        //            // only allocate what is still undelivered
+        //            var required = line.remaining_qty;
+        //            decimal allocatedTotal = 0;
+        //            if (string.IsNullOrWhiteSpace(order.source_branch_id))
+        //                throw new Exception("Order source branch is missing.");
+
+        //            var lots = await _context.ProductLotNumbers
+        //                .Where(x =>
+        //                    x.product_id == line.product_id &&
+        //                    x.branch_id == order.source_branch_id &&   // ✅ BRANCH FILTER
+        //                    x.quantity > 0 &&
+        //                    !x.is_deleted)
+        //                .OrderBy(x => x.expiration_date)
+        //                .ThenBy(x => x.manufacturing_date)
+        //                .ThenBy(x => x.lot_no)
+        //                .ToListAsync();
+
+        //            int priority = 1;
+
+        //            foreach (var lot in lots)
+        //            {
+        //                if (allocatedTotal >= required)
+        //                    break;
+        //                decimal alreadyAllocated = await _context.DailyOrderAllocations
+        //.Where(a =>
+        //    a.product_id == line.product_id &&
+        //     a.branch_id == order.source_branch_id &&   // ✅ NEW
+        //    a.lot_no == lot.lot_no &&
+        //    a.order_line_id != line.order_line_id &&   // 🔥 IMPORTANT
+        //    a.allocated_qty > 0
+        //)
+        //.SumAsync(a => (decimal?)a.allocated_qty) ?? 0;
+
+
+
+        //                var available = lot.quantity - alreadyAllocated;
+        //                if (available <= 0)
+        //                    continue;
+
+        //                var allocateQty = Math.Min(available, required - allocatedTotal);
+        //                if (allocateQty <= 0)
+        //                    continue;
+
+        //                var allocation = new DailyOrderAllocation
+        //                {
+        //                    order_line_id = line.order_line_id,
+        //                    product_id = line.product_id,
+        //                    branch_id = lot.branch_id,   // ✅ NEW
+        //                    lot_no = lot.lot_no,
+        //                    manufacturing_date = lot.manufacturing_date,
+        //                    expiration_date = lot.expiration_date,
+        //                    on_hand_qty = lot.quantity,
+        //                    reserved_qty = alreadyAllocated,
+        //                    available_qty = available,
+        //                    allocated_qty = allocateQty,
+        //                    priority_rank = priority++,
+        //                    created_at = DateTime.UtcNow
+        //                };
+
+        //                _context.DailyOrderAllocations.Add(allocation);
+        //                allocatedTotal += allocateQty;
+        //            }
+
+        //            line.allocated_qty = allocatedTotal;
+
+        //            var remainingToAllocate = Math.Max(0, line.remaining_qty - line.allocated_qty);
+
+        //            if (line.allocated_qty == 0)
+        //                line.allocation_status = "Not Allocated";
+        //            else if (remainingToAllocate > 0)
+        //                line.allocation_status = "Partial";
+        //            else
+        //                line.allocation_status = "Fully Allocated";
+
+        //            line.updated_at = DateTime.UtcNow;
+        //        }
+
+        //        await _context.SaveChangesAsync();
+
+        //        bool allDelivered = order.Lines.All(x => x.dispatched_qty >= x.required_qty);
+        //        bool allAllocatedForRemaining = order.Lines.All(x =>
+        //            x.remaining_qty <= 0 || (x.allocated_qty > 0 && (x.remaining_qty - x.allocated_qty) <= 0));
+        //        bool anyAllocated = order.Lines.Any(x => x.allocated_qty > 0);
+        //        bool anyDelivered = order.Lines.Any(x => x.dispatched_qty > 0);
+
+        //        order.status = allDelivered
+        //            ? "COMPLETED"
+        //            : anyDelivered
+        //                ? "PARTIALLY DELIVERED"
+        //                : allAllocatedForRemaining
+        //                    ? "Allocated"
+        //                    : anyAllocated
+        //                        ? "Partially Allocated"
+        //                        : "For Allocation";
+
+        //        order.updated_at = DateTime.UtcNow;
+
+        //        await _context.SaveChangesAsync();
+
+        //        return new { Message = "Allocation completed." };
+        //    }
 
         // =========================================
         // READY FOR DISPATCH
