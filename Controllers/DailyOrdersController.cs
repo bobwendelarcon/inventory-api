@@ -15,6 +15,8 @@ namespace inventory_api.Controllers
             _service = service;
         }
 
+      
+
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] string? className,

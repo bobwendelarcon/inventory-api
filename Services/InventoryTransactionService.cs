@@ -422,6 +422,89 @@ namespace inventory_api.Services
             };
         }
 
+        public async Task<List<Dictionary<string, object>>> GetHistoryByLotAsync(
+    string product_id,
+    string lot_no,
+    string branch_id)
+        {
+            if (string.IsNullOrWhiteSpace(product_id))
+                throw new Exception("product_id is required.");
+
+            if (string.IsNullOrWhiteSpace(lot_no))
+                throw new Exception("lot_no is required.");
+
+            if (string.IsNullOrWhiteSpace(branch_id))
+                throw new Exception("branch_id is required.");
+
+            var transactions = await _context.InventoryTransactions
+                .Where(x =>
+                    !x.is_deleted &&
+                    x.product_id == product_id &&
+                    x.lot_no == lot_no &&
+                    x.branch_id == branch_id)
+                .OrderByDescending(x => x.created_at)
+                .ToListAsync();
+
+            var users = await _context.Users.ToListAsync();
+            var userDict = users.ToDictionary(x => x.user_id, x => x.full_name);
+
+            var partners = await _context.Partners.ToListAsync();
+            var partnerDict = partners.ToDictionary(x => x.partner_id, x => x.partner_name);
+
+            var branches = await _context.Branches.ToListAsync();
+            var branchDict = branches.ToDictionary(x => x.branch_id, x => x.branch_name);
+
+            var result = new List<Dictionary<string, object>>();
+
+            foreach (var t in transactions)
+            {
+                string fullNameValue = "";
+                string customerName = "";
+                string branchName = "";
+
+                if (!string.IsNullOrEmpty(t.scanned_by) && userDict.ContainsKey(t.scanned_by))
+                    fullNameValue = userDict[t.scanned_by];
+
+             
+                if (!string.IsNullOrEmpty(t.branch_id) && branchDict.ContainsKey(t.branch_id))
+                    branchName = branchDict[t.branch_id];
+
+                if (!string.IsNullOrEmpty(t.customer_id) && partnerDict.ContainsKey(t.customer_id))
+                    customerName = partnerDict[t.customer_id];
+
+                string reference = "";
+
+                if (!string.IsNullOrWhiteSpace(t.dr_no))
+                    reference += $"DR: {t.dr_no} ";
+                if (!string.IsNullOrWhiteSpace(t.inv_no))
+                    reference += $"INV: {t.inv_no} ";
+                if (!string.IsNullOrWhiteSpace(t.po_no))
+                    reference += $"PO: {t.po_no} ";
+                if (!string.IsNullOrWhiteSpace(t.order_no))
+                    reference += $"DO: {t.order_no} ";
+                if (!string.IsNullOrWhiteSpace(t.checklist_no))
+                    reference += $"DC: {t.checklist_no}";
+
+                result.Add(new Dictionary<string, object>
+        {
+            { "transaction_id", t.transaction_id },
+            { "created_at", t.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
+            { "transaction_type", t.transaction_type ?? "" },
+            { "quantity", t.quantity },
+            { "reference_type", t.reference_type ?? "" },
+            { "reference", reference.Trim() },
+            { "scanned_by", string.IsNullOrWhiteSpace(fullNameValue) ? (t.scanned_by ?? "") : fullNameValue },
+            { "customer_name", customerName },
+            { "branch_id", t.branch_id ?? "" },
+            { "warehouse", string.IsNullOrWhiteSpace(branchName) ? (t.branch_id ?? "") : branchName },
+            { "remarks", t.remarks ?? "" },
+            { "lot_no", t.lot_no ?? "" }
+        });
+            }
+
+            return result;
+        }
+
         //public async Task TransferAsync(TransferDto dto)
         //{
         //    if (dto == null)
@@ -483,6 +566,144 @@ namespace inventory_api.Services
         //        throw;
         //    }
         //}
+
+
+        public async Task<object> AdjustAsync(InventoryAdjustRequestDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(dto.product_id))
+                throw new Exception("product_id is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.lot_no))
+                throw new Exception("lot_no is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.branch_id))
+                throw new Exception("branch_id is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.adjustment_type))
+                throw new Exception("adjustment_type is required.");
+
+            if (dto.quantity < 0)
+                throw new Exception("quantity cannot be negative.");
+
+            if (string.IsNullOrWhiteSpace(dto.adjusted_by))
+                throw new Exception("adjusted_by is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.remarks))
+                throw new Exception("remarks is required.");
+
+            var lot = await _context.ProductLotNumbers
+                .FirstOrDefaultAsync(x =>
+                    !x.is_deleted &&
+                    x.product_id == dto.product_id &&
+                    x.lot_no == dto.lot_no &&
+                    x.branch_id == dto.branch_id);
+
+            if (lot == null)
+                throw new Exception("Inventory lot not found.");
+
+            var today = DateTime.UtcNow.Date;
+
+            if (lot.quantity <= 0)
+                throw new Exception("Cannot adjust inventory with zero qty.");
+
+            if (lot.expiration_date.HasValue && lot.expiration_date.Value.Date < today)
+                throw new Exception("Cannot adjust expired inventory.");
+
+            string adjustmentType = dto.adjustment_type.Trim().ToUpper();
+
+            decimal oldQty = lot.quantity;
+            decimal newQty = oldQty;
+            decimal movementQty = 0;
+            string transactionType = "";
+
+            switch (adjustmentType)
+            {
+                case "ADD":
+                    if (dto.quantity <= 0)
+                        throw new Exception("quantity must be greater than 0 for ADD.");
+
+                    newQty = oldQty + dto.quantity;
+                    movementQty = dto.quantity;
+                    transactionType = "IN";
+                    break;
+
+                case "DEDUCT":
+                    if (dto.quantity <= 0)
+                        throw new Exception("quantity must be greater than 0 for DEDUCT.");
+
+                    if (dto.quantity > oldQty)
+                        throw new Exception("Adjustment quantity cannot be greater than current stock.");
+
+                    newQty = oldQty - dto.quantity;
+                    movementQty = dto.quantity;
+                    transactionType = "OUT";
+                    break;
+
+                case "SET":
+                    newQty = dto.quantity;
+                    movementQty = Math.Abs(newQty - oldQty);
+
+                    if (newQty > oldQty)
+                        transactionType = "IN";
+                    else if (newQty < oldQty)
+                        transactionType = "OUT";
+                    else
+                        throw new Exception("No change detected. New quantity is same as current quantity.");
+
+                    break;
+
+                default:
+                    throw new Exception("adjustment_type must be ADD, DEDUCT, or SET.");
+            }
+
+            lot.quantity = newQty;
+            lot.updated_at = DateTime.UtcNow;
+
+            var transactionData = new InventoryTransaction
+            {
+                product_id = dto.product_id,
+                branch_id = dto.branch_id,
+                transaction_type = transactionType,
+                reference_type = "MANUAL_ADJUSTMENT",
+                lot_no = dto.lot_no,
+                quantity = movementQty,
+                scanned_by = dto.adjusted_by,
+                remarks = dto.remarks ?? "",
+                supplier_id = null,
+                customer_id = null,
+                dr_no = "",
+                inv_no = "",
+                po_no = "",
+                checklist_id = null,
+                checklist_no = "",
+                checklist_line_id = null,
+                order_id = null,
+                order_no = "",
+                order_line_id = null,
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow,
+                is_deleted = false
+            };
+
+            _context.InventoryTransactions.Add(transactionData);
+
+            await _context.SaveChangesAsync();
+
+            return new
+            {
+                success = true,
+                message = "Inventory adjusted successfully.",
+                product_id = dto.product_id,
+                lot_no = dto.lot_no,
+                branch_id = dto.branch_id,
+                old_qty = oldQty,
+                new_qty = newQty,
+                adjustment_type = adjustmentType
+            };
+        }
 
         public async Task TransferAsync(TransferDto dto)
         {

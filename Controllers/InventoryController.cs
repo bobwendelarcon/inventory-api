@@ -107,5 +107,41 @@ namespace inventory_api.Controllers
             await _service.TransferAsync(dto);
             return Ok("Transfer successful");
         }
+
+        [HttpGet("history")]
+        public async Task<IActionResult> GetHistory(string product_id, string lot_no, string branch_id)
+        {
+            try
+            {
+                var result = await _service.GetHistoryByLotAsync(product_id, lot_no, branch_id);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpPost("adjust")]
+        public async Task<IActionResult> Adjust([FromBody] InventoryAdjustRequestDto dto)
+        {
+            try
+            {
+                var result = await _service.AdjustAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
     }
 }
