@@ -14,6 +14,9 @@
 
         public string allocation_status { get; set; } = "Not Allocated";
         public DateTime created_at { get; set; }
+        public decimal dispatched_qty { get; set; }
+        public string status { get; set; } = "PENDING";
+        public DateTime? updated_at { get; set; }
 
         public DailyOrderHeader Header { get; set; } = null!;
         public ICollection<DailyOrderAllocation> Allocations { get; set; } = new List<DailyOrderAllocation>();

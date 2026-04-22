@@ -21,6 +21,16 @@
         public string? inv_no { get; set; }
         public string? po_no { get; set; }
 
+
+        public long? checklist_id { get; set; }
+        public string? checklist_no { get; set; }
+        public long? checklist_line_id { get; set; }
+
+        public long? order_id { get; set; }
+        public string? order_no { get; set; }
+        public long? order_line_id { get; set; }
+
+
         // ✅ ADD THESE
         public DateTime? manufacturing_date { get; set; }
         public DateTime? expiration_date { get; set; }

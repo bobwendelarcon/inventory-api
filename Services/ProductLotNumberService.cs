@@ -88,7 +88,7 @@ namespace inventory_api.Services
             {
                 // ✅ UPDATE QUANTITY (ADD)
                 existingLot.quantity += dto.quantity;
-                existingLot.updated_at = DateTime.Now;
+                existingLot.updated_at = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
                 return;
@@ -103,8 +103,8 @@ namespace inventory_api.Services
                 quantity = dto.quantity,
                 manufacturing_date = dto.manufacturing_date,
                 expiration_date = dto.expiration_date,
-                created_at = DateTime.Now,
-                updated_at = DateTime.Now,
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow,
                 is_deleted = false
             };
 

@@ -49,8 +49,8 @@ namespace inventory_api.Services
                 password_hash = BCrypt.Net.BCrypt.HashPassword(dto.password_hash),
                 role_name = dto.role_name,
                 is_deleted = false,
-                created_at = DateTime.Now,
-                updated_at = DateTime.Now
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow
             };
 
             _context.Users.Add(user);
@@ -71,7 +71,7 @@ namespace inventory_api.Services
                 user.password_hash = BCrypt.Net.BCrypt.HashPassword(dto.password_hash);
             }
             user.role_name = dto.role_name;
-            user.updated_at = DateTime.Now;
+            user.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }
@@ -83,7 +83,7 @@ namespace inventory_api.Services
             foreach (var user in users)
             {
                 user.is_deleted = true;
-                user.updated_at = DateTime.Now;
+                user.updated_at = DateTime.UtcNow;
             }
 
             await _context.SaveChangesAsync();

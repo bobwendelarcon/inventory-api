@@ -57,8 +57,8 @@ namespace inventory_api.Services
                 contact = dto.contact,
                 partner_type = dto.partner_type,
                 is_deleted = dto.is_deleted,
-                created_at = DateTime.Now,
-                updated_at = DateTime.Now
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow
             };
 
             _context.Partners.Add(partner);
@@ -92,7 +92,7 @@ namespace inventory_api.Services
             partner.contact = dto.contact;
             partner.partner_type = dto.partner_type;
             partner.is_deleted = dto.is_deleted;
-            partner.updated_at = DateTime.Now;
+            partner.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }

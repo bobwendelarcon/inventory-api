@@ -93,8 +93,8 @@ namespace inventory_api.Services
                 stock_level = dto.stock_level,
                 catg_id = dto.catg_id,
                 is_deleted = false,
-                created_at = DateTime.Now,
-                updated_at = DateTime.Now
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow
             };
 
             _context.Products.Add(product);
@@ -127,7 +127,7 @@ namespace inventory_api.Services
             product.stock_level = dto.stock_level;
             product.catg_id = dto.catg_id;
             product.is_deleted = dto.is_deleted;
-            product.updated_at = DateTime.Now;
+            product.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }
@@ -140,7 +140,7 @@ namespace inventory_api.Services
                 return false;
 
             product.is_deleted = true;
-            product.updated_at = DateTime.Now;
+            product.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return true;

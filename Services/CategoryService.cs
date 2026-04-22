@@ -48,8 +48,8 @@ namespace inventory_api.Services
                 catg_name = dto.catg_name,
                 catg_desc = dto.catg_desc,
                 is_deleted = false,
-                created_at = DateTime.Now,
-                updated_at = DateTime.Now
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow
             };
 
             _context.Categories.Add(category);
@@ -69,7 +69,7 @@ namespace inventory_api.Services
             category.catg_name = dto.catg_name;
             category.catg_desc = dto.catg_desc ?? "";
             category.is_deleted = dto.is_deleted;
-            category.updated_at = DateTime.Now;
+            category.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }

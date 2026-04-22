@@ -15,7 +15,7 @@ namespace inventory_api.Controllers
             {
                 status = "ok",
                 message = "API is running",
-                timestamp = DateTime.Now
+                timestamp = DateTime.UtcNow
             });
         }
     }

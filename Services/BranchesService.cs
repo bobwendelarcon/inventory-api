@@ -48,8 +48,8 @@ namespace inventory_api.Services
                 branch_name = dto.branch_name,
                 branch_loc = dto.branch_loc,
                 is_deleted = false,
-                created_at = DateTime.Now,
-                updated_at = DateTime.Now
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow
             };
 
             _context.Branches.Add(branch);
@@ -64,7 +64,7 @@ namespace inventory_api.Services
                 return false;
 
             branch.is_deleted = true;
-            branch.updated_at = DateTime.Now;
+            branch.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return true;
@@ -92,7 +92,7 @@ namespace inventory_api.Services
             branch.branch_loc = dto.branch_loc;
             branch.is_deleted = dto.is_deleted;
 
-            branch.updated_at = DateTime.Now;
+            branch.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }

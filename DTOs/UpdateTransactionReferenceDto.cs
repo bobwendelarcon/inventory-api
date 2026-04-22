@@ -8,5 +8,7 @@
         public string? inv_no { get; set; }
         public string? po_no { get; set; }
         public string? remarks { get; set; }
+        //public string? order_no { get; set; }
+        //public string? checklist_no { get; set; }
     }
 }

@@ -27,6 +27,9 @@ namespace inventory_api.Data
         public DbSet<DailyOrderLine> DailyOrderLines { get; set; }
         public DbSet<DailyOrderAllocation> DailyOrderAllocations { get; set; }
 
+        public DbSet<DeliveryChecklistHeader> DeliveryChecklistHeaders { get; set; }
+        public DbSet<DeliveryChecklistLine> DeliveryChecklistLines { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -84,6 +87,17 @@ namespace inventory_api.Data
                 .HasOne(x => x.Line)
                 .WithMany(l => l.Allocations)
                 .HasForeignKey(x => x.order_line_id);
+
+            modelBuilder.Entity<DeliveryChecklistHeader>().ToTable("delivery_checklist_header");
+            modelBuilder.Entity<DeliveryChecklistHeader>().HasKey(x => x.checklist_id);
+
+            modelBuilder.Entity<DeliveryChecklistLine>().ToTable("delivery_checklist_line");
+            modelBuilder.Entity<DeliveryChecklistLine>().HasKey(x => x.checklist_line_id);
+
+            modelBuilder.Entity<DeliveryChecklistLine>()
+                .HasOne(x => x.Header)
+                .WithMany(h => h.Lines)
+                .HasForeignKey(x => x.checklist_id);
 
 
 

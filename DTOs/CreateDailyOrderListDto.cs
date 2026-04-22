@@ -12,9 +12,15 @@
         public decimal RequiredQty { get; set; }
         public decimal AllocatedQty { get; set; }
         public decimal RemainingQty { get; set; }
+        public decimal DispatchedQty { get; set; }
         public string AllocationStatus { get; set; } = string.Empty;
+
         public DateTime? DateOrdered { get; set; }
         public DateTime? DeliveryDate { get; set; }
+
+        public int AgingDays { get; set; }
+       
+        public string? LineStatus { get; set; }
         public DateTime? DateDelivered { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? SpecialInstructions { get; set; }
