@@ -14,6 +14,10 @@
         public decimal AllocatedQty { get; set; }
         public decimal RemainingQty { get; set; }
         public decimal DispatchedQty { get; set; }
+
+        public string? Uom { get; set; }
+        public decimal? PackQty { get; set; }
+        public string? PackUom { get; set; }
         public string AllocationStatus { get; set; } = string.Empty;
 
         public DateTime? DateOrdered { get; set; }

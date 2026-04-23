@@ -23,6 +23,11 @@
         public decimal RequiredQty { get; set; }
         public decimal AllocatedQty { get; set; }
         public decimal AvailableBeforeAllocation { get; set; }
+
+        public string? Uom { get; set; }
+        public decimal? PackQty { get; set; }
+        public string? PackUom { get; set; }
+
         public string AllocationResult { get; set; } = string.Empty;
         public List<DailyOrderAllocationDto> Allocations { get; set; } = new();
     }
@@ -37,6 +42,10 @@
         public decimal ReservedQty { get; set; }
         public decimal AvailableQty { get; set; }
         public decimal AllocatedQty { get; set; }
+
+        public string? Uom { get; set; }
+        public decimal? PackQty { get; set; }
+        public string? PackUom { get; set; }
         public int PriorityRank { get; set; }
     }
 }

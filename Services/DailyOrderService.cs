@@ -34,40 +34,53 @@ namespace inventory_api.Services
             var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
             var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
 
-            var result = headers
-                .SelectMany(h => h.Lines.Select(l => new DailyOrderListDto
-                {
+            var products = await _context.Products.ToListAsync();
+            var productDict = products.ToDictionary(x => x.product_id, x => x);
 
+          var result = headers
+    .SelectMany(h => h.Lines.Select(l =>
+    {
+        productDict.TryGetValue(l.product_id, out var p);
 
-                    OrderId = h.order_id,
-                    ClassName = h.class_name ?? "",
-                    Year = h.date_ordered?.Year ?? 0,
-                    Month = h.date_ordered?.ToString("MMMM") ?? "",
-                    OrderNo = h.order_no,
-                    CustomerName = h.customer_name,
-                    ProductName = l.product_name,
-                    RequiredQty = l.required_qty,
-                    AllocatedQty = l.allocated_qty,
-                    RemainingQty = l.remaining_qty,
-                    DispatchedQty = l.dispatched_qty,
-                    AllocationStatus = l.allocation_status,
-                    DateOrdered = h.date_ordered,
-                    DeliveryDate = h.delivery_date,
-                    DateDelivered = h.date_delivered,
-                    Status = h.status,          // header status
-                    LineStatus = l.status,      // line status
-                    SpecialInstructions = h.special_instructions,
+        return new DailyOrderListDto
+        {
+            OrderId = h.order_id,
+            ClassName = h.class_name ?? "",
+            Year = h.date_ordered?.Year ?? 0,
+            Month = h.date_ordered?.ToString("MMMM") ?? "",
+            OrderNo = h.order_no,
+            CustomerName = h.customer_name,
+            ProductName = l.product_name,
 
-                    AgingDays =
-    h.delivery_date.HasValue
-    ? (
-        h.date_delivered.HasValue
-            ? (h.date_delivered.Value.Date - h.delivery_date.Value.Date).Days
-            : (today - h.delivery_date.Value.Date).Days
-      )
-    : 0,
-                }))
-                .AsQueryable();
+            RequiredQty = l.required_qty,
+            AllocatedQty = l.allocated_qty,
+            RemainingQty = l.remaining_qty,
+            DispatchedQty = l.dispatched_qty,
+
+            // 🔥 ADD THESE
+            Uom = p?.uom ?? "",
+            PackQty = p?.pack_qty ?? 0,
+            PackUom = p?.pack_uom ?? "",
+
+            AllocationStatus = l.allocation_status,
+            DateOrdered = h.date_ordered,
+            DeliveryDate = h.delivery_date,
+            DateDelivered = h.date_delivered,
+            Status = h.status,
+            LineStatus = l.status,
+            SpecialInstructions = h.special_instructions,
+
+            AgingDays =
+                h.delivery_date.HasValue
+                ? (
+                    h.date_delivered.HasValue
+                        ? (h.date_delivered.Value.Date - h.delivery_date.Value.Date).Days
+                        : (today - h.delivery_date.Value.Date).Days
+                  )
+                : 0
+        };
+    }))
+    .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(className))
                 result = result.Where(x => x.ClassName == className);
@@ -227,6 +240,9 @@ namespace inventory_api.Services
                     .FirstOrDefaultAsync();
             }
 
+            var products = await _context.Products.ToListAsync();
+            var productDict = products.ToDictionary(x => x.product_id, x => x);
+
             var dto = new DailyOrderDetailsDto
             {
                 OrderId = order.order_id,
@@ -239,29 +255,44 @@ namespace inventory_api.Services
                 DeliveryDate = order.delivery_date,
                 SpecialInstructions = order.special_instructions,
                 Status = order.status,
-                Lines = order.Lines.Select(l => new DailyOrderLineDto
+                Lines = order.Lines.Select(l =>
                 {
-                    OrderLineId = l.order_line_id,
-                    ProductName = l.product_name,
-                    RequiredQty = l.required_qty,
-                    AllocatedQty = l.allocated_qty,
-                    AvailableBeforeAllocation = l.required_qty,
-                    AllocationResult = l.allocation_status,
-                    Allocations = l.Allocations
-                        .OrderBy(a => a.priority_rank)
-                        .Select(a => new DailyOrderAllocationDto
-                        {
-                            BranchId = a.branch_id,
-                            LotNo = a.lot_no,
-                            ManufacturingDate = a.manufacturing_date,
-                            ExpirationDate = a.expiration_date,
-                            OnHandQty = a.on_hand_qty,
-                            ReservedQty = a.reserved_qty,
-                            AvailableQty = a.available_qty,
-                            AllocatedQty = a.allocated_qty,
-                            PriorityRank = a.priority_rank
-                        })
-                        .ToList()
+                    productDict.TryGetValue(l.product_id, out var p);
+
+                    return new DailyOrderLineDto
+                    {
+                        OrderLineId = l.order_line_id,
+                        ProductName = l.product_name,
+                        RequiredQty = l.required_qty,
+                        AllocatedQty = l.allocated_qty,
+                        // AvailableBeforeAllocation = l.required_qty,
+                        AvailableBeforeAllocation = l.Allocations.Sum(a => a.available_qty),
+                        AllocationResult = l.allocation_status,
+
+                        Uom = p?.uom ?? "",
+                        PackQty = p?.pack_qty ?? 0,
+                        PackUom = p?.pack_uom ?? "",
+
+                        Allocations = l.Allocations
+                            .OrderBy(a => a.priority_rank)
+                            .Select(a => new DailyOrderAllocationDto
+                            {
+                                BranchId = a.branch_id,
+                                LotNo = a.lot_no,
+                                ManufacturingDate = a.manufacturing_date,
+                                ExpirationDate = a.expiration_date,
+                                OnHandQty = a.on_hand_qty,
+                                ReservedQty = a.reserved_qty,
+                                AvailableQty = a.available_qty,
+                                AllocatedQty = a.allocated_qty,
+                                PriorityRank = a.priority_rank,
+
+                                Uom = p?.uom ?? "",
+                                PackQty = p?.pack_qty ?? 0,
+                                PackUom = p?.pack_uom ?? ""
+                            })
+                            .ToList()
+                    };
                 }).ToList()
             };
 

@@ -214,17 +214,17 @@ namespace inventory_api.Services
             transaction.po_no = dto.po_no ?? "";
             transaction.remarks = dto.remarks ?? "";
 
-            if (!string.IsNullOrWhiteSpace(dto.customer))
-            {
-                var partner = await _context.Partners
-                    .FirstOrDefaultAsync(x => x.partner_name == dto.customer);
+            //if (!string.IsNullOrWhiteSpace(dto.customer))
+            //{
+            //    var partner = await _context.Partners
+            //        .FirstOrDefaultAsync(x => x.partner_name == dto.customer);
 
-                transaction.customer_id = partner?.partner_id;
-            }
-            else
-            {
-                transaction.customer_id = null;
-            }
+            //    transaction.customer_id = partner?.partner_id;
+            //}
+            //else
+            //{
+            //    transaction.customer_id = null;
+            //}
 
             transaction.updated_at = DateTime.UtcNow;
 
@@ -387,6 +387,9 @@ namespace inventory_api.Services
     { "product_id", t.product_id },
     { "product_name", productData?.product_name ?? "" },
     { "product_description", productData?.product_description ?? "" },
+    { "uom", productData?.uom ?? "" },
+{ "pack_uom", productData?.pack_uom ?? "" },
+{ "pack_qty", productData?.pack_qty ?? 0 },
     { "branch_id", t.branch_id },
     { "branch_name", branchName },
     { "transaction_type", t.transaction_type },
@@ -454,6 +457,9 @@ namespace inventory_api.Services
             var branches = await _context.Branches.ToListAsync();
             var branchDict = branches.ToDictionary(x => x.branch_id, x => x.branch_name);
 
+            var product = await _context.Products
+    .FirstOrDefaultAsync(x => x.product_id == product_id);
+
             var result = new List<Dictionary<string, object>>();
 
             foreach (var t in transactions)
@@ -491,6 +497,9 @@ namespace inventory_api.Services
             { "created_at", t.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
             { "transaction_type", t.transaction_type ?? "" },
             { "quantity", t.quantity },
+             { "uom", product?.uom ?? "" },
+    { "pack_uom", product?.pack_uom ?? "" },
+    { "pack_qty", product?.pack_qty ?? 0 },
             { "reference_type", t.reference_type ?? "" },
             { "reference", reference.Trim() },
             { "scanned_by", string.IsNullOrWhiteSpace(fullNameValue) ? (t.scanned_by ?? "") : fullNameValue },

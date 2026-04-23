@@ -29,6 +29,11 @@
 
         public string? branch_id { get; set; }   // ✅ NEW
 
+        public string? uom { get; set; }
+        public string? pack_uom { get; set; }
+        public decimal? pack_qty { get; set; }
+
+
         public string? lot_no { get; set; }
         public DateTime? manufacturing_date { get; set; }
         public DateTime? expiration_date { get; set; }

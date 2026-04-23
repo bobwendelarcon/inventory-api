@@ -226,9 +226,11 @@ namespace inventory_api.Services
             cmd.Parameters.AddWithValue("@lot_no", lot.lot_no);
             cmd.Parameters.AddWithValue("@manufacturing_date", (object?)lot.manufacturing_date ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@expiration_date", (object?)lot.expiration_date ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@uom", DBNull.Value);
-            cmd.Parameters.AddWithValue("@pack_uom", DBNull.Value);
-            cmd.Parameters.AddWithValue("@pack_qty", DBNull.Value);
+
+            cmd.Parameters.AddWithValue("@uom", (object?)line.uom ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pack_uom", (object?)line.pack_uom ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pack_qty", (object?)line.pack_qty ?? DBNull.Value);
+
             cmd.Parameters.AddWithValue("@required_qty", line.required_qty);
             cmd.Parameters.AddWithValue("@allocated_qty", lot.allocated_qty);
             cmd.Parameters.AddWithValue("@checklist_qty", lot.allocated_qty);
@@ -436,6 +438,9 @@ SELECT
     oh.delivery_date,
     ol.product_id,
     ol.product_name,
+    p.uom,
+    p.pack_uom,
+    p.pack_qty,
     ol.required_qty,
     ol.allocated_qty,
     ol.dispatched_qty,
@@ -444,6 +449,8 @@ SELECT
 FROM daily_order_line ol
 INNER JOIN daily_order_header oh 
     ON ol.order_id = oh.order_id
+LEFT JOIN products p
+    ON ol.product_id = p.product_id
 WHERE 
     IFNULL(oh.is_deleted, 0) = 0
     AND ol.allocated_qty > 0
@@ -517,6 +524,9 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
                     delivery_date = reader["delivery_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["delivery_date"]),
                     product_id = reader["product_id"]?.ToString() ?? "",
                     product_name = reader["product_name"]?.ToString() ?? "",
+                    uom = reader["uom"] == DBNull.Value ? null : reader["uom"]?.ToString(),
+                    pack_uom = reader["pack_uom"] == DBNull.Value ? null : reader["pack_uom"]?.ToString(),
+                    pack_qty = reader["pack_qty"] == DBNull.Value ? null : Convert.ToDecimal(reader["pack_qty"]),
                     required_qty = reader["required_qty"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["required_qty"]),
                     allocated_qty = allocatedQty,
                     remaining_qty = reader["remaining_qty"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["remaining_qty"]),
@@ -704,6 +714,12 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
     product_name,
     branch_id,
     lot_no,
+
+    uom,
+    pack_uom,
+    pack_qty,
+    
+
     manufacturing_date,
     expiration_date,
     required_qty,
@@ -740,6 +756,12 @@ ORDER BY product_name ASC, expiration_date ASC, lot_no ASC;";
                         lot_no = reader["lot_no"] == DBNull.Value ? null : reader["lot_no"]?.ToString(),
                         manufacturing_date = reader["manufacturing_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["manufacturing_date"]),
                         expiration_date = reader["expiration_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["expiration_date"]),
+
+
+                        uom = reader["uom"] == DBNull.Value ? null : reader["uom"]?.ToString(),
+                        pack_uom = reader["pack_uom"] == DBNull.Value ? null : reader["pack_uom"]?.ToString(),
+                        pack_qty = reader["pack_qty"] == DBNull.Value ? null : Convert.ToDecimal(reader["pack_qty"]),
+
 
                         required_qty = reader["required_qty"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["required_qty"]),
                         allocated_qty = reader["allocated_qty"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["allocated_qty"]),
