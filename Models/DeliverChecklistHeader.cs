@@ -15,6 +15,7 @@
         public string? remarks { get; set; }
         public string? created_by { get; set; }
         public DateTime created_at { get; set; }
+        public bool is_deleted { get; set; }
 
         public List<DeliveryChecklistLine> Lines { get; set; } = new();
     }

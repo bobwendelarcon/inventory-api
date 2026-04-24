@@ -71,11 +71,11 @@ namespace inventory_api.Services
                     branch_id = lot.branch_id,
                     description = productData != null ? (productData.product_name ?? "") : "",
                     uom = productData != null ? (productData.uom ?? "") : "",
-                    pack_qty = productData != null ? (int)(productData.pack_qty ?? 0) : 0,
+                    pack_qty = productData != null ? (decimal)(productData.pack_qty ?? 0) : 0,
                     pack_uom = productData != null ? (productData.pack_uom ?? "") : "",
                     lot_no = lot.lot_no ?? "",
                     warehouse = branch != null ? (branch.branch_name ?? "") : lot.branch_id,
-                    qty = (int)lot.quantity,
+                    qty = (decimal)lot.quantity,
                     created_at = lot.created_at,
                     manufacturing_date = lot.manufacturing_date,
                     expiration_date = lot.expiration_date

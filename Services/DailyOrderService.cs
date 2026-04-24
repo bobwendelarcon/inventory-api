@@ -50,8 +50,7 @@ namespace inventory_api.Services
             Month = h.date_ordered?.ToString("MMMM") ?? "",
             OrderNo = h.order_no,
             CustomerName = h.customer_name,
-            ProductName = l.product_name,
-
+            ProductName = p?.product_name ?? l.product_name,
             RequiredQty = l.required_qty,
             AllocatedQty = l.allocated_qty,
             RemainingQty = l.remaining_qty,
@@ -91,14 +90,43 @@ namespace inventory_api.Services
             if (!string.IsNullOrWhiteSpace(month))
                 result = result.Where(x => x.Month == month);
 
-            if (string.IsNullOrWhiteSpace(status))
+            //if (string.IsNullOrWhiteSpace(status))
+            //{
+            //    result = result.Where(x => (x.Status ?? "").Trim().ToUpper() != "COMPLETED");
+            //}
+            //else
+            //{
+            //    var selectedStatus = status.Trim().ToUpper();
+            //    result = result.Where(x => (x.Status ?? "").Trim().ToUpper() == selectedStatus);
+            //}
+
+            if (!string.IsNullOrWhiteSpace(status))
             {
-                result = result.Where(x => (x.Status ?? "").Trim().ToUpper() != "COMPLETED");
+                var selectedStatus = status.Trim().ToUpper();
+
+                if (selectedStatus == "ALL_EXCL_COMPLETED")
+                {
+                    result = result.Where(x =>
+                        (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
+                    );
+                }
+                else if (selectedStatus == "ALL")
+                {
+                    // no filter → show everything
+                }
+                else
+                {
+                    result = result.Where(x =>
+                        (x.Status ?? "").Trim().ToUpper() == selectedStatus
+                    );
+                }
             }
             else
             {
-                var selectedStatus = status.Trim().ToUpper();
-                result = result.Where(x => (x.Status ?? "").Trim().ToUpper() == selectedStatus);
+                // fallback (default behavior)
+                result = result.Where(x =>
+                    (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
+                );
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -118,94 +146,38 @@ namespace inventory_api.Services
             {
                 TotalOrders = grouped.Count(),
 
-                Completed = grouped.Count(g =>
-                    g.All(x => (x.LineStatus ?? "").ToUpper() == "COMPLETED")
-                ),
-
-                PartiallyDelivered = grouped.Count(g =>
-                    g.Any(x => (x.LineStatus ?? "").ToUpper() == "PARTIALLY DELIVERED") &&
-                    g.Any(x => (x.LineStatus ?? "").ToUpper() != "COMPLETED")
-                ),
-
-                Partial = grouped.Count(g =>
-                    g.Any(x => (x.AllocationStatus ?? "").ToUpper() == "PARTIAL") &&
-                    !g.Any(x => (x.LineStatus ?? "").ToUpper() == "PARTIALLY DELIVERED")
-                ),
+                ForAllocation = grouped.Count(g =>
+                    (g.First().Status ?? "").Trim().ToUpper() == "FOR ALLOCATION"
+     ),
 
                 Allocated = grouped.Count(g =>
-                    g.All(x => (x.AllocationStatus ?? "").ToUpper() == "FULLY ALLOCATED")
-                ),
+                    (g.First().Status ?? "").Trim().ToUpper() == "ALLOCATED"
+     ),
 
-                ForAllocation = grouped.Count(g =>
-                    g.All(x => (x.AllocationStatus ?? "").ToUpper() == "NOT ALLOCATED")
-                ),
+                Partial = grouped.Count(g =>
+                    (g.First().Status ?? "").Trim().ToUpper() == "PARTIALLY ALLOCATED"
+     ),
 
                 ReadyDispatch = grouped.Count(g =>
-                    g.All(x => (x.Status ?? "").ToUpper() == "READY FOR DISPATCH")
-                ),
+                    (g.First().Status ?? "").Trim().ToUpper() == "READY FOR DISPATCH"
+     ),
+
+                PartiallyDelivered = grouped.Count(g =>
+                    (g.First().Status ?? "").Trim().ToUpper() == "PARTIALLY DELIVERED"
+     ),
+
+                Completed = grouped.Count(g =>
+                    (g.First().Status ?? "").Trim().ToUpper() == "COMPLETED"
+     ),
 
                 Overdue = grouped.Count(g =>
                     g.Any(x =>
                         x.DeliveryDate.HasValue &&
                         x.DeliveryDate.Value.Date < today &&
-                        (x.LineStatus ?? "").ToUpper() != "COMPLETED"
+                        (g.First().Status ?? "").Trim().ToUpper() != "COMPLETED"
                     )
-                )
+     )
             };
-
-            //        var summary = new DailyOrderSummaryDto
-            //        {
-            //            TotalOrders = filteredList.Select(x => x.OrderId).Distinct().Count(),
-
-            //            ForAllocation = filteredList
-            //    .Where(x => (x.Status ?? "").Trim().ToUpper() == "FOR ALLOCATION")
-            //    .Select(x => x.OrderId)
-            //    .Distinct()
-            //    .Count(),
-
-            //            Allocated = filteredList
-            //    .Where(x => (x.Status ?? "").Trim().ToUpper() == "ALLOCATED")
-            //    .Select(x => x.OrderId)
-            //    .Distinct()
-            //    .Count(),
-
-            //            Partial = filteredList
-            //    .Where(x => (x.Status ?? "").Trim().ToUpper() == "PARTIALLY ALLOCATED")
-            //    .Select(x => x.OrderId)
-            //    .Distinct()
-            //    .Count(),
-
-            //            ReadyDispatch = filteredList
-            //    .Where(x => (x.Status ?? "").Trim().ToUpper() == "READY FOR DISPATCH")
-            //    .Select(x => x.OrderId)
-            //    .Distinct()
-            //    .Count(),
-
-            //            PartiallyDelivered = filteredList
-            //.Where(x => (x.LineStatus ?? "").Trim().ToUpper() == "PARTIALLY DELIVERED")
-            //.Select(x => x.OrderId)
-            //.Distinct()
-            //.Count(),
-            //            Completed = filteredList
-            //.Where(x => (x.Status ?? "").Trim().ToUpper() == "COMPLETED")
-            //.Select(x => x.OrderId)
-            //.Distinct()
-            //.Count(),
-
-
-            //            Overdue = filteredList
-            //.Where(x =>
-            //    x.DeliveryDate.HasValue &&
-            //    x.DeliveryDate.Value.Date < today &&
-            //    (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
-            //)
-
-
-
-            //.Select(x => x.OrderId)
-            //.Distinct()
-            //.Count()
-            //        };
 
 
             return new DailyOrderListResponse
@@ -242,6 +214,9 @@ namespace inventory_api.Services
 
             var products = await _context.Products.ToListAsync();
             var productDict = products.ToDictionary(x => x.product_id, x => x);
+            var lotStocks = await _context.ProductLotNumbers
+    .Where(x => !x.is_deleted)
+    .ToListAsync();
 
             var dto = new DailyOrderDetailsDto
             {
@@ -259,14 +234,37 @@ namespace inventory_api.Services
                 {
                     productDict.TryGetValue(l.product_id, out var p);
 
+                    var availableStock = lotStocks
+      .Where(x =>
+          x.product_id == l.product_id &&
+          x.branch_id == order.source_branch_id)
+      .Sum(lot =>
+      {
+          var reservedQty = _context.DailyOrderAllocations
+              .Where(a =>
+                  a.product_id == l.product_id &&
+                  a.branch_id == lot.branch_id &&
+                  a.lot_no == lot.lot_no &&
+                 // a.order_line_id != l.order_line_id &&
+                  a.allocated_qty > 0)
+              .Sum(a => (decimal?)a.allocated_qty) ?? 0;
+
+          return Math.Max(0, lot.quantity - reservedQty);
+      });
+
+
                     return new DailyOrderLineDto
                     {
                         OrderLineId = l.order_line_id,
-                        ProductName = l.product_name,
+                        ProductName = p?.product_name ?? l.product_name,
+                        //RequiredQty = l.required_qty,
+                        //AllocatedQty = l.allocated_qty,
+                        //// AvailableBeforeAllocation = l.required_qty,
+                        //AvailableBeforeAllocation = l.Allocations.Sum(a => a.available_qty),
                         RequiredQty = l.required_qty,
                         AllocatedQty = l.allocated_qty,
-                        // AvailableBeforeAllocation = l.required_qty,
-                        AvailableBeforeAllocation = l.Allocations.Sum(a => a.available_qty),
+                        RemainingQty = l.remaining_qty,
+                        AvailableBeforeAllocation = availableStock,
                         AllocationResult = l.allocation_status,
 
                         Uom = p?.uom ?? "",
@@ -475,11 +473,17 @@ namespace inventory_api.Services
                 var remainingToAllocate = Math.Max(0, line.remaining_qty - line.allocated_qty);
 
                 if (line.allocated_qty == 0)
-                    line.allocation_status = "Not Allocated";
+                {
+                    line.allocation_status = "NO STOCK";
+                }
                 else if (remainingToAllocate > 0)
-                    line.allocation_status = "Partial";
+                {
+                    line.allocation_status = "PARTIAL";
+                }
                 else
-                    line.allocation_status = "Fully Allocated";
+                {
+                    line.allocation_status = "FULLY ALLOCATED";
+                }
 
                 line.updated_at = DateTime.UtcNow;
             }

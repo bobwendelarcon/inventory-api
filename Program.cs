@@ -28,6 +28,7 @@ builder.Services.AddScoped<InventoryDisplayService>();
 builder.Services.AddScoped<DailyOrderService>();
 builder.Services.AddScoped<DeliveryChecklistService>();
 builder.Services.AddScoped<ChecklistOutService>();
+builder.Services.AddScoped<DashboardService>();
 
 var app = builder.Build();
 
