@@ -31,6 +31,11 @@ namespace inventory_api.Data
         public DbSet<DeliveryChecklistLine> DeliveryChecklistLines { get; set; }
 
 
+        //ptp
+
+        public DbSet<ProductToProduceHeader> ProductToProduceHeaders { get; set; }
+        public DbSet<ProductToProduceLine> ProductToProduceLines { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -87,6 +92,25 @@ namespace inventory_api.Data
                 .HasOne(x => x.Line)
                 .WithMany(l => l.Allocations)
                 .HasForeignKey(x => x.order_line_id);
+
+
+            //ptp
+
+            modelBuilder.Entity<ProductToProduceHeader>(entity =>
+            {
+                entity.ToTable("product_to_produce_header");
+                entity.HasKey(e => e.ptp_id);
+
+                entity.HasMany(e => e.Lines)
+                    .WithOne(e => e.Header)
+                    .HasForeignKey(e => e.ptp_id);
+            });
+
+            modelBuilder.Entity<ProductToProduceLine>(entity =>
+            {
+                entity.ToTable("product_to_produce_line");
+                entity.HasKey(e => e.ptp_line_id);
+            });
 
             modelBuilder.Entity<DeliveryChecklistHeader>().ToTable("delivery_checklist_header");
             modelBuilder.Entity<DeliveryChecklistHeader>().HasKey(x => x.checklist_id);
