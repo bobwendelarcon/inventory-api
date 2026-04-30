@@ -140,6 +140,21 @@ namespace inventory_api.Services
             var uploadFolder = Path.Combine(_environment.WebRootPath, "uploads", "profile");
             Directory.CreateDirectory(uploadFolder);
 
+            // ✅ Delete old profile image first
+            if (!string.IsNullOrWhiteSpace(user.profile_image))
+            {
+                var oldRelativePath = user.profile_image
+                    .TrimStart('/')
+                    .Replace("/", Path.DirectorySeparatorChar.ToString());
+
+                var oldFilePath = Path.Combine(_environment.WebRootPath, oldRelativePath);
+
+                if (System.IO.File.Exists(oldFilePath))
+                {
+                    System.IO.File.Delete(oldFilePath);
+                }
+            }
+
             var fileName = $"{id}_{DateTime.UtcNow:yyyyMMddHHmmss}{ext}";
             var filePath = Path.Combine(uploadFolder, fileName);
 

@@ -18,9 +18,23 @@ namespace inventory_api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 50,
+    [FromQuery] string? search = null,
+    [FromQuery] string? categoryId = null,
+    [FromQuery] bool? status = null,
+    [FromQuery] string? source = null)
         {
-            var result = await _productService.GetAllAsync();
+            var result = await _productService.GetAllAsync(
+                page,
+                pageSize,
+                search,
+                categoryId,
+                status,
+                source
+            );
+
             return Ok(result);
         }
 

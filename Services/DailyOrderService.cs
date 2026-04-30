@@ -55,6 +55,7 @@ namespace inventory_api.Services
             AllocatedQty = l.allocated_qty,
             RemainingQty = l.remaining_qty,
             DispatchedQty = l.dispatched_qty,
+            CreatedBy = h.created_by,
 
             // 🔥 ADD THESE
             Uom = p?.uom ?? "",
@@ -241,13 +242,21 @@ namespace inventory_api.Services
       .Sum(lot =>
       {
           var reservedQty = _context.DailyOrderAllocations
-              .Where(a =>
-                  a.product_id == l.product_id &&
-                  a.branch_id == lot.branch_id &&
-                  a.lot_no == lot.lot_no &&
-                 // a.order_line_id != l.order_line_id &&
-                  a.allocated_qty > 0)
-              .Sum(a => (decimal?)a.allocated_qty) ?? 0;
+    .Where(a =>
+        a.product_id == l.product_id &&
+        a.branch_id == lot.branch_id &&
+        a.lot_no == lot.lot_no &&
+        a.allocated_qty > 0)
+    .Join(_context.DailyOrderLines,
+        a => a.order_line_id,
+        dl => dl.order_line_id,
+        (a, dl) => new { a, dl })
+    .Join(_context.DailyOrderHeaders,
+        x => x.dl.order_id,
+        h => h.order_id,
+        (x, h) => new { x.a, x.dl, h })
+    .Where(x => !x.h.is_deleted)
+    .Sum(x => (decimal?)x.a.allocated_qty) ?? 0;
 
           return Math.Max(0, lot.quantity - reservedQty);
       });
@@ -412,12 +421,22 @@ namespace inventory_api.Services
                 if (string.IsNullOrWhiteSpace(order.source_branch_id))
                     throw new Exception("Order source branch is missing.");
 
+                var phToday = TimeZoneInfo.ConvertTimeFromUtc(
+     DateTime.UtcNow,
+     TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila")
+ ).Date;
+
                 var lots = await _context.ProductLotNumbers
                     .Where(x =>
                         x.product_id == line.product_id &&
                         x.branch_id == order.source_branch_id &&
                         x.quantity > 0 &&
-                        !x.is_deleted)
+                        !x.is_deleted &&
+                        (
+                            x.expiration_date == null ||
+                            x.expiration_date.Value.Date >= phToday
+                        )
+                    )
                     .OrderBy(x => x.expiration_date)
                     .ThenBy(x => x.manufacturing_date)
                     .ThenBy(x => x.lot_no)
@@ -431,14 +450,23 @@ namespace inventory_api.Services
                         break;
 
                     decimal alreadyAllocated = await _context.DailyOrderAllocations
-                        .Where(a =>
-                            a.product_id == line.product_id &&
-                            a.branch_id == lot.branch_id &&
-                            a.lot_no == lot.lot_no &&
-                            a.order_line_id != line.order_line_id &&
-                            a.allocated_qty > 0
-                        )
-                        .SumAsync(a => (decimal?)a.allocated_qty) ?? 0;
+     .Where(a =>
+         a.product_id == line.product_id &&
+         a.branch_id == lot.branch_id &&
+         a.lot_no == lot.lot_no &&
+         a.order_line_id != line.order_line_id &&
+         a.allocated_qty > 0
+     )
+     .Join(_context.DailyOrderLines,
+         a => a.order_line_id,
+         dl => dl.order_line_id,
+         (a, dl) => new { a, dl })
+     .Join(_context.DailyOrderHeaders,
+         x => x.dl.order_id,
+         h => h.order_id,
+         (x, h) => new { x.a, x.dl, h })
+     .Where(x => !x.h.is_deleted)
+     .SumAsync(x => (decimal?)x.a.allocated_qty) ?? 0;
 
                     var available = lot.quantity - alreadyAllocated;
                     if (available <= 0)

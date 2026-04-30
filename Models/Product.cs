@@ -12,6 +12,7 @@
         public decimal? pack_qty { get; set; }    // ✅ added
         public decimal stock_level { get; set; }
         public string? catg_id { get; set; }
+        public string product_source { get; set; } = "OWN";
         public bool is_deleted { get; set; }
         public DateTime created_at { get; set; }
         public DateTime updated_at { get; set; }

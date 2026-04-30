@@ -17,7 +17,7 @@ namespace inventory_api.Services
         public async Task<List<Dictionary<string, object>>> GetAllAsync()
         {
             var categories = await _context.Categories
-                .OrderBy(x => x.catg_name)
+                .OrderByDescending(x => x.catg_id) // catg_name
                 .ToListAsync();
 
             return categories.Select(x => new Dictionary<string, object>
@@ -31,22 +31,23 @@ namespace inventory_api.Services
                 { "doc_id", x.catg_id }
             }).ToList();
         }
+        //auto generated id 
 
         public async Task AddAsync(CreateCategoryDto dto)
         {
             if (dto == null)
                 throw new Exception("Invalid request.");
 
-            bool exists = await _context.Categories.AnyAsync(x => x.catg_id == dto.catg_id);
+            if (string.IsNullOrWhiteSpace(dto.catg_name))
+                throw new Exception("Category name is required.");
 
-            if (exists)
-                throw new Exception("Category already exists.");
+            string newCategoryId = await GenerateCategoryIdAsync();
 
             var category = new Category
             {
-                catg_id = dto.catg_id,
-                catg_name = dto.catg_name,
-                catg_desc = dto.catg_desc,
+                catg_id = newCategoryId,
+                catg_name = dto.catg_name.Trim(),
+                catg_desc = dto.catg_desc ?? "",
                 is_deleted = false,
                 created_at = DateTime.UtcNow,
                 updated_at = DateTime.UtcNow
@@ -55,6 +56,51 @@ namespace inventory_api.Services
             _context.Categories.Add(category);
             await _context.SaveChangesAsync();
         }
+        private async Task<string> GenerateCategoryIdAsync()
+        {
+            var lastCategory = await _context.Categories
+                .Where(x => x.catg_id.StartsWith("catg"))
+                .OrderByDescending(x => x.catg_id)
+                .FirstOrDefaultAsync();
+
+            int nextNumber = 1;
+
+            if (lastCategory != null)
+            {
+                string numberPart = lastCategory.catg_id.Replace("catg", "");
+
+                if (int.TryParse(numberPart, out int lastNumber))
+                {
+                    nextNumber = lastNumber + 1;
+                }
+            }
+
+            return $"catg{nextNumber:D4}";
+        }
+
+        //public async Task AddAsync(CreateCategoryDto dto)
+        //{
+        //    if (dto == null)
+        //        throw new Exception("Invalid request.");
+
+        //    bool exists = await _context.Categories.AnyAsync(x => x.catg_id == dto.catg_id);
+
+        //    if (exists)
+        //        throw new Exception("Category already exists.");
+
+        //    var category = new Category
+        //    {
+        //        catg_id = dto.catg_id,
+        //        catg_name = dto.catg_name,
+        //        catg_desc = dto.catg_desc,
+        //        is_deleted = false,
+        //        created_at = DateTime.UtcNow,
+        //        updated_at = DateTime.UtcNow
+        //    };
+
+        //    _context.Categories.Add(category);
+        //    await _context.SaveChangesAsync();
+        //}
 
         public async Task UpdateAsync(string id, CreateCategoryDto dto)
         {

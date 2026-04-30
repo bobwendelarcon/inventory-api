@@ -27,6 +27,7 @@ namespace inventory_api.Services
                 { "address", x.address ?? "" },
                 { "contact_no", x.contact ?? "" },
                 { "partner_type", x.partner_type ?? "" },
+                { "region", x.region ?? "" },
                 { "is_deleted", x.is_deleted },
                 { "created_at", x.created_at.ToString("yyyy-MM-dd HH:mm:ss") },
                 { "updated_at", x.updated_at.ToString("yyyy-MM-dd HH:mm:ss") }
@@ -56,6 +57,7 @@ namespace inventory_api.Services
                 address = dto.address,
                 contact = dto.contact,
                 partner_type = dto.partner_type,
+                region = dto.region,
                 is_deleted = dto.is_deleted,
                 created_at = DateTime.UtcNow,
                 updated_at = DateTime.UtcNow
@@ -91,6 +93,7 @@ namespace inventory_api.Services
             partner.address = dto.address;
             partner.contact = dto.contact;
             partner.partner_type = dto.partner_type;
+            partner.region = dto.region;
             partner.is_deleted = dto.is_deleted;
             partner.updated_at = DateTime.UtcNow;
 

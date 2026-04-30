@@ -30,6 +30,8 @@ builder.Services.AddScoped<DeliveryChecklistService>();
 builder.Services.AddScoped<ChecklistOutService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ProductToProduceService>();
+builder.Services.AddScoped<ReturnService>();
+builder.Services.AddScoped<ReportService>();
 
 var app = builder.Build();
 

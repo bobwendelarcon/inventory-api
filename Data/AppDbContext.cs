@@ -36,6 +36,11 @@ namespace inventory_api.Data
         public DbSet<ProductToProduceHeader> ProductToProduceHeaders { get; set; }
         public DbSet<ProductToProduceLine> ProductToProduceLines { get; set; }
 
+        //return
+
+        public DbSet<ReturnHeader> ReturnHeaders { get; set; }
+        public DbSet<ReturnLine> ReturnLines { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -122,6 +127,28 @@ namespace inventory_api.Data
                 .HasOne(x => x.Header)
                 .WithMany(h => h.Lines)
                 .HasForeignKey(x => x.checklist_id);
+
+
+            //return 
+
+            modelBuilder.Entity<ReturnHeader>(entity =>
+            {
+                entity.ToTable("return_header");
+                entity.HasKey(e => e.return_id);
+
+                entity.HasMany(e => e.Lines)
+                    .WithOne(e => e.ReturnHeader)
+                    .HasForeignKey(e => e.return_id);
+            });
+
+            modelBuilder.Entity<ReturnLine>(entity =>
+            {
+                entity.ToTable("return_line");
+                entity.HasKey(e => e.return_line_id);
+
+                entity.Property(e => e.quantity).HasPrecision(18, 2);
+                entity.Property(e => e.released_qty).HasPrecision(18, 2);
+            });
 
 
 

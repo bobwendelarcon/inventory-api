@@ -15,5 +15,9 @@
 
         public string Uom { get; set; } = "";
         public string AlertType { get; set; } = "";
+
+        public string? LotNo { get; set; }
+        public DateTime? ExpirationDate { get; set; }
+        public int? MonthsLeft { get; set; }
     }
 }

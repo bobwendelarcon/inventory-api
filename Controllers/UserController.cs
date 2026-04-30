@@ -81,19 +81,41 @@ namespace inventory_api.Controllers
             return Ok(new { message = "Account updated successfully." });
         }
 
+        //[HttpPost("UploadProfileImage/{id}")]
+        //public async Task<IActionResult> UploadProfileImage(string id, IFormFile file)
+        //{
+        //    if (file == null || file.Length == 0)
+        //        return BadRequest(new { message = "No file uploaded." });
+
+        //    var imagePath = await _userService.UploadProfileImageAsync(id, file);
+
+        //    return Ok(new
+        //    {
+        //        message = "Profile image uploaded successfully.",
+        //        profile_image = imagePath
+        //    });
+        //}
+
         [HttpPost("UploadProfileImage/{id}")]
         public async Task<IActionResult> UploadProfileImage(string id, IFormFile file)
         {
-            if (file == null || file.Length == 0)
-                return BadRequest(new { message = "No file uploaded." });
-
-            var imagePath = await _userService.UploadProfileImageAsync(id, file);
-
-            return Ok(new
+            try
             {
-                message = "Profile image uploaded successfully.",
-                profile_image = imagePath
-            });
+                if (file == null || file.Length == 0)
+                    return BadRequest("No file uploaded.");
+
+                var imagePath = await _userService.UploadProfileImageAsync(id, file);
+
+                return Ok(new
+                {
+                    message = "Success",
+                    profile_image = imagePath
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message); // 🔥 IMPORTANT
+            }
         }
 
         [HttpDelete("reset")]

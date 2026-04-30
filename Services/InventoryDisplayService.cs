@@ -88,7 +88,7 @@ namespace inventory_api.Services
                 query = query.Where(x => x.description.Contains(product));
 
             if (!string.IsNullOrWhiteSpace(warehouse))
-                query = query.Where(x => x.warehouse == warehouse);
+                query = query.Where(x => x.branch_id == warehouse);
 
             if (!string.IsNullOrWhiteSpace(from) && DateTime.TryParse(from, out var fromDate))
             {
@@ -148,12 +148,31 @@ namespace inventory_api.Services
                 query = query.Where(x => !x.expiration_date.HasValue);
             }
 
-            if (!string.IsNullOrWhiteSpace(months) && int.TryParse(months, out var m))
+            //if (!string.IsNullOrWhiteSpace(months) && int.TryParse(months, out var m))
+            //{
+            //    query = query.Where(x =>
+            //        x.expiration_date.HasValue &&
+            //        x.expiration_date.Value.Date >= todayPh &&
+            //        x.expiration_date.Value.Date <= todayPh.AddMonths(m));
+            //}
+
+            if (!string.IsNullOrWhiteSpace(months))
             {
-                query = query.Where(x =>
-                    x.expiration_date.HasValue &&
-                    x.expiration_date.Value.Date >= todayPh &&
-                    x.expiration_date.Value.Date <= todayPh.AddMonths(m));
+                if (months == "over12")
+                {
+                    query = query.Where(x =>
+                        x.expiration_date.HasValue &&
+                        x.expiration_date.Value.Date > todayPh.AddMonths(12));
+                }
+                else if (int.TryParse(months, out var m))
+                {
+                    var endDate = todayPh.AddMonths(m);
+
+                    query = query.Where(x =>
+                        x.expiration_date.HasValue &&
+                        x.expiration_date.Value.Date >= todayPh &&
+                        x.expiration_date.Value.Date <= endDate);
+                }
             }
 
             query = order?.ToLower() == "asc"

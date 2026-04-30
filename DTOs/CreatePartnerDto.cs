@@ -8,5 +8,6 @@
         public string? contact { get; set; }
         public string? partner_type { get; set; }
         public bool is_deleted{ get; set; }
+        public string? region { get; set; }
     }
 }

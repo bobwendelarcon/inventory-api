@@ -160,7 +160,7 @@ namespace inventory_api.Services
                     dr_no = dto.dr_no ?? "",
                     inv_no = dto.inv_no ?? "",
                     po_no = dto.po_no ?? "",
-                 
+
                     checklist_id = dto.checklist_id,
                     checklist_no = dto.checklist_no ?? "",
                     checklist_line_id = dto.checklist_line_id,
@@ -244,7 +244,7 @@ namespace inventory_api.Services
             string reference = "",
             string warehouse = "",
             string order = "desc"
-           
+
         )
         {
             var query = _context.InventoryTransactions.AsQueryable();
@@ -255,8 +255,22 @@ namespace inventory_api.Services
             if (!string.IsNullOrWhiteSpace(type))
                 query = query.Where(x => x.transaction_type == type);
 
-            if (!string.IsNullOrWhiteSpace(scanned_by))
-                query = query.Where(x => x.scanned_by.Contains(scanned_by));
+            if (!string.IsNullOrWhiteSpace(scanned_by) || !string.IsNullOrWhiteSpace(full_name))
+            {
+                var search = !string.IsNullOrWhiteSpace(full_name)
+                    ? full_name.Trim()
+                    : scanned_by.Trim();
+
+                var userIds = await _context.Users
+                    .Where(u => u.full_name.Contains(search))
+                    .Select(u => u.user_id)
+                    .ToListAsync();
+
+                query = query.Where(x =>
+                    x.scanned_by.Contains(search) ||   // match user_id (user001)
+                    userIds.Contains(x.scanned_by)     // match full_name (Bob)
+                );
+            }
 
             if (!string.IsNullOrWhiteSpace(warehouse))
                 query = query.Where(x => x.branch_id == warehouse);
@@ -267,7 +281,7 @@ namespace inventory_api.Services
                     (x.dr_no ?? "").Contains(reference) ||
                     (x.inv_no ?? "").Contains(reference) ||
                     (x.po_no ?? "").Contains(reference) ||
-                
+
                     (x.order_no ?? "").Contains(reference) ||
                     (x.checklist_no ?? "").Contains(reference) ||
                     (x.remarks ?? "").Contains(reference)
@@ -293,15 +307,6 @@ namespace inventory_api.Services
                 query = query.Where(x => productIds.Contains(x.product_id));
             }
 
-            if (!string.IsNullOrWhiteSpace(full_name))
-            {
-                var userIds = await _context.Users
-                    .Where(u => u.full_name.Contains(full_name))
-                    .Select(u => u.user_id)
-                    .ToListAsync();
-
-                query = query.Where(x => userIds.Contains(x.scanned_by));
-            }
 
             query = order?.ToLower() == "asc"
                 ? query.OrderBy(x => x.created_at)
@@ -405,7 +410,7 @@ namespace inventory_api.Services
     { "dr_no", t.dr_no },
     { "inv_no", t.inv_no },
     { "po_no", t.po_no },
- 
+
     { "checklist_id", t.checklist_id },
     { "checklist_no", t.checklist_no },
     { "checklist_line_id", t.checklist_line_id },
@@ -471,7 +476,7 @@ namespace inventory_api.Services
                 if (!string.IsNullOrEmpty(t.scanned_by) && userDict.ContainsKey(t.scanned_by))
                     fullNameValue = userDict[t.scanned_by];
 
-             
+
                 if (!string.IsNullOrEmpty(t.branch_id) && branchDict.ContainsKey(t.branch_id))
                     branchName = branchDict[t.branch_id];
 
@@ -609,19 +614,32 @@ namespace inventory_api.Services
                     x.product_id == dto.product_id &&
                     x.lot_no == dto.lot_no &&
                     x.branch_id == dto.branch_id);
-
             if (lot == null)
                 throw new Exception("Inventory lot not found.");
 
             var today = DateTime.UtcNow.Date;
+            var adjustmentType = dto.adjustment_type.Trim().ToUpper();
 
-            if (lot.quantity <= 0)
-                throw new Exception("Cannot adjust inventory with zero qty.");
+            var isExpired = lot.expiration_date.HasValue &&
+                            lot.expiration_date.Value.Date < today;
 
-            if (lot.expiration_date.HasValue && lot.expiration_date.Value.Date < today)
-                throw new Exception("Cannot adjust expired inventory.");
+            // Expired stock can only be deducted/disposed.
+            // If expired and already zero, no disposal needed.
+            if (isExpired)
+            {
+                if (lot.quantity <= 0)
+                    throw new Exception("Cannot dispose expired inventory with zero qty.");
 
-            string adjustmentType = dto.adjustment_type.Trim().ToUpper();
+                if (adjustmentType != "DEDUCT")
+                    throw new Exception("Expired items can only be deducted.");
+            }
+
+            // Non-expired zero stock can still be adjusted using ADD or SET.
+            if (!isExpired && lot.quantity <= 0 && adjustmentType == "DEDUCT")
+            {
+                throw new Exception("Cannot deduct inventory with zero qty.");
+            }
+
 
             decimal oldQty = lot.quantity;
             decimal newQty = oldQty;
@@ -817,5 +835,107 @@ namespace inventory_api.Services
 
             await _context.SaveChangesAsync();
         }
+        // for searching return module
+
+        public async Task<List<ReturnOutTransactionSearchDto>> SearchOutTransactionsForReturnAsync(
+      string search = "",
+      string lotNo = "",
+      int limit = 50)
+        {
+            var query = _context.InventoryTransactions
+                .Where(x =>
+                    !x.is_deleted &&
+                    x.transaction_type == "OUT");
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.Trim();
+
+                query = query.Where(x =>
+                    (x.dr_no ?? "").Contains(search) ||
+                    (x.inv_no ?? "").Contains(search) ||
+                    (x.po_no ?? "").Contains(search) ||
+                    (x.order_no ?? "").Contains(search) ||
+                    (x.checklist_no ?? "").Contains(search) ||
+                    (x.remarks ?? "").Contains(search));
+            }
+
+            if (!string.IsNullOrWhiteSpace(lotNo))
+            {
+                lotNo = lotNo.Trim();
+                query = query.Where(x => x.lot_no.Contains(lotNo));
+            }
+
+            var data = await query
+                .OrderByDescending(x => x.created_at)
+                .Take(limit)
+                .Select(t => new ReturnOutTransactionSearchDto
+                {
+                    transaction_id = t.transaction_id,
+                    created_at = t.created_at,
+
+                    product_id = t.product_id,
+                    product_name = _context.Products
+                        .Where(p => p.product_id == t.product_id)
+                        .Select(p => p.product_name)
+                        .FirstOrDefault() ?? "",
+
+                    branch_id = t.branch_id,
+                    branch_name = _context.Branches
+                        .Where(b => b.branch_id == t.branch_id)
+                        .Select(b => b.branch_name)
+                        .FirstOrDefault() ?? "",
+
+                    lot_no = t.lot_no,
+                    quantity = t.quantity,
+
+                    returned_qty = _context.ReturnLines
+                        .Where(r =>
+                            r.source_transaction_id == t.transaction_id &&
+                            r.release_status != "CANCELLED")
+                        .Sum(r => (decimal?)r.quantity) ?? 0,
+
+                    returnable_qty = t.quantity - (
+                        _context.ReturnLines
+                            .Where(r =>
+                                r.source_transaction_id == t.transaction_id &&
+                                r.release_status != "CANCELLED")
+                            .Sum(r => (decimal?)r.quantity) ?? 0
+                    ),
+
+                    uom = _context.Products
+                        .Where(p => p.product_id == t.product_id)
+                        .Select(p => p.uom)
+                        .FirstOrDefault() ?? "",
+
+                    customer_id = t.customer_id,
+                    customer_name = _context.Partners
+                        .Where(p => p.partner_id == t.customer_id)
+                        .Select(p => p.partner_name)
+                        .FirstOrDefault() ?? "",
+
+                    dr_no = t.dr_no,
+                    inv_no = t.inv_no,
+                    po_no = t.po_no,
+                    remarks = t.remarks,
+
+                    order_id = t.order_id,
+                    order_no = t.order_no,
+
+                    checklist_id = t.checklist_id,
+                    checklist_no = t.checklist_no
+                })
+                .ToListAsync();
+
+            foreach (var item in data)
+            {
+                if (item.returnable_qty < 0)
+                    item.returnable_qty = 0;
+            }
+
+            return data;
+        }
+
+       
     }
 }

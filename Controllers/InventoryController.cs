@@ -21,7 +21,11 @@ namespace inventory_api.Controllers
         {
             dto.transaction_type = "IN";
             await _service.AddAsync(dto);
-            return Ok("Stock IN saved");
+            return Ok(new
+            {
+                success = true,
+                message = "Stock IN saved"
+            });
         }
 
         [HttpPost("out")]
@@ -49,7 +53,7 @@ namespace inventory_api.Controllers
     string from = "",
     string to = "",
     string scanned_by = "",
-    string full_name="",
+    string full_name = "",
     string reference = "",
     string warehouse = "",
     string order = "desc"
@@ -72,7 +76,7 @@ namespace inventory_api.Controllers
 
             return Ok(result);
         }
-       
+
         [HttpDelete("reset")]
         public async Task<IActionResult> ResetAll()
         {
@@ -143,5 +147,33 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
+        // for return search 
+
+        [HttpGet("search-out-for-return")]
+        public async Task<IActionResult> SearchOutForReturn(
+    string search = "",
+    string lotNo = "",
+    int limit = 50)
+        {
+            try
+            {
+                var result = await _service.SearchOutTransactionsForReturnAsync(search, lotNo, limit);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
+   
+
+
     }
 }

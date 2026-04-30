@@ -2,7 +2,7 @@
 {
     public class CreateProductDto
     {
-        public string product_id { get; set; } = string.Empty;
+        public string? product_id { get; set; } = string.Empty;
         public string? product_sku { get; set; }
         public string product_name { get; set; } = string.Empty;
         public string? product_description { get; set; }
@@ -15,5 +15,6 @@
         public bool is_deleted { get; set; }
         public decimal stock_level { get; set; }
         public string? catg_id { get; set; }
+        public string? product_source { get; set; }
     }
 }
