@@ -32,6 +32,8 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ProductToProduceService>();
 builder.Services.AddScoped<ReturnService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<ProductToProduceService>();
+
 
 var app = builder.Build();
 

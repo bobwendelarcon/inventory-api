@@ -47,5 +47,57 @@ namespace inventory_api.Controllers
 
             return Ok(result);
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetList(
+    int page = 1,
+    int pageSize = 50,
+    string status = "ACTIVE",
+    string search = "")
+        {
+            var result = await _service.GetListAsync(page, pageSize, status, search);
+            return Ok(result);
+        }
+        [HttpDelete("line/{ptpLineId}")]
+        public async Task<IActionResult> DeleteLine(long ptpLineId)
+        {
+            await _service.DeleteLineAsync(ptpLineId);
+
+            return Ok(new
+            {
+                message = "PTP request deleted successfully."
+            });
+        }
+
+        [HttpPost("line/{ptpLineId}/start")]
+        public async Task<IActionResult> StartProduction(long ptpLineId)
+        {
+            await _service.StartProductionAsync(ptpLineId);
+
+            return Ok(new
+            {
+                message = "Production started successfully."
+            });
+        }
+
+        [HttpPost("produce")]
+        public async Task<IActionResult> Produce([FromBody] ProduceStockDto dto)
+        {
+            var producedBy =
+     string.IsNullOrWhiteSpace(dto.producedBy)
+         ? "production"
+         : dto.producedBy;
+
+            await _service.ProduceStockAsync(dto, producedBy);
+
+            return Ok(new
+            {
+                message = "Production stock recorded successfully."
+            });
+        }
+
+
+
+
     }
 }

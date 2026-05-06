@@ -26,6 +26,10 @@ namespace inventory_api.Models
         public string source_type { get; set; } = "MANUAL";
         public string status { get; set; } = "PENDING";
 
+        public decimal produced_qty { get; set; } = 0;
+        public DateTime? started_at { get; set; }
+        public DateTime? completed_at { get; set; }
+
         public ProductToProduceHeader? Header { get; set; }
     }
 }

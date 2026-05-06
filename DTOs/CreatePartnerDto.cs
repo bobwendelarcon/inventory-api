@@ -7,7 +7,10 @@
         public string? address { get; set; }
         public string? contact { get; set; }
         public string? partner_type { get; set; }
-        public bool is_deleted{ get; set; }
+        public bool is_deleted { get; set; }
         public string? region { get; set; }
+
+        // NEW
+        public string? agent_id { get; set; }
     }
 }
