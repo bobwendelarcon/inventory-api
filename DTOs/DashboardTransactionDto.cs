@@ -14,6 +14,8 @@
         public string DrNo { get; set; } = "";
         public string InvNo { get; set; } = "";
         public string PoNo { get; set; } = "";
+
+        public string TrNo { get; set; } = "";
         public string OrderNo { get; set; } = "";
         public string ChecklistNo { get; set; } = "";
 

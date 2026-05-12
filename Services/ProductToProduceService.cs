@@ -355,8 +355,8 @@ namespace inventory_api.Services
                 quantity = (double)dto.quantity,
                 scanned_by = producedBy,
                 remarks = $"Production Stock IN - {header.ptp_no}",
-                dr_no = trNo,
-               
+                tr_no = trNo,
+
                 manufacturing_date = dto.manufacturingDate,
                 expiration_date = dto.expirationDate
             });

@@ -21,6 +21,8 @@
         public string? inv_no { get; set; }
         public string? po_no { get; set; }
 
+        public string? tr_no { get; set; }
+
 
         public long? checklist_id { get; set; }
         public string? checklist_no { get; set; }

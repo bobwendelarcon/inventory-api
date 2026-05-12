@@ -17,6 +17,8 @@
         public decimal available_qty { get; set; }
         public decimal allocated_qty { get; set; }
 
+        public string allocation_mode { get; set; } = "FEFO";
+
         public int priority_rank { get; set; }
         public DateTime created_at { get; set; }
 

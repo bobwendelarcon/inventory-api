@@ -22,6 +22,8 @@
         public string ProductName { get; set; } = string.Empty;
         public decimal RequiredQty { get; set; }
         public decimal AllocatedQty { get; set; }
+
+        public decimal UnallocatedQty { get; set; }
         public decimal AvailableBeforeAllocation { get; set; }
         public decimal RemainingQty { get; set; }
         public string? Uom { get; set; }
@@ -42,7 +44,7 @@
         public decimal ReservedQty { get; set; }
         public decimal AvailableQty { get; set; }
         public decimal AllocatedQty { get; set; }
-
+        public string AllocationMode { get; set; } = "FEFO";
         public string? Uom { get; set; }
         public decimal? PackQty { get; set; }
         public string? PackUom { get; set; }

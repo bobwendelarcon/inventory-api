@@ -160,6 +160,7 @@ namespace inventory_api.Services
                     dr_no = dto.dr_no ?? "",
                     inv_no = dto.inv_no ?? "",
                     po_no = dto.po_no ?? "",
+                    tr_no = dto.tr_no ?? "",
 
                     checklist_id = dto.checklist_id,
                     checklist_no = dto.checklist_no ?? "",
@@ -281,6 +282,7 @@ namespace inventory_api.Services
                     (x.dr_no ?? "").Contains(reference) ||
                     (x.inv_no ?? "").Contains(reference) ||
                     (x.po_no ?? "").Contains(reference) ||
+                    (x.tr_no ?? "").Contains(reference) ||
 
                     (x.order_no ?? "").Contains(reference) ||
                     (x.checklist_no ?? "").Contains(reference) ||
@@ -410,6 +412,7 @@ namespace inventory_api.Services
     { "dr_no", t.dr_no },
     { "inv_no", t.inv_no },
     { "po_no", t.po_no },
+    { "tr_no", t.tr_no },
 
     { "checklist_id", t.checklist_id },
     { "checklist_no", t.checklist_no },
@@ -443,6 +446,8 @@ namespace inventory_api.Services
 
             if (string.IsNullOrWhiteSpace(branch_id))
                 throw new Exception("branch_id is required.");
+
+
 
             var transactions = await _context.InventoryTransactions
                 .Where(x =>
@@ -493,8 +498,13 @@ namespace inventory_api.Services
                     reference += $"PO: {t.po_no} ";
                 if (!string.IsNullOrWhiteSpace(t.order_no))
                     reference += $"DO: {t.order_no} ";
+                if (!string.IsNullOrWhiteSpace(t.tr_no))
+                    reference += $"TR: {t.tr_no} ";
+
                 if (!string.IsNullOrWhiteSpace(t.checklist_no))
-                    reference += $"DC: {t.checklist_no}";
+                    reference += $"DC: {t.checklist_no} ";
+
+
 
                 result.Add(new Dictionary<string, object>
         {

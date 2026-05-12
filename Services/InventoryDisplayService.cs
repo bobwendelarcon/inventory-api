@@ -186,24 +186,87 @@ namespace inventory_api.Services
                 .Take(pageSize)
                 .ToListAsync();
 
-            var result = rawResult.Select(x => new InventoryDisplayDto
+            var allocations = await (
+    from a in _context.DailyOrderAllocations
+    join line in _context.DailyOrderLines
+        on a.order_line_id equals line.order_line_id
+    join header in _context.DailyOrderHeaders
+        on line.order_id equals header.order_id
+    where !header.is_deleted
+          && a.allocated_qty > 0
+    select new
+    {
+        a.product_id,
+        a.branch_id,
+        a.lot_no,
+        a.allocated_qty,
+
+        header.order_no,
+        header.customer_name
+    }
+).ToListAsync();
+
+            var result = rawResult.Select(x =>
             {
-                product_id = x.product_id,
-                branch_id = x.branch_id,
-                description = x.description,
-                uom = x.uom,
-                pack_qty = x.pack_qty,
-                pack_uom = x.pack_uom,
-                lot_no = x.lot_no,
-                warehouse = x.warehouse,
-                qty = x.qty,
-                date = ConvertToPhilippineTime(x.created_at, phTimeZone).ToString("yyyy-MM-dd"),
-                manufacturing_date = x.manufacturing_date.HasValue
-          ? ConvertToPhilippineTime(x.manufacturing_date.Value, phTimeZone).ToString("yyyy-MM-dd")
-          : "",
-                expiration_date = x.expiration_date.HasValue
-          ? ConvertToPhilippineTime(x.expiration_date.Value, phTimeZone).ToString("yyyy-MM-dd")
-          : ""
+                var reservedList = allocations
+    .Where(a =>
+        (a.product_id ?? "").Trim() == (x.product_id ?? "").Trim() &&
+        (a.branch_id ?? "").Trim() == (x.branch_id ?? "").Trim() &&
+        (a.lot_no ?? "").Trim() == (x.lot_no ?? "").Trim())
+    .ToList();
+
+                var reservedQty = reservedList.Sum(a => a.allocated_qty);
+
+                var availableQty = Math.Max(0, x.qty - reservedQty);
+
+                return new InventoryDisplayDto
+                {
+                    product_id = x.product_id,
+                    branch_id = x.branch_id,
+                    description = x.description,
+                    uom = x.uom,
+                    pack_qty = x.pack_qty,
+                    pack_uom = x.pack_uom,
+                    lot_no = x.lot_no,
+                    warehouse = x.warehouse,
+
+                    qty = x.qty,
+                    reserved_qty = reservedQty,
+                    available_qty = availableQty,
+
+                    reserved_details = reservedList
+    .GroupBy(r => new { r.order_no, r.customer_name })
+    .Select(g => new InventoryReservedDetailDto
+    {
+        order_no = g.Key.order_no,
+        customer_name = g.Key.customer_name,
+        reserved_qty = g.Sum(x => x.allocated_qty)
+    })
+    .ToList(),
+
+
+                    date = ConvertToPhilippineTime(
+                        x.created_at,
+                        phTimeZone
+                    ).ToString("yyyy-MM-dd"),
+
+
+
+
+                    manufacturing_date = x.manufacturing_date.HasValue
+                        ? ConvertToPhilippineTime(
+                            x.manufacturing_date.Value,
+                            phTimeZone
+                          ).ToString("yyyy-MM-dd")
+                        : "",
+
+                    expiration_date = x.expiration_date.HasValue
+                        ? ConvertToPhilippineTime(
+                            x.expiration_date.Value,
+                            phTimeZone
+                          ).ToString("yyyy-MM-dd")
+                        : ""
+                };
             }).ToList();
 
             return new Dictionary<string, object>

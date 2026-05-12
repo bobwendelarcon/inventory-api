@@ -50,12 +50,25 @@ namespace inventory_api.Controllers
             return Ok(result);
         }
 
+
         [HttpPost("{orderId}/allocate")]
-        public async Task<IActionResult> Allocate(long orderId)
+        public async Task<IActionResult> Allocate(long orderId, [FromBody] AllocateDailyOrderRequest request)
         {
-            var result = await _service.AllocateAsync(orderId);
-            return Ok(result);
+            try
+            {
+                var result = await _service.AllocateAsync(orderId, request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
         }
+
+
 
         [HttpPost("{orderId}/ready-for-dispatch")]
         public async Task<IActionResult> MarkReadyForDispatch(long orderId)
@@ -98,5 +111,81 @@ namespace inventory_api.Controllers
                 return StatusCode(500, ex.Message);
             }
         }
+
+        [HttpPost("{orderId}/manual-allocate")]
+        public async Task<IActionResult> ManualAllocate(
+    long orderId,
+    [FromBody] ManualAllocateRequest request)
+        {
+            try
+            {
+                var result = await _service.ManualAllocateAsync(orderId, request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpGet("{orderId}/available-lots")]
+        public async Task<IActionResult> GetAvailableLots(long orderId)
+        {
+            try
+            {
+                var result = await _service.GetAvailableLotsAsync(orderId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpPut("{orderId}/lines/{orderLineId}/required-qty")]
+        public async Task<IActionResult> UpdateLineRequiredQty(
+    long orderId,
+    long orderLineId,
+    [FromBody] UpdateDailyOrderLineQtyRequest request)
+        {
+            try
+            {
+                var result = await _service.UpdateLineRequiredQtyAsync(orderId, orderLineId, request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpDelete("{orderId}/lines/{orderLineId}/allocation")]
+        public async Task<IActionResult> ClearLineAllocation(long orderId, long orderLineId)
+        {
+            try
+            {
+                var result = await _service.ClearLineAllocationAsync(orderId, orderLineId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpPost("{orderId}/back-to-allocation")]
+        public async Task<IActionResult> BackToAllocation(long orderId)
+        {
+            try
+            {
+                var result = await _service.BackToAllocationAsync(orderId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
     }
 }

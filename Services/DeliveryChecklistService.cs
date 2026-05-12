@@ -453,9 +453,8 @@ LEFT JOIN products p
     ON ol.product_id = p.product_id
 WHERE 
     IFNULL(oh.is_deleted, 0) = 0
-    AND ol.allocated_qty > 0
-    AND ol.remaining_qty > 0
-    AND UPPER(TRIM(oh.status)) IN ('READY FOR DISPATCH', 'PARTIAL', 'PARTIALLY DELIVERED')
+  AND ol.allocated_qty > 0
+AND UPPER(TRIM(oh.status)) = 'READY FOR DISPATCH'
     AND NOT EXISTS
 (
     SELECT 1

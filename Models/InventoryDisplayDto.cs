@@ -14,5 +14,11 @@
         public string date { get; set; } = "";
         public string manufacturing_date { get; set; } = "";
         public string expiration_date { get; set; } = "";
+
+        public decimal reserved_qty { get; set; }
+        public decimal available_qty { get; set; }
+        public List<InventoryReservedDetailDto> reserved_details { get; set; } = new();
+
+        //  public List<InventoryReservedDetailDto> reserved_details { get; set; } = new();
     }
 }
