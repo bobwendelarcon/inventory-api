@@ -1,4 +1,5 @@
-﻿using inventory_api.Data;
+﻿using ClosedXML.Excel;
+using inventory_api.Data;
 using inventory_api.DTOs;
 using inventory_api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -295,5 +296,200 @@ namespace inventory_api.Services
                 })
                 .ToListAsync();
         }
+
+        // import module for product excel
+
+        public async Task<object> PreviewImportAsync(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                throw new Exception("Excel file is required.");
+
+            var folder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "imports", "products");
+            Directory.CreateDirectory(folder);
+
+            var fileToken = $"{Guid.NewGuid()}.xlsx";
+            var filePath = Path.Combine(folder, fileToken);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var result = new List<ProductImportPreviewDto>();
+
+            using var workbook = new XLWorkbook(filePath);
+
+            foreach (var sheet in workbook.Worksheets)
+            {
+                var sheetName = sheet.Name.Trim();
+
+                var category = await _context.Categories
+                    .FirstOrDefaultAsync(x =>
+                        !x.is_deleted &&
+                        x.catg_name.ToLower().Trim() == sheetName.ToLower());
+
+                int productCount = sheet.RowsUsed()
+                    .Skip(1)
+                    .Count(row => !string.IsNullOrWhiteSpace(row.Cell(1).GetString()));
+
+                result.Add(new ProductImportPreviewDto
+                {
+                    SheetName = sheetName,
+                    CategoryExists = category != null,
+                    CategoryId = category?.catg_id,
+                    ProductCount = productCount
+                });
+            }
+
+            return new
+            {
+                fileToken,
+                sheets = result
+            };
+        }
+
+        public async Task<object> ImportSelectedSheetsAsync(ProductImportRequestDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (string.IsNullOrWhiteSpace(dto.FileToken))
+                throw new Exception("File token is required.");
+
+            if (dto.SelectedSheets == null || !dto.SelectedSheets.Any())
+                throw new Exception("Please select at least one sheet.");
+
+            var filePath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                "imports",
+                "products",
+                dto.FileToken
+            );
+
+            if (!File.Exists(filePath))
+                throw new Exception("Uploaded Excel file not found. Please upload again.");
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            int importedCount = 0;
+            int skippedCount = 0;
+
+            try
+            {
+                using var workbook = new XLWorkbook(filePath);
+
+                var lastProduct = await _context.Products
+                    .Where(x => x.product_id.StartsWith("prod"))
+                    .OrderByDescending(x => x.product_id)
+                    .FirstOrDefaultAsync();
+
+                int nextProductNumber = 1;
+
+                if (lastProduct != null)
+                {
+                    var numberPart = lastProduct.product_id.Replace("prod", "");
+
+                    if (int.TryParse(numberPart, out int lastNumber))
+                        nextProductNumber = lastNumber + 1;
+                }
+
+                foreach (var selectedSheet in dto.SelectedSheets)
+                {
+                    var sheet = workbook.Worksheets
+                        .FirstOrDefault(x => x.Name.Trim().ToLower() == selectedSheet.Trim().ToLower());
+
+                    if (sheet == null)
+                        throw new Exception($"Sheet not found: {selectedSheet}");
+
+                    string sheetName = sheet.Name.Trim();
+
+                    var category = await _context.Categories
+                        .FirstOrDefaultAsync(x =>
+                            !x.is_deleted &&
+                            x.catg_name.ToLower().Trim() == sheetName.ToLower());
+
+                    if (category == null)
+                        throw new Exception($"Category not found for sheet: {sheetName}");
+
+                    foreach (var row in sheet.RowsUsed().Skip(1))
+                    {
+                        string productName = row.Cell(1).GetString().Trim();
+
+                        if (string.IsNullOrWhiteSpace(productName))
+                        {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        bool productExists = await _context.Products.AnyAsync(x =>
+    x.catg_id == category.catg_id &&
+    x.product_name.Trim().ToLower() == productName.Trim().ToLower()
+);
+
+                        if (productExists)
+                        {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        string sku = row.Cell(2).GetString().Trim();
+                        string uom = row.Cell(3).GetString().Trim();
+                        string packUom = row.Cell(4).GetString().Trim();
+
+                        decimal packQty = 0;
+                        decimal stockLevel = 0;
+
+                        decimal.TryParse(row.Cell(5).GetString(), out packQty);
+                        decimal.TryParse(row.Cell(6).GetString(), out stockLevel);
+
+                        string productSource = row.Cell(7).GetString().Trim();
+
+                        if (string.IsNullOrWhiteSpace(productSource))
+                            productSource = "OWN";
+
+                        var product = new Product
+                        {
+                            product_id = $"prod{nextProductNumber:D4}",
+                            product_sku = sku,
+                            product_name = productName,
+                            product_description = productName,
+                            product_price = 0,
+                            uom = uom,
+                            pack_uom = packUom,
+                            pack_qty = packQty,
+                            stock_level = stockLevel,
+                            product_source = productSource.ToUpper(),
+                            catg_id = category.catg_id,
+                            is_deleted = false,
+                            created_at = DateTime.UtcNow,
+                            updated_at = DateTime.UtcNow
+                        };
+
+                        _context.Products.Add(product);
+
+                        importedCount++;
+                        nextProductNumber++;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return new
+                {
+                    message = "Products imported successfully.",
+                    importedCount,
+                    skippedCount
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+
     }
 }

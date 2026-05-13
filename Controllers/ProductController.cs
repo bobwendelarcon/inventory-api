@@ -98,6 +98,36 @@ public async Task<IActionResult> ResetAll()
         }
 
 
+        // import module for product with excel
+        [HttpPost("import-preview")]
+        public async Task<IActionResult> ImportPreview(IFormFile file)
+        {
+            try
+            {
+                var result = await _productService.PreviewImportAsync(file);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("import-selected")]
+        public async Task<IActionResult> ImportSelected([FromBody] ProductImportRequestDto dto)
+        {
+            try
+            {
+                var result = await _productService.ImportSelectedSheetsAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+
 
     }
 
