@@ -18,8 +18,9 @@ namespace inventory_api.Services
             int pageSize = 30,
             string lot_no = "",
             string product = "",
-            string warehouse = "",
-            string stockStatus = "",
+           string warehouse = "",
+string category = "",
+string stockStatus = "",
             string expiryStatus = "",
             string months = "",
             string from = "",
@@ -46,6 +47,10 @@ namespace inventory_api.Services
                     on lot.product_id equals productData.product_id into productJoin
                 from productData in productJoin.DefaultIfEmpty()
 
+                join categoryData in _context.Categories
+     on productData.catg_id equals categoryData.catg_id into categoryJoin
+                from categoryData in categoryJoin.DefaultIfEmpty()
+
                 join branch in _context.Branches
                     on lot.branch_id equals branch.branch_id into branchJoin
                 from branch in branchJoin.DefaultIfEmpty()
@@ -68,6 +73,10 @@ namespace inventory_api.Services
                 select new
                 {
                     product_id = lot.product_id,
+
+                    category_name = categoryData != null
+    ? (categoryData.catg_name ?? "")
+    : "",
                     branch_id = lot.branch_id,
                     description = productData != null ? (productData.product_name ?? "") : "",
                     uom = productData != null ? (productData.uom ?? "") : "",
@@ -89,6 +98,9 @@ namespace inventory_api.Services
 
             if (!string.IsNullOrWhiteSpace(warehouse))
                 query = query.Where(x => x.branch_id == warehouse);
+
+            if (!string.IsNullOrWhiteSpace(category))
+                query = query.Where(x => x.category_name == category);
 
             if (!string.IsNullOrWhiteSpace(from) && DateTime.TryParse(from, out var fromDate))
             {
@@ -223,6 +235,7 @@ namespace inventory_api.Services
                 {
                     product_id = x.product_id,
                     branch_id = x.branch_id,
+                    category_name = x.category_name,
                     description = x.description,
                     uom = x.uom,
                     pack_qty = x.pack_qty,

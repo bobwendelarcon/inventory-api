@@ -68,5 +68,54 @@ public async Task<IActionResult> ResetAll()
     await _productLotNumberService.ResetAllAsync();
     return Ok(new { message = "All Lot Number deleted" });
 }
+
+
+        [HttpPut("rename-lot")]
+        public async Task<IActionResult> RenameLot([FromBody] RenameLotNumberDto dto)
+        {
+            try
+            {
+                await _productLotNumberService.RenameLotAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Lot number updated successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("check-similar")]
+        public async Task<IActionResult> CheckSimilarLot(
+    string productId,
+    string branchId,
+    string lotNo)
+        {
+            try
+            {
+                var result = await _productLotNumberService
+                    .CheckSimilarLotAsync(productId, branchId, lotNo);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
     }
 }

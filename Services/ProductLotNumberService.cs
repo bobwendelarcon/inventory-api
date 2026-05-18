@@ -165,5 +165,139 @@ namespace inventory_api.Services
             _context.ProductLotNumbers.RemoveRange(lots);
             await _context.SaveChangesAsync();
         }
+
+        public async Task RenameLotAsync(RenameLotNumberDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (dto.requested_by_role?.Trim().ToUpper() != "ADMIN")
+                throw new Exception("Only ADMIN account can edit lot number.");
+
+            if (string.IsNullOrWhiteSpace(dto.product_id))
+                throw new Exception("Product is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.branch_id))
+                throw new Exception("Branch is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.old_lot_no))
+                throw new Exception("Old lot number is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.new_lot_no))
+                throw new Exception("New lot number is required.");
+
+            var oldLot = dto.old_lot_no.Trim();
+            var newLot = dto.new_lot_no.Trim();
+
+            if (oldLot.Equals(newLot, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("New lot number is the same as current lot number.");
+
+            var lot = await _context.ProductLotNumbers.FirstOrDefaultAsync(x =>
+                !x.is_deleted &&
+                x.product_id == dto.product_id &&
+                x.branch_id == dto.branch_id &&
+                x.lot_no == oldLot);
+
+            if (lot == null)
+                throw new Exception("Lot number not found.");
+
+            var newLotExists = await _context.ProductLotNumbers.AnyAsync(x =>
+                !x.is_deleted &&
+                x.product_id == dto.product_id &&
+                x.branch_id == dto.branch_id &&
+                x.lot_no == newLot);
+
+            if (newLotExists)
+                throw new Exception("New lot number already exists for this product and branch.");
+
+            lot.lot_no = newLot;
+            lot.updated_at = DateTime.UtcNow;
+
+            var transactions = await _context.InventoryTransactions
+                .Where(x =>
+                    !x.is_deleted &&
+                    x.product_id == dto.product_id &&
+                    x.branch_id == dto.branch_id &&
+                    x.lot_no == oldLot)
+                .ToListAsync();
+
+            foreach (var trx in transactions)
+            {
+                trx.lot_no = newLot;
+                trx.updated_at = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<object> CheckSimilarLotAsync(
+    string productId,
+    string branchId,
+    string lotNo)
+        {
+            if (string.IsNullOrWhiteSpace(lotNo))
+            {
+                return new
+                {
+                    hasSimilar = false,
+                    similarLots = new List<string>()
+                };
+            }
+
+            lotNo = lotNo.Trim().ToUpper();
+
+            var existingLots = await _context.ProductLotNumbers
+                .Where(x =>
+                    !x.is_deleted &&
+                    x.product_id == productId &&
+                    x.branch_id == branchId)
+                .Select(x => x.lot_no)
+                .Distinct()
+                .ToListAsync();
+
+            var similarLots = existingLots
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x) &&
+                    x.ToUpper() != lotNo &&
+                    LevenshteinDistance(x.ToUpper(), lotNo) <= 2)
+                .Take(5)
+                .ToList();
+
+            return new
+            {
+                hasSimilar = similarLots.Any(),
+                similarLots
+            };
+        }
+
+        private int LevenshteinDistance(string s, string t)
+        {
+            int n = s.Length;
+            int m = t.Length;
+
+            int[,] d = new int[n + 1, m + 1];
+
+            if (n == 0) return m;
+            if (m == 0) return n;
+
+            for (int i = 0; i <= n; d[i, 0] = i++) { }
+            for (int j = 0; j <= m; d[0, j] = j++) { }
+
+            for (int i = 1; i <= n; i++)
+            {
+                for (int j = 1; j <= m; j++)
+                {
+                    int cost = (t[j - 1] == s[i - 1]) ? 0 : 1;
+
+                    d[i, j] = Math.Min(
+                        Math.Min(
+                            d[i - 1, j] + 1,
+                            d[i, j - 1] + 1),
+                        d[i - 1, j - 1] + cost);
+                }
+            }
+
+            return d[n, m];
+        }
     }
 }
