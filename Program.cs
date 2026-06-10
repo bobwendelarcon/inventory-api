@@ -1,5 +1,13 @@
 using inventory_api.Data;
 using inventory_api.Services;
+using inventory_api.Services.Manufacturing.Materials;
+using inventory_api.Services.Purchasing;
+using inventory_api.Services.Purchasing.Canvassing;
+using inventory_api.Services.Purchasing.PurchaseOrders;
+using inventory_api.Services.Purchasing.QcInspections;
+using inventory_api.Services.Purchasing.ReceivingReports;
+using inventory_api.Services.Purchasing.Suppliers;
+
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +42,30 @@ builder.Services.AddScoped<ReturnService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<ProductToProduceService>();
 
+
+//manufacturing
+builder.Services.AddScoped<MaterialCategoryService>();
+builder.Services.AddScoped<MaterialService>();
+builder.Services.AddScoped<MaterialSubCategoryService>();
+
+//purchasing
+builder.Services.AddScoped<MprfService>();
+//purchasing-supplier
+builder.Services.AddScoped<SupplierService>();
+//purchasing-manufacturer
+builder.Services.AddScoped<ManufacturerService>();
+//purchasing - supplier - supplier material service
+builder.Services.AddScoped<SupplierMaterialService>();
+// msupplier manufacturer
+builder.Services.AddScoped<SupplierManufacturerService>();
+//canvassing
+builder.Services.AddScoped<CanvassingService>();
+//PO
+builder.Services.AddScoped<PurchaseOrderService>();
+//receiving
+builder.Services.AddScoped<ReceivingReportService>();
+//qaqc
+builder.Services.AddScoped<QcInspectionService>();
 
 var app = builder.Build();
 
