@@ -406,21 +406,8 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 5,
+          "SelectedChildIndex": 4,
           "Children": [
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "ReceivingReportDetailsDto.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
-              "RelativeDocumentMoniker": "DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
-              "RelativeToolTip": "DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
-              "ViewState": "AgIAABAAAAAAAAAAAAA9wDQAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T00:24:26.16Z",
-              "EditorCaption": ""
-            },
             {
               "$type": "Document",
               "DocumentIndex": 4,
@@ -431,8 +418,7 @@
               "RelativeToolTip": "DTOs\\Purchasing\\ReceivingReports\\ReceivingReportListDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T00:19:31.334Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T00:19:31.334Z"
             },
             {
               "$type": "Document",
@@ -444,8 +430,7 @@
               "RelativeToolTip": "Models\\Purchasing\\ReceivingReports\\ReceivingReportHeader.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAB4AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T08:14:04.617Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T08:14:04.617Z"
             },
             {
               "$type": "Document",
@@ -457,8 +442,7 @@
               "RelativeToolTip": "Models\\Purchasing\\ReceivingReports\\ReceivingReportLine.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAwAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T08:14:23.86Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T08:14:23.86Z"
             },
             {
               "$type": "Document",
@@ -470,8 +454,7 @@
               "RelativeToolTip": "Models\\Purchasing\\PurchaseOrders\\PurchaseOrderHeader.cs",
               "ViewState": "AgIAAAIAAAAAAAAAAAA9wBgAAAAtAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-07T23:54:28.872Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-07T23:54:28.872Z"
             },
             {
               "$type": "Document",
@@ -488,6 +471,18 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "ReceivingReportDetailsDto.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
+              "RelativeDocumentMoniker": "DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
+              "RelativeToolTip": "DTOs\\Purchasing\\ReceivingReports\\ReceivingReportDetailsDto.cs",
+              "ViewState": "AgIAABAAAAAAAAAAAAA9wDQAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-10T00:24:26.16Z"
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 6,
               "Title": "CreateReceivingReportDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\ReceivingReports\\CreateReceivingReportDto.cs",
@@ -496,8 +491,7 @@
               "RelativeToolTip": "DTOs\\Purchasing\\ReceivingReports\\CreateReceivingReportDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T08:16:20.862Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T08:16:20.862Z"
             },
             {
               "$type": "Document",
@@ -509,8 +503,7 @@
               "RelativeToolTip": "Controllers\\Purchasing\\ReceivingReports\\ReceivingReportController.cs",
               "ViewState": "AgIAAG0AAAAAAAAAAAAmwKAAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T08:19:39.909Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T08:19:39.909Z"
             },
             {
               "$type": "Document",
@@ -522,8 +515,7 @@
               "RelativeToolTip": "Services\\Purchasing\\ReceivingReports\\ReceivingReportService.cs",
               "ViewState": "AgIAAGoBAAAAAAAAAAAAwJ4BAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T08:19:05.292Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T08:19:05.292Z"
             },
             {
               "$type": "Document",
@@ -535,8 +527,7 @@
               "RelativeToolTip": "Controllers\\Purchasing\\QcInspections\\QcInspectionController.cs",
               "ViewState": "AgIAAB8AAAAAAAAAAAAAwDUAAAAlAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:53:52.595Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:53:52.595Z"
             },
             {
               "$type": "Document",
@@ -548,8 +539,7 @@
               "RelativeToolTip": "Services\\Purchasing\\QcInspections\\QcInspectionService.cs",
               "ViewState": "AgIAALkAAAAAAAAAAAAYwM8AAAAqAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:26:24.93Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:26:24.93Z"
             },
             {
               "$type": "Document",
@@ -561,8 +551,7 @@
               "RelativeToolTip": "Models\\Purchasing\\QcInspections\\QcInspectionLine.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:10:02.415Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:10:02.415Z"
             },
             {
               "$type": "Document",
@@ -574,8 +563,7 @@
               "RelativeToolTip": "Program.cs",
               "ViewState": "AgIAAB4AAAAAAAAAAAAAAEMAAAAyAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T03:24:15.719Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-29T03:24:15.719Z"
             },
             {
               "$type": "Document",
@@ -587,8 +575,7 @@
               "RelativeToolTip": "DTOs\\Purchasing\\QcInspections\\QcInspectionListDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:25:05.751Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:25:05.751Z"
             },
             {
               "$type": "Document",
@@ -600,8 +587,7 @@
               "RelativeToolTip": "DTOs\\Purchasing\\QcInspections\\QcInspectionDetailsDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAADQAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:25:28.68Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:25:28.68Z"
             },
             {
               "$type": "Document",
@@ -613,8 +599,7 @@
               "RelativeToolTip": "DTOs\\Purchasing\\QcInspections\\SaveQcInspectionDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:25:50.976Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:25:50.976Z"
             },
             {
               "$type": "Document",
@@ -626,8 +611,7 @@
               "RelativeToolTip": "Models\\Purchasing\\QcInspections\\QcInspectionHeader.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAACAAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:09:44.337Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:09:44.337Z"
             },
             {
               "$type": "Document",
@@ -639,8 +623,7 @@
               "RelativeToolTip": "Data\\AppDbContext.cs",
               "ViewState": "AgIAALgBAAAAAAAAAAAwwO8BAAAPAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T01:02:37.474Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-29T01:02:37.474Z"
             },
             {
               "$type": "Document",
