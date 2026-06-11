@@ -10,6 +10,7 @@
         public string? SourceBranchId { get; set; }
         public string CustomerName { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
+        public string? ProductDescription { get; set; }
         public decimal RequiredQty { get; set; }
         public decimal AllocatedQty { get; set; }
         public decimal RemainingQty { get; set; }

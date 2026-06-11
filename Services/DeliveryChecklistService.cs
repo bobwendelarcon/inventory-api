@@ -438,6 +438,7 @@ SELECT
     oh.delivery_date,
     ol.product_id,
     ol.product_name,
+p.product_description,
     p.uom,
     p.pack_uom,
     p.pack_qty,
@@ -523,6 +524,9 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
                     delivery_date = reader["delivery_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["delivery_date"]),
                     product_id = reader["product_id"]?.ToString() ?? "",
                     product_name = reader["product_name"]?.ToString() ?? "",
+                    product_description = reader["product_description"] == DBNull.Value
+    ? null
+    : reader["product_description"].ToString(),
                     uom = reader["uom"] == DBNull.Value ? null : reader["uom"]?.ToString(),
                     pack_uom = reader["pack_uom"] == DBNull.Value ? null : reader["pack_uom"]?.ToString(),
                     pack_qty = reader["pack_qty"] == DBNull.Value ? null : Convert.ToDecimal(reader["pack_qty"]),
@@ -702,36 +706,38 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
 
             // LINES
             string lineSql = @"
-   SELECT
-    checklist_line_id,
-    order_id,
-    order_no,
-    order_line_id,
-    customer_id,
-    customer_name,
-    product_id,
-    product_name,
-    branch_id,
-    lot_no,
+SELECT
+    dcl.checklist_line_id,
+    dcl.order_id,
+    dcl.order_no,
+    dcl.order_line_id,
+    dcl.customer_id,
+    dcl.customer_name,
+    dcl.product_id,
+    dcl.product_name,
+    p.product_description,
+    dcl.branch_id,
+    dcl.lot_no,
 
-    uom,
-    pack_uom,
-    pack_qty,
-    
+    dcl.uom,
+    dcl.pack_uom,
+    dcl.pack_qty,
 
-    manufacturing_date,
-    expiration_date,
-    required_qty,
-    allocated_qty,
-    checklist_qty,
-    released_qty,
-    remaining_qty,
-    status,
-    remarks
-FROM delivery_checklist_line
-WHERE checklist_id = @checklist_id
-  AND is_deleted = 0
-ORDER BY product_name ASC, expiration_date ASC, lot_no ASC;";
+    dcl.manufacturing_date,
+    dcl.expiration_date,
+    dcl.required_qty,
+    dcl.allocated_qty,
+    dcl.checklist_qty,
+    dcl.released_qty,
+    dcl.remaining_qty,
+    dcl.status,
+    dcl.remarks
+FROM delivery_checklist_line dcl
+LEFT JOIN products p
+    ON dcl.product_id = p.product_id
+WHERE dcl.checklist_id = @checklist_id
+  AND dcl.is_deleted = 0
+ORDER BY dcl.product_name ASC, dcl.expiration_date ASC, dcl.lot_no ASC;";
 
             using (var lineCmd = new MySqlCommand(lineSql, conn))
             {
@@ -751,6 +757,9 @@ ORDER BY product_name ASC, expiration_date ASC, lot_no ASC;";
                         customer_name = reader["customer_name"] == DBNull.Value ? null : reader["customer_name"]?.ToString(),
                         product_id = reader["product_id"]?.ToString() ?? string.Empty,
                         product_name = reader["product_name"]?.ToString() ?? string.Empty,
+                        product_description = reader["product_description"] == DBNull.Value
+    ? null
+    : reader["product_description"]?.ToString(),
                         branch_id = reader["branch_id"] == DBNull.Value ? null : reader["branch_id"]?.ToString(),
                         lot_no = reader["lot_no"] == DBNull.Value ? null : reader["lot_no"]?.ToString(),
                         manufacturing_date = reader["manufacturing_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["manufacturing_date"]),

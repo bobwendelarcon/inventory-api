@@ -26,6 +26,7 @@
         public string? customer_name { get; set; }
         public string product_id { get; set; } = string.Empty;
         public string product_name { get; set; } = string.Empty;
+        public string? product_description { get; set; }
 
         public string? branch_id { get; set; }   // ✅ NEW
 

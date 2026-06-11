@@ -14,6 +14,7 @@
 
         public string product_id { get; set; } = string.Empty;
         public string product_name { get; set; } = string.Empty;
+        public string? product_description { get; set; }
         public string? branch_id { get; set; }   // ✅ NEW
         public string? uom { get; set; }
         public string? pack_uom { get; set; }

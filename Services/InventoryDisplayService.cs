@@ -75,10 +75,19 @@ string stockStatus = "",
                     product_id = lot.product_id,
 
                     category_name = categoryData != null
-    ? (categoryData.catg_name ?? "")
-    : "",
+          ? (categoryData.catg_name ?? "")
+          : "",
+
                     branch_id = lot.branch_id,
-                    description = productData != null ? (productData.product_name ?? "") : "",
+
+                    description = productData != null
+          ? (productData.product_name ?? "")
+          : "",
+
+                    product_description = productData != null
+          ? (productData.product_description ?? "")
+          : "",
+
                     uom = productData != null ? (productData.uom ?? "") : "",
                     pack_qty = productData != null ? (decimal)(productData.pack_qty ?? 0) : 0,
                     pack_uom = productData != null ? (productData.pack_uom ?? "") : "",
@@ -237,6 +246,7 @@ string stockStatus = "",
                     branch_id = x.branch_id,
                     category_name = x.category_name,
                     description = x.description,
+                    product_description = x.product_description,
                     uom = x.uom,
                     pack_qty = x.pack_qty,
                     pack_uom = x.pack_uom,

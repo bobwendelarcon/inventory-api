@@ -22,6 +22,8 @@
         public string LotNo { get; set; } = "";
         public string ProductName { get; set; } = "";
 
+        public string? ProductDescription { get; set; }
+
         public decimal Quantity { get; set; }
 
         public string Uom { get; set; } = "";

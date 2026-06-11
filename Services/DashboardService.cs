@@ -385,6 +385,7 @@ namespace inventory_api.Services
                     LotNo = x.t.lot_no ?? "",
 
                     ProductName = x.p.product_name,
+                    ProductDescription = x.p.product_description,
                     Quantity = x.t.quantity,
                     Uom = x.p.uom,
                     Type = x.t.transaction_type,

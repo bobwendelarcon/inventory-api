@@ -7,5 +7,6 @@
         public string? RouteName { get; set; }
         public DateTime? DeliveryDate { get; set; }
         public string? SpecialInstructions { get; set; }
+        public string? SourceBranchId { get; set; }
     }
 }

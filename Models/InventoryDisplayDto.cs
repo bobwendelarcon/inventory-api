@@ -5,6 +5,7 @@
         public string product_id { get; set; } = "";
         public string branch_id { get; set; } = "";
         public string description { get; set; } = "";
+        public string? product_description { get; set; }
         public string category_name { get; set; } = "";
         public string uom { get; set; } = "";
         public decimal pack_qty { get; set; }

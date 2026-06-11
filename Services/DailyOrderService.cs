@@ -59,6 +59,7 @@ namespace inventory_api.Services
             OrderNo = h.order_no,
             CustomerName = h.customer_name,
             ProductName = p?.product_name ?? l.product_name,
+            ProductDescription = p?.product_description ?? "",
             RequiredQty = l.required_qty,
             AllocatedQty = l.allocated_qty,
             RemainingQty = l.remaining_qty,
@@ -274,6 +275,7 @@ namespace inventory_api.Services
                     {
                         OrderLineId = l.order_line_id,
                         ProductName = p?.product_name ?? l.product_name,
+                        ProductDescription = p?.product_description ?? "",
                         //RequiredQty = l.required_qty,
                         //AllocatedQty = l.allocated_qty,
                         //// AvailableBeforeAllocation = l.required_qty,
@@ -898,6 +900,11 @@ namespace inventory_api.Services
 
             if (order.status == "Ready for Dispatch" || order.status == "Completed")
                 throw new Exception("This order can no longer be edited.");
+
+            if (string.IsNullOrWhiteSpace(request.SourceBranchId))
+                throw new Exception("Source branch is required.");
+
+            order.source_branch_id = request.SourceBranchId;
 
             order.customer_name = request.CustomerName;
             order.class_name = request.ClassName;

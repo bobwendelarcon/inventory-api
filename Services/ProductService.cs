@@ -279,22 +279,27 @@ namespace inventory_api.Services
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var keyword = search.Trim().ToLower();
-                query = query.Where(x => x.product_name.ToLower().Contains(keyword));
+                search = search.Trim();
+
+                query = query.Where(x =>
+                    x.product_name.Contains(search) ||
+                    x.product_description.Contains(search)
+                );
             }
 
             return await query
-                .OrderBy(x => x.product_name)
-                .Select(x => new ProductLookupDto
-                {
-                    ProductId = x.product_id,
-                    ProductName = x.product_name,
-                    CategoryId = x.catg_id,
-                    Uom = x.uom,
-                    PackUom = x.pack_uom,
-                    PackQty = x.pack_qty
-                })
-                .ToListAsync();
+     .OrderBy(x => x.product_name)
+     .Select(x => new ProductLookupDto
+     {
+         ProductId = x.product_id,
+         ProductName = x.product_name,
+         ProductDescription = x.product_description,
+         CategoryId = x.catg_id,
+         Uom = x.uom,
+         PackUom = x.pack_uom,
+         PackQty = x.pack_qty
+     })
+     .ToListAsync();
         }
 
         // import module for product excel
@@ -414,7 +419,11 @@ namespace inventory_api.Services
 
                     foreach (var row in sheet.RowsUsed().Skip(1))
                     {
-                        string productName = row.Cell(1).GetString().Trim();
+                        string genericName = row.Cell(1).GetString().Trim();
+                        string brandName = row.Cell(2).GetString().Trim();
+                        string client = row.Cell(3).GetString().Trim();
+
+                        string productName = genericName;
 
                         if (string.IsNullOrWhiteSpace(productName))
                         {
@@ -422,10 +431,17 @@ namespace inventory_api.Services
                             continue;
                         }
 
+                        string description = brandName;
+
+                        if (!string.IsNullOrWhiteSpace(client))
+                        {
+                            description = $"{brandName} ({client})";
+                        }
+
                         bool productExists = await _context.Products.AnyAsync(x =>
-    x.catg_id == category.catg_id &&
-    x.product_name.Trim().ToLower() == productName.Trim().ToLower()
-);
+                            x.catg_id == category.catg_id &&
+                            x.product_name.Trim().ToLower() == productName.Trim().ToLower()
+                        );
 
                         if (productExists)
                         {
@@ -433,17 +449,17 @@ namespace inventory_api.Services
                             continue;
                         }
 
-                        string sku = row.Cell(2).GetString().Trim();
-                        string uom = row.Cell(3).GetString().Trim();
-                        string packUom = row.Cell(4).GetString().Trim();
+                        string sku = row.Cell(4).GetString().Trim();
+                        string uom = row.Cell(5).GetString().Trim();
+                        string packUom = row.Cell(6).GetString().Trim();
 
                         decimal packQty = 0;
                         decimal stockLevel = 0;
 
-                        decimal.TryParse(row.Cell(5).GetString(), out packQty);
-                        decimal.TryParse(row.Cell(6).GetString(), out stockLevel);
+                        decimal.TryParse(row.Cell(7).GetString(), out packQty);
+                        decimal.TryParse(row.Cell(8).GetString(), out stockLevel);
 
-                        string productSource = row.Cell(7).GetString().Trim();
+                        string productSource = row.Cell(9).GetString().Trim();
 
                         if (string.IsNullOrWhiteSpace(productSource))
                             productSource = "OWN";
@@ -453,7 +469,7 @@ namespace inventory_api.Services
                             product_id = $"prod{nextProductNumber:D4}",
                             product_sku = sku,
                             product_name = productName,
-                            product_description = productName,
+                            product_description = description,
                             product_price = 0,
                             uom = uom,
                             pack_uom = packUom,

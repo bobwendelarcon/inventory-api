@@ -9,5 +9,7 @@
         public string? Uom { get; set; }
         public string? PackUom { get; set; }
         public decimal? PackQty { get; set; }
+
+        public string? ProductDescription { get; set; }
     }
 }
