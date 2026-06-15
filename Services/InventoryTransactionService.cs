@@ -42,16 +42,17 @@ namespace inventory_api.Services
             // ✅ BUSINESS RULE:
             // same lot + same product = allowed
             // same lot + different product = reject
-            var existingLotForDifferentProduct = await _context.ProductLotNumbers
-                .FirstOrDefaultAsync(x =>
-                    x.lot_no == dto.lot_no &&
-                    x.product_id != dto.product_id &&
-                    !x.is_deleted);
 
-            if (existingLotForDifferentProduct != null)
-            {
-                throw new Exception($"Lot number '{dto.lot_no}' is already assigned to another product.");
-            }
+            //var existingLotForDifferentProduct = await _context.ProductLotNumbers
+            //    .FirstOrDefaultAsync(x =>
+            //        x.lot_no == dto.lot_no &&
+            //        x.product_id != dto.product_id &&
+            //        !x.is_deleted);
+
+            //if (existingLotForDifferentProduct != null)
+            //{
+            //    throw new Exception($"Lot number '{dto.lot_no}' is already assigned to another product.");
+            //}
 
             var hasOuterTransaction = _context.Database.CurrentTransaction != null;
             var transaction = hasOuterTransaction
