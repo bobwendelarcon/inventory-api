@@ -16,17 +16,46 @@ namespace inventory_api.Controllers
             _service = service;
         }
 
+        //[HttpPost("in")]
+        //public async Task<IActionResult> StockIn([FromBody] CreateInventoryTransactionDto dto)
+        //{
+        //    dto.transaction_type = "IN";
+        //    await _service.AddAsync(dto);
+        //    return Ok(new
+        //    {
+        //        success = true,
+        //        message = "Stock IN saved"
+        //    });
+        //}
+
+
         [HttpPost("in")]
         public async Task<IActionResult> StockIn([FromBody] CreateInventoryTransactionDto dto)
         {
-            dto.transaction_type = "IN";
-            await _service.AddAsync(dto);
-            return Ok(new
+            try
             {
-                success = true,
-                message = "Stock IN saved"
-            });
+                dto.transaction_type = "IN";
+                await _service.AddAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Stock IN saved"
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message,
+                    inner = ex.InnerException?.Message,
+                    fullError = ex.ToString()
+                });
+            }
         }
+
+
 
         [HttpPost("out")]
         public async Task<IActionResult> StockOut([FromBody] CreateInventoryTransactionDto dto)
