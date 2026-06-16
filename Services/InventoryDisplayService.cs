@@ -102,8 +102,18 @@ string stockStatus = "",
             if (!string.IsNullOrWhiteSpace(lot_no))
                 query = query.Where(x => x.lot_no.Contains(lot_no));
 
+            //if (!string.IsNullOrWhiteSpace(product))
+            //    query = query.Where(x => x.description.Contains(product));
             if (!string.IsNullOrWhiteSpace(product))
-                query = query.Where(x => x.description.Contains(product));
+            {
+                var keyword = product.Trim();
+
+                query = query.Where(x =>
+                    x.description.Contains(keyword) ||
+                    x.product_description.Contains(keyword)
+                );
+            }
+
 
             if (!string.IsNullOrWhiteSpace(warehouse))
                 query = query.Where(x => x.branch_id == warehouse);
