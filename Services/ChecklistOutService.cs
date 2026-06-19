@@ -561,12 +561,17 @@ namespace inventory_api.Services
           product_id = x.product_id,
           product_name = x.product_name,
 
+          product_description = _context.Products
+        .Where(p => p.product_id == x.product_id)
+        .Select(p => p.product_description)
+        .FirstOrDefault(),
+
           branch_id = x.branch_id,
 
           branch_name = _context.Branches
-              .Where(b => b.branch_id == x.branch_id)
-              .Select(b => b.branch_name)
-              .FirstOrDefault(),
+        .Where(b => b.branch_id == x.branch_id)
+        .Select(b => b.branch_name)
+        .FirstOrDefault(),
 
           uom = x.uom,
           pack_uom = x.pack_uom,
