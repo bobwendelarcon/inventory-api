@@ -38,6 +38,7 @@
     public class DailyOrderAllocationDto
     {
         public string? BranchId { get; set; }
+        public string? WarehouseName { get; set; } // ✅ ADD
         public string LotNo { get; set; } = string.Empty;
         public DateTime? ManufacturingDate { get; set; }
         public DateTime? ExpirationDate { get; set; }

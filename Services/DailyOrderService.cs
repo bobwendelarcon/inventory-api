@@ -336,6 +336,14 @@ namespace inventory_api.Services
             var products = await _context.Products.ToListAsync();
             var productDict = products.ToDictionary(x => x.product_id, x => x);
 
+            var branches = await _context.Branches.ToListAsync();
+
+            var branchDict = branches.ToDictionary(
+                x => x.branch_id,
+                x => x.branch_name
+            );
+
+
             var result = new List<object>();
 
             foreach (var line in order.Lines)
@@ -384,6 +392,29 @@ namespace inventory_api.Services
 
                     var available = Math.Max(0, lot.quantity - reservedQty);
 
+                    //update 06192026
+
+                    //lotDtos.Add(new
+                    //{
+                    //    OrderLineId = line.order_line_id,
+                    //    ProductId = line.product_id,
+                    //    ProductName = product?.product_name ?? line.product_name,
+
+                    //    LotNo = lot.lot_no,
+                    //    ManufacturingDate = lot.manufacturing_date,
+                    //    ExpirationDate = lot.expiration_date,
+
+                    //    OnHandQty = lot.quantity,
+                    //    ReservedQty = reservedQty,
+                    //    AvailableQty = available,
+
+                    //    ExistingAllocatedQty = currentAllocated,
+
+                    //    Uom = product?.uom ?? "",
+                    //    PackQty = product?.pack_qty ?? 0,
+                    //    PackUom = product?.pack_uom ?? ""
+                    //});
+
                     lotDtos.Add(new
                     {
                         OrderLineId = line.order_line_id,
@@ -391,6 +422,14 @@ namespace inventory_api.Services
                         ProductName = product?.product_name ?? line.product_name,
 
                         LotNo = lot.lot_no,
+
+                        BranchId = lot.branch_id,
+                        WarehouseName =
+        !string.IsNullOrWhiteSpace(lot.branch_id) &&
+        branchDict.ContainsKey(lot.branch_id)
+            ? branchDict[lot.branch_id]
+            : lot.branch_id,
+
                         ManufacturingDate = lot.manufacturing_date,
                         ExpirationDate = lot.expiration_date,
 
