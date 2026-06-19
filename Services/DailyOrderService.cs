@@ -202,6 +202,7 @@ namespace inventory_api.Services
         // =========================================
         // GET DETAILS (VIEW MODAL)
         // =========================================
+
         public async Task<DailyOrderDetailsDto> GetByIdAsync(long orderId)
         {
             var order = await _context.DailyOrderHeaders
@@ -224,9 +225,17 @@ namespace inventory_api.Services
 
             var products = await _context.Products.ToListAsync();
             var productDict = products.ToDictionary(x => x.product_id, x => x);
+
+            var branches = await _context.Branches.ToListAsync();
+
+            var branchDict = branches.ToDictionary(
+                x => x.branch_id,
+                x => x.branch_name
+            );
+
             var lotStocks = await _context.ProductLotNumbers
-    .Where(x => !x.is_deleted)
-    .ToListAsync();
+                .Where(x => !x.is_deleted)
+                .ToListAsync();
 
             var dto = new DailyOrderDetailsDto
             {
@@ -240,54 +249,77 @@ namespace inventory_api.Services
                 DeliveryDate = order.delivery_date,
                 SpecialInstructions = order.special_instructions,
                 Status = order.status,
+
                 Lines = order.Lines.Select(l =>
                 {
                     productDict.TryGetValue(l.product_id, out var p);
 
-                    var availableStock = lotStocks
-      .Where(x =>
-          x.product_id == l.product_id &&
-          x.branch_id == order.source_branch_id)
-      .Sum(lot =>
-      {
-          var reservedQty = _context.DailyOrderAllocations
-    .Where(a =>
-        a.product_id == l.product_id &&
-        a.branch_id == lot.branch_id &&
-        a.lot_no == lot.lot_no &&
-        a.allocated_qty > 0)
-    .Join(_context.DailyOrderLines,
-        a => a.order_line_id,
-        dl => dl.order_line_id,
-        (a, dl) => new { a, dl })
-    .Join(_context.DailyOrderHeaders,
-        x => x.dl.order_id,
-        h => h.order_id,
-        (x, h) => new { x.a, x.dl, h })
-    .Where(x => !x.h.is_deleted)
-    .Sum(x => (decimal?)x.a.allocated_qty) ?? 0;
+                    var warehouseAvailableStocks = lotStocks
+                        .Where(x => x.product_id == l.product_id)
+                        .GroupBy(x => x.branch_id)
+                        .Select(g =>
+                        {
+                            var branchId = g.Key;
 
-          return Math.Max(0, lot.quantity - reservedQty);
-      });
+                            var availableQty = g.Sum(lot =>
+                            {
+                                var reservedQty = _context.DailyOrderAllocations
+                                    .Where(a =>
+                                        a.product_id == l.product_id &&
+                                        a.branch_id == lot.branch_id &&
+                                        a.lot_no == lot.lot_no &&
+                                        a.allocated_qty > 0)
+                                    .Join(_context.DailyOrderLines,
+                                        a => a.order_line_id,
+                                        dl => dl.order_line_id,
+                                        (a, dl) => new { a, dl })
+                                    .Join(_context.DailyOrderHeaders,
+                                        x => x.dl.order_id,
+                                        h => h.order_id,
+                                        (x, h) => new { x.a, x.dl, h })
+                                    .Where(x => !x.h.is_deleted)
+                                    .Sum(x => (decimal?)x.a.allocated_qty) ?? 0;
 
+                                return Math.Max(0, lot.quantity - reservedQty);
+                            });
+
+                            return new WarehouseAvailableDto
+                            {
+                                BranchId = branchId,
+                                WarehouseName =
+                                    !string.IsNullOrWhiteSpace(branchId) &&
+                                    branchDict.ContainsKey(branchId)
+                                        ? branchDict[branchId]
+                                        : branchId ?? "-",
+                                AvailableQty = availableQty,
+                                IsPreferred = branchId == order.source_branch_id
+                            };
+                        })
+                        .Where(x => x.AvailableQty > 0)
+                        .OrderBy(x => x.IsPreferred ? 0 : 1)
+                        .ThenByDescending(x => x.AvailableQty)
+                        .ToList();
+
+                    var totalAvailableStock = warehouseAvailableStocks.Sum(x => x.AvailableQty);
 
                     return new DailyOrderLineDto
                     {
                         OrderLineId = l.order_line_id,
                         ProductName = p?.product_name ?? l.product_name,
                         ProductDescription = p?.product_description ?? "",
-                        //RequiredQty = l.required_qty,
-                        //AllocatedQty = l.allocated_qty,
-                        //// AvailableBeforeAllocation = l.required_qty,
-                        //AvailableBeforeAllocation = l.Allocations.Sum(a => a.available_qty),
+
                         RequiredQty = l.required_qty,
                         AllocatedQty = l.allocated_qty,
                         UnallocatedQty = Math.Max(
-    0,
-    l.required_qty - l.dispatched_qty - l.allocated_qty
-),
+                            0,
+                            l.required_qty - l.dispatched_qty - l.allocated_qty
+                        ),
                         RemainingQty = l.remaining_qty,
-                        AvailableBeforeAllocation = availableStock,
+
+                        AvailableBeforeAllocation = totalAvailableStock,
+                        TotalAvailableStock = totalAvailableStock,
+                        WarehouseAvailableStocks = warehouseAvailableStocks,
+
                         AllocationResult = l.allocation_status,
 
                         Uom = p?.uom ?? "",
@@ -295,31 +327,156 @@ namespace inventory_api.Services
                         PackUom = p?.pack_uom ?? "",
 
                         Allocations = l.Allocations
-                            .OrderBy(a => a.priority_rank)
-                            .Select(a => new DailyOrderAllocationDto
-                            {
-                                BranchId = a.branch_id,
-                                LotNo = a.lot_no,
-                                ManufacturingDate = a.manufacturing_date,
-                                ExpirationDate = a.expiration_date,
-                                OnHandQty = a.on_hand_qty,
-                                ReservedQty = a.reserved_qty,
-                                AvailableQty = a.available_qty,
-                                AllocatedQty = a.allocated_qty,
-                                AllocationMode = a.allocation_mode,
-                                PriorityRank = a.priority_rank,
+    .OrderBy(a => a.priority_rank)
+    .Select(a => new DailyOrderAllocationDto
+    {
+        BranchId = a.branch_id,
+        WarehouseName =
+            !string.IsNullOrWhiteSpace(a.branch_id) &&
+            branchDict.ContainsKey(a.branch_id)
+                ? branchDict[a.branch_id]
+                : a.branch_id,
 
-                                Uom = p?.uom ?? "",
-                                PackQty = p?.pack_qty ?? 0,
-                                PackUom = p?.pack_uom ?? ""
-                            })
-                            .ToList()
+        LotNo = a.lot_no,
+        ManufacturingDate = a.manufacturing_date,
+        ExpirationDate = a.expiration_date,
+        OnHandQty = a.on_hand_qty,
+        ReservedQty = a.reserved_qty,
+        AvailableQty = a.available_qty,
+        AllocatedQty = a.allocated_qty,
+        AllocationMode = a.allocation_mode,
+        PriorityRank = a.priority_rank,
+
+        Uom = p?.uom ?? "",
+        PackQty = p?.pack_qty ?? 0,
+        PackUom = p?.pack_uom ?? ""
+    })
+    .ToList()
                     };
                 }).ToList()
             };
 
             return dto;
         }
+
+        //        public async Task<DailyOrderDetailsDto> GetByIdAsync(long orderId)
+        //        {
+        //            var order = await _context.DailyOrderHeaders
+        //                .Include(h => h.Lines)
+        //                    .ThenInclude(l => l.Allocations)
+        //                .FirstOrDefaultAsync(x => x.order_id == orderId && !x.is_deleted);
+
+        //            if (order == null)
+        //                throw new Exception("Order not found.");
+
+        //            string? sourceBranchName = null;
+
+        //            if (!string.IsNullOrWhiteSpace(order.source_branch_id))
+        //            {
+        //                sourceBranchName = await _context.Branches
+        //                    .Where(b => b.branch_id == order.source_branch_id)
+        //                    .Select(b => b.branch_name)
+        //                    .FirstOrDefaultAsync();
+        //            }
+
+        //            var products = await _context.Products.ToListAsync();
+        //            var productDict = products.ToDictionary(x => x.product_id, x => x);
+        //            var lotStocks = await _context.ProductLotNumbers
+        //    .Where(x => !x.is_deleted)
+        //    .ToListAsync();
+
+        //            var dto = new DailyOrderDetailsDto
+        //            {
+        //                OrderId = order.order_id,
+        //                OrderNo = order.order_no,
+        //                CustomerName = order.customer_name,
+        //                ClassName = order.class_name,
+        //                SourceBranchId = order.source_branch_id,
+        //                SourceBranchName = sourceBranchName,
+        //                RouteName = order.route_name,
+        //                DeliveryDate = order.delivery_date,
+        //                SpecialInstructions = order.special_instructions,
+        //                Status = order.status,
+        //                Lines = order.Lines.Select(l =>
+        //                {
+        //                    productDict.TryGetValue(l.product_id, out var p);
+
+        //                    var availableStock = lotStocks
+        //      .Where(x =>
+        //          x.product_id == l.product_id &&
+        //          x.branch_id == order.source_branch_id)
+        //      .Sum(lot =>
+        //      {
+        //          var reservedQty = _context.DailyOrderAllocations
+        //    .Where(a =>
+        //        a.product_id == l.product_id &&
+        //        a.branch_id == lot.branch_id &&
+        //        a.lot_no == lot.lot_no &&
+        //        a.allocated_qty > 0)
+        //    .Join(_context.DailyOrderLines,
+        //        a => a.order_line_id,
+        //        dl => dl.order_line_id,
+        //        (a, dl) => new { a, dl })
+        //    .Join(_context.DailyOrderHeaders,
+        //        x => x.dl.order_id,
+        //        h => h.order_id,
+        //        (x, h) => new { x.a, x.dl, h })
+        //    .Where(x => !x.h.is_deleted)
+        //    .Sum(x => (decimal?)x.a.allocated_qty) ?? 0;
+
+        //          return Math.Max(0, lot.quantity - reservedQty);
+        //      });
+
+
+        //                    return new DailyOrderLineDto
+        //                    {
+        //                        OrderLineId = l.order_line_id,
+        //                        ProductName = p?.product_name ?? l.product_name,
+        //                        ProductDescription = p?.product_description ?? "",
+        //                        //RequiredQty = l.required_qty,
+        //                        //AllocatedQty = l.allocated_qty,
+        //                        //// AvailableBeforeAllocation = l.required_qty,
+        //                        //AvailableBeforeAllocation = l.Allocations.Sum(a => a.available_qty),
+        //                        RequiredQty = l.required_qty,
+        //                        AllocatedQty = l.allocated_qty,
+        //                        UnallocatedQty = Math.Max(
+        //    0,
+        //    l.required_qty - l.dispatched_qty - l.allocated_qty
+        //),
+        //                        RemainingQty = l.remaining_qty,
+        //                        AvailableBeforeAllocation = availableStock,
+        //                        AllocationResult = l.allocation_status,
+
+        //                        Uom = p?.uom ?? "",
+        //                        PackQty = p?.pack_qty ?? 0,
+        //                        PackUom = p?.pack_uom ?? "",
+
+        //                        Allocations = l.Allocations
+        //                            .OrderBy(a => a.priority_rank)
+        //                            .Select(a => new DailyOrderAllocationDto
+        //                            {
+        //                                BranchId = a.branch_id,
+        //                                LotNo = a.lot_no,
+        //                                ManufacturingDate = a.manufacturing_date,
+        //                                ExpirationDate = a.expiration_date,
+        //                                OnHandQty = a.on_hand_qty,
+        //                                ReservedQty = a.reserved_qty,
+        //                                AvailableQty = a.available_qty,
+        //                                AllocatedQty = a.allocated_qty,
+        //                                AllocationMode = a.allocation_mode,
+        //                                PriorityRank = a.priority_rank,
+
+        //                                Uom = p?.uom ?? "",
+        //                                PackQty = p?.pack_qty ?? 0,
+        //                                PackUom = p?.pack_uom ?? ""
+        //                            })
+        //                            .ToList()
+        //                    };
+        //                }).ToList()
+        //            };
+
+        //            return dto;
+        //        }
 
         public async Task<object> GetAvailableLotsAsync(long orderId)
         {
@@ -352,14 +509,22 @@ namespace inventory_api.Services
 
                 var lots = await _context.ProductLotNumbers
                     .Where(l =>
+                        //l.product_id == line.product_id &&
+                        //l.branch_id == order.source_branch_id &&
+                        //l.quantity > 0 &&
+                        //!l.is_deleted)
                         l.product_id == line.product_id &&
-                        l.branch_id == order.source_branch_id &&
                         l.quantity > 0 &&
                         !l.is_deleted)
-                    .OrderBy(l => l.expiration_date)
+                    //.OrderBy(l => l.expiration_date)
+                    //.ThenBy(l => l.manufacturing_date)
+                    //.ThenBy(l => l.lot_no)
+                   
+                    .OrderBy(l => l.branch_id == order.source_branch_id ? 0 : 1)
+                    .ThenBy(l => l.expiration_date)
                     .ThenBy(l => l.manufacturing_date)
                     .ThenBy(l => l.lot_no)
-                    .ToListAsync();
+                     .ToListAsync();
 
                 var lotDtos = new List<object>();
 
@@ -627,8 +792,11 @@ namespace inventory_api.Services
 
                 var lots = await _context.ProductLotNumbers
                     .Where(x =>
+                        //x.product_id == line.product_id &&
+                        //x.branch_id == order.source_branch_id &&
+                        //x.quantity > 0 &&
+                        //!x.is_deleted &&
                         x.product_id == line.product_id &&
-                        x.branch_id == order.source_branch_id &&
                         x.quantity > 0 &&
                         !x.is_deleted &&
                         (
@@ -636,10 +804,15 @@ namespace inventory_api.Services
                             x.expiration_date.Value.Date >= phToday
                         )
                     )
-                    .OrderBy(x => x.expiration_date)
-                    .ThenBy(x => x.manufacturing_date)
-                    .ThenBy(x => x.lot_no)
-                    .ToListAsync();
+                    //.OrderBy(x => x.expiration_date)
+                    //.ThenBy(x => x.manufacturing_date)
+                    //.ThenBy(x => x.lot_no)
+                    //.ToListAsync();
+                    .OrderBy(x => x.branch_id == order.source_branch_id ? 0 : 1)
+.ThenBy(x => x.expiration_date)
+.ThenBy(x => x.manufacturing_date)
+.ThenBy(x => x.lot_no)
+.ToListAsync();
 
                 int priority = 1;
 
@@ -1306,23 +1479,23 @@ namespace inventory_api.Services
                         continue;
 
                     var lot = await _context.ProductLotNumbers
-                        .FirstOrDefaultAsync(x =>
-                            x.product_id == line.product_id &&
-                            x.branch_id == order.source_branch_id &&
-                            x.lot_no == lotRequest.LotNo &&
-                            !x.is_deleted);
+    .FirstOrDefaultAsync(x =>
+        x.product_id == line.product_id &&
+        x.branch_id == lotRequest.BranchId &&
+        x.lot_no == lotRequest.LotNo &&
+        !x.is_deleted);
 
                     if (lot == null)
                         throw new Exception($"Lot {lotRequest.LotNo} not found.");
 
                     decimal alreadyReserved = await _context.DailyOrderAllocations
                         .Where(a =>
-                            a.product_id == line.product_id &&
-                            a.branch_id == order.source_branch_id &&
-                            a.lot_no == lot.lot_no &&
-                            a.order_line_id != line.order_line_id &&
-                            a.allocated_qty > 0
-                        )
+    a.product_id == line.product_id &&
+    a.branch_id == lotRequest.BranchId &&
+    a.lot_no == lot.lot_no &&
+    a.order_line_id != line.order_line_id &&
+    a.allocated_qty > 0
+)
                         .Join(_context.DailyOrderLines,
                             a => a.order_line_id,
                             dl => dl.order_line_id,

@@ -34,13 +34,23 @@ namespace inventory_api.Services
             {
                 string checklistNo = await GenerateChecklistNoAsync(conn, transaction);
 
-                long checklistId = await InsertChecklistHeaderAsync(conn, transaction, dto, checklistNo, createdBy);
+                long checklistId = await InsertChecklistHeaderAsync(
+                    conn,
+                    transaction,
+                    dto,
+                    checklistNo,
+                    createdBy
+                );
 
                 foreach (var line in dto.lines)
                 {
                     await ValidateChecklistLineAsync(conn, transaction, line);
 
-                    var allocationLots = await GetAllocationLotsAsync(conn, transaction, line.order_line_id);
+                    var allocationLots = await GetAllocationLotsAsync(
+                        conn,
+                        transaction,
+                        line.order_line_id
+                    );
 
                     if (allocationLots.Count == 0)
                         throw new Exception($"No allocated lots found for order line {line.order_line_id}.");
@@ -49,18 +59,18 @@ namespace inventory_api.Services
 
                     if (totalLotAllocatedQty <= 0)
                         throw new Exception($"Allocated lot qty is zero for order line {line.order_line_id}.");
-                    var distinctBranches = allocationLots
-    .Where(x => !string.IsNullOrWhiteSpace(x.branch_id))
-    .Select(x => x.branch_id)
-    .Distinct()
-    .ToList();
 
-                    if (distinctBranches.Count > 1)
-                        throw new Exception($"Mixed-branch allocation detected for order line {line.order_line_id}. This is not allowed.");
-
+                    // ✅ MULTI-WAREHOUSE SUPPORTED
+                    // Create one checklist line per allocated lot/warehouse.
                     foreach (var lot in allocationLots)
                     {
-                        await InsertChecklistLinePerLotAsync(conn, transaction, checklistId, line, lot);
+                        await InsertChecklistLinePerLotAsync(
+                            conn,
+                            transaction,
+                            checklistId,
+                            line,
+                            lot
+                        );
                     }
                 }
 
@@ -716,9 +726,11 @@ SELECT
     dcl.product_id,
     dcl.product_name,
     p.product_description,
-    dcl.branch_id,
-    dcl.lot_no,
 
+    dcl.branch_id,
+    b.branch_name AS branch_name,
+
+    dcl.lot_no,
     dcl.uom,
     dcl.pack_uom,
     dcl.pack_qty,
@@ -735,6 +747,8 @@ SELECT
 FROM delivery_checklist_line dcl
 LEFT JOIN products p
     ON dcl.product_id = p.product_id
+LEFT JOIN branches b
+    ON dcl.branch_id = b.branch_id
 WHERE dcl.checklist_id = @checklist_id
   AND dcl.is_deleted = 0
 ORDER BY dcl.product_name ASC, dcl.expiration_date ASC, dcl.lot_no ASC;";
@@ -758,9 +772,12 @@ ORDER BY dcl.product_name ASC, dcl.expiration_date ASC, dcl.lot_no ASC;";
                         product_id = reader["product_id"]?.ToString() ?? string.Empty,
                         product_name = reader["product_name"]?.ToString() ?? string.Empty,
                         product_description = reader["product_description"] == DBNull.Value
-    ? null
-    : reader["product_description"]?.ToString(),
+                        ? null
+                        : reader["product_description"]?.ToString(),
                         branch_id = reader["branch_id"] == DBNull.Value ? null : reader["branch_id"]?.ToString(),
+                        branch_name = reader["branch_name"] == DBNull.Value
+                        ? null
+                        : reader["branch_name"]?.ToString(),
                         lot_no = reader["lot_no"] == DBNull.Value ? null : reader["lot_no"]?.ToString(),
                         manufacturing_date = reader["manufacturing_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["manufacturing_date"]),
                         expiration_date = reader["expiration_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["expiration_date"]),

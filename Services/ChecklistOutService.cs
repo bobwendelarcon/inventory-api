@@ -536,46 +536,56 @@ namespace inventory_api.Services
             var header = await _context.DeliveryChecklistHeaders
                 .FirstOrDefaultAsync(x => x.checklist_id == checklistId);
 
+
+
             if (header == null)
                 throw new Exception("Checklist not found.");
 
-       
+
 
             var lines = await _context.DeliveryChecklistLines
-                .Where(x => x.checklist_id == checklistId && !x.is_deleted)
-                .OrderBy(x => x.customer_name)
-                .ThenBy(x => x.product_name)
-                .ThenBy(x => x.lot_no)
-                .Select(x => new ChecklistDetailLineDto
-                {
-                    checklist_line_id = x.checklist_line_id,
-                    order_id = x.order_id,
-                    order_no = x.order_no,
-                    order_line_id = x.order_line_id,
+      .Where(x => x.checklist_id == checklistId && !x.is_deleted)
+      .OrderBy(x => x.customer_name)
+      .ThenBy(x => x.product_name)
+      .ThenBy(x => x.lot_no)
+      .Select(x => new ChecklistDetailLineDto
+      {
+          checklist_line_id = x.checklist_line_id,
+          order_id = x.order_id,
+          order_no = x.order_no,
+          order_line_id = x.order_line_id,
 
+          customer_id = x.customer_id,
+          customer_name = x.customer_name,
 
-                    customer_id = x.customer_id,
-                    customer_name = x.customer_name,
+          product_id = x.product_id,
+          product_name = x.product_name,
 
+          branch_id = x.branch_id,
 
-                    product_id = x.product_id,
-                    product_name = x.product_name,
-                    branch_id = x.branch_id,   // ✅ NEW
-                    uom = x.uom,
-                    pack_uom = x.pack_uom,
-                    pack_qty = x.pack_qty,
-                    lot_no = x.lot_no ?? "",
-                    manufacturing_date = x.manufacturing_date,
-                    expiration_date = x.expiration_date,
-                    required_qty = x.required_qty,
-                    allocated_qty = x.allocated_qty,
-                    checklist_qty = x.checklist_qty,
-                    released_qty = x.released_qty,
-                    remaining_qty = x.remaining_qty,
-                    status = x.status,
-                    remarks = x.remarks
-                })
-                .ToListAsync();
+          branch_name = _context.Branches
+              .Where(b => b.branch_id == x.branch_id)
+              .Select(b => b.branch_name)
+              .FirstOrDefault(),
+
+          uom = x.uom,
+          pack_uom = x.pack_uom,
+          pack_qty = x.pack_qty,
+
+          lot_no = x.lot_no ?? "",
+          manufacturing_date = x.manufacturing_date,
+          expiration_date = x.expiration_date,
+
+          required_qty = x.required_qty,
+          allocated_qty = x.allocated_qty,
+          checklist_qty = x.checklist_qty,
+          released_qty = x.released_qty,
+          remaining_qty = x.remaining_qty,
+
+          status = x.status,
+          remarks = x.remarks
+      })
+      .ToListAsync();
 
             return new ChecklistDetailsDto
             {

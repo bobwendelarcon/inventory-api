@@ -32,6 +32,8 @@
         public string? PackUom { get; set; }
 
         public string AllocationResult { get; set; } = string.Empty;
+        public decimal TotalAvailableStock { get; set; }
+        public List<WarehouseAvailableDto> WarehouseAvailableStocks { get; set; } = new();
         public List<DailyOrderAllocationDto> Allocations { get; set; } = new();
     }
 

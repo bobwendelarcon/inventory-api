@@ -13,6 +13,7 @@
 
     public class ManualAllocateLotRequest
     {
+        public string? BranchId { get; set; } // ADD
         public string LotNo { get; set; } = string.Empty;
         public decimal AllocateQty { get; set; }
     }

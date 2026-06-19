@@ -18,6 +18,8 @@
 
         public string? branch_id { get; set; }   // ✅ NEW
 
+        public string? branch_name { get; set; }
+
         public string? uom { get; set; }
         public string? pack_uom { get; set; }
         public decimal? pack_qty { get; set; }

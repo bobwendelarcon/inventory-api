@@ -22,6 +22,7 @@
         public string order_no { get; set; } = string.Empty;
         public long order_line_id { get; set; }
 
+        public string? branch_name { get; set; }
         public string? customer_id { get; set; }
         public string? customer_name { get; set; }
         public string product_id { get; set; } = string.Empty;
