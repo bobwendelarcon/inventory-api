@@ -17,7 +17,8 @@ namespace inventory_api.Services
             int page = 1,
             int pageSize = 30,
             string lot_no = "",
-            string product = "",
+           string genericName = "",
+string brandName = "",
            string warehouse = "",
 string category = "",
 string stockStatus = "",
@@ -104,12 +105,20 @@ string stockStatus = "",
 
             //if (!string.IsNullOrWhiteSpace(product))
             //    query = query.Where(x => x.description.Contains(product));
-            if (!string.IsNullOrWhiteSpace(product))
+            if (!string.IsNullOrWhiteSpace(genericName))
             {
-                var keyword = product.Trim();
+                var keyword = genericName.Trim();
 
                 query = query.Where(x =>
-                    x.description.Contains(keyword) ||
+                    x.description.Contains(keyword)
+                );
+            }
+
+            if (!string.IsNullOrWhiteSpace(brandName))
+            {
+                var keyword = brandName.Trim();
+
+                query = query.Where(x =>
                     x.product_description.Contains(keyword)
                 );
             }

@@ -77,7 +77,8 @@ namespace inventory_api.Controllers
     int page = 1,
     int pageSize = 30,
     string lot_no = "",
-    string product = "",
+   string genericName = "",
+string brandName = "",
     string type = "",
     string from = "",
     string to = "",
@@ -89,19 +90,20 @@ namespace inventory_api.Controllers
 )
         {
             var result = await _service.GetAllAsync(
-                page,
-                pageSize,
-                lot_no,
-                product,
-                type,
-                from,
-                to,
-                scanned_by,
-                full_name,
-                reference,
-                warehouse,
-                order
-            );
+     page,
+     pageSize,
+     lot_no,
+     genericName,
+     brandName,
+     type,
+     from,
+     to,
+     scanned_by,
+     full_name,
+     reference,
+     warehouse,
+     order
+ );
 
             return Ok(result);
         }

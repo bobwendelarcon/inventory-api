@@ -234,20 +234,20 @@ namespace inventory_api.Services
         }
 
         public async Task<Dictionary<string, object>> GetAllAsync(
-            int page = 1,
-            int pageSize = 30,
-            string lot_no = "",
-            string product = "",
-            string type = "",
-            string from = "",
-            string to = "",
-            string scanned_by = "",
-            string full_name = "",
-            string reference = "",
-            string warehouse = "",
-            string order = "desc"
-
-        )
+     int page = 1,
+     int pageSize = 30,
+     string lot_no = "",
+     string genericName = "",
+     string brandName = "",
+     string type = "",
+     string from = "",
+     string to = "",
+     string scanned_by = "",
+     string full_name = "",
+     string reference = "",
+     string warehouse = "",
+     string order = "desc"
+ )
         {
             var query = _context.InventoryTransactions.AsQueryable();
 
@@ -300,10 +300,25 @@ namespace inventory_api.Services
                 query = query.Where(x => x.created_at < toDate);
             }
 
-            if (!string.IsNullOrWhiteSpace(product))
+            if (!string.IsNullOrWhiteSpace(genericName) || !string.IsNullOrWhiteSpace(brandName))
             {
-                var productIds = await _context.Products
-                    .Where(p => p.product_name.Contains(product))
+                var productQuery = _context.Products.AsQueryable();
+
+                if (!string.IsNullOrWhiteSpace(genericName))
+                {
+                    var keyword = genericName.Trim();
+                    productQuery = productQuery.Where(p =>
+                        p.product_name.Contains(keyword));
+                }
+
+                if (!string.IsNullOrWhiteSpace(brandName))
+                {
+                    var keyword = brandName.Trim();
+                    productQuery = productQuery.Where(p =>
+                        p.product_description.Contains(keyword));
+                }
+
+                var productIds = await productQuery
                     .Select(p => p.product_id)
                     .ToListAsync();
 
