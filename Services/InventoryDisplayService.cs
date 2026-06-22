@@ -92,6 +92,9 @@ string stockStatus = "",
                     uom = productData != null ? (productData.uom ?? "") : "",
                     pack_qty = productData != null ? (decimal)(productData.pack_qty ?? 0) : 0,
                     pack_uom = productData != null ? (productData.pack_uom ?? "") : "",
+                    stock_level = productData != null
+    ? productData.stock_level
+    : 0,
                     lot_no = lot.lot_no ?? "",
                     warehouse = branch != null ? (branch.branch_name ?? "") : lot.branch_id,
                     qty = (decimal)lot.quantity,
@@ -143,13 +146,27 @@ string stockStatus = "",
             }
 
             if (stockStatus == "zero")
+            {
                 query = query.Where(x => x.qty <= 0);
+            }
             else if (stockStatus == "low")
-                query = query.Where(x => x.qty > 0 && x.qty <= 5);
+            {
+                query = query.Where(x =>
+                    x.qty > 0 &&
+                    x.stock_level > 0 &&
+                    x.qty < x.stock_level
+                );
+            }
             else if (stockStatus == "normal")
-                query = query.Where(x => x.qty > 5 && x.qty <= 100);
-            else if (stockStatus == "over")
-                query = query.Where(x => x.qty > 100);
+            {
+                query = query.Where(x =>
+                    x.qty > 0 &&
+                    (
+                        x.stock_level <= 0 ||
+                        x.qty >= x.stock_level
+                    )
+                );
+            }
 
             if (expiryStatus == "expired")
             {
@@ -268,6 +285,7 @@ string stockStatus = "",
                     product_description = x.product_description,
                     uom = x.uom,
                     pack_qty = x.pack_qty,
+                    stock_level = x.stock_level,
                     pack_uom = x.pack_uom,
                     lot_no = x.lot_no,
                     warehouse = x.warehouse,
@@ -320,7 +338,23 @@ string stockStatus = "",
             };
         }
 
-
+        public async Task<List<string>> GetInventoryCategoriesAsync()
+        {
+            return await (
+                from lot in _context.ProductLotNumbers
+                join product in _context.Products
+                    on lot.product_id equals product.product_id
+                join category in _context.Categories
+                    on product.catg_id equals category.catg_id
+                where !lot.is_deleted
+                      && category.catg_name != null
+                      && category.catg_name != ""
+                select category.catg_name
+            )
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync();
+        }
 
         private static DateTime ConvertToPhilippineTime(DateTime dateTime, TimeZoneInfo phTimeZone)
         {

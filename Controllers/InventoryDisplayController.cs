@@ -16,6 +16,15 @@ namespace inventory_api.Controllers
         }
 
 
+
+        [HttpGet("categories")]
+        public async Task<IActionResult> GetInventoryCategories()
+        {
+            var result = await _inventoryDisplayService.GetInventoryCategoriesAsync();
+            return Ok(result);
+        }
+
+
         [HttpGet]
         public async Task<IActionResult> GetInventoryDisplay(
       int page = 1,
