@@ -11,5 +11,11 @@
 
         public string adjusted_by { get; set; } = string.Empty;
         public string? remarks { get; set; }
+
+        //DTO for Stock out
+        public string? dr_no { get; set; }
+        public string? inv_no { get; set; }
+        public string? po_no { get; set; }
+        public string? reference_type { get; set; }
     }
 }

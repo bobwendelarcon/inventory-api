@@ -270,36 +270,45 @@ namespace inventory_api.Services
 
         public async Task<List<ProductLookupDto>> GetProductsLookupAsync(string? categoryId, string? search)
         {
-            var query = _context.Products
-                .Where(x => !x.is_deleted)
-                .AsQueryable();
+            var query =
+                from p in _context.Products
+                join c in _context.Categories
+                    on p.catg_id equals c.catg_id
+                where !p.is_deleted
+                select new
+                {
+                    Product = p,
+                    CategoryName = c.catg_name
+                };
 
             if (!string.IsNullOrWhiteSpace(categoryId))
-                query = query.Where(x => x.catg_id == categoryId);
+                query = query.Where(x => x.Product.catg_id == categoryId);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 search = search.Trim();
 
                 query = query.Where(x =>
-                    x.product_name.Contains(search) ||
-                    x.product_description.Contains(search)
-                );
+                    x.Product.product_name.Contains(search) ||
+                    x.Product.product_description.Contains(search));
             }
 
             return await query
-     .OrderBy(x => x.product_name)
-     .Select(x => new ProductLookupDto
-     {
-         ProductId = x.product_id,
-         ProductName = x.product_name,
-         ProductDescription = x.product_description,
-         CategoryId = x.catg_id,
-         Uom = x.uom,
-         PackUom = x.pack_uom,
-         PackQty = x.pack_qty
-     })
-     .ToListAsync();
+                .OrderBy(x => x.Product.product_name)
+                .Select(x => new ProductLookupDto
+                {
+                    ProductId = x.Product.product_id,
+                    ProductName = x.Product.product_name,
+                    ProductDescription = x.Product.product_description,
+
+                    CategoryId = x.Product.catg_id,
+                    CategoryName = x.CategoryName,
+
+                    Uom = x.Product.uom,
+                    PackUom = x.Product.pack_uom,
+                    PackQty = x.Product.pack_qty
+                })
+                .ToListAsync();
         }
 
         // import module for product excel

@@ -1,4 +1,5 @@
-﻿using inventory_api.Services;
+﻿using inventory_api.DTOs;
+using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace inventory_api.Controllers
@@ -71,6 +72,27 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
+
+        [HttpPut("update-lot-dates")]
+        public async Task<IActionResult> UpdateLotDates([FromBody] UpdateLotDatesDto dto)
+        {
+            try
+            {
+                var result = await _inventoryDisplayService.UpdateLotDatesAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
 
     }
 }

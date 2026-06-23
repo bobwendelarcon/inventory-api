@@ -366,5 +366,40 @@ string stockStatus = "",
 
             return dateTime;
         }
+
+        public async Task<object> UpdateLotDatesAsync(UpdateLotDatesDto dto)
+        {
+            var lot = await _context.ProductLotNumbers
+                .FirstOrDefaultAsync(x =>
+                    !x.is_deleted &&
+                    x.product_id == dto.product_id &&
+                    x.branch_id == dto.branch_id &&
+                    x.lot_no == dto.lot_no
+                );
+
+            if (lot == null)
+                throw new Exception("Lot not found.");
+
+            if (!dto.manufacturing_date.HasValue)
+                throw new Exception("Manufacturing date is required.");
+
+            if (!dto.expiration_date.HasValue)
+                throw new Exception("Expiration date is required.");
+
+            if (dto.expiration_date.Value.Date < dto.manufacturing_date.Value.Date)
+                throw new Exception("Expiration date cannot be earlier than manufacturing date.");
+
+            lot.manufacturing_date = dto.manufacturing_date.Value.Date;
+            lot.expiration_date = dto.expiration_date.Value.Date;
+            lot.updated_at = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return new
+            {
+                success = true,
+                message = "Lot dates updated successfully."
+            };
+        }
     }
 }
