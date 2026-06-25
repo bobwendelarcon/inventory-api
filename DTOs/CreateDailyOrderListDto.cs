@@ -3,6 +3,7 @@
     public class DailyOrderListDto
     {
         public long OrderId { get; set; }
+        public long OrderLineId { get; set; }
         public string ClassName { get; set; } = string.Empty;
         public int Year { get; set; }
         public string Month { get; set; } = string.Empty;

@@ -136,5 +136,83 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
+        [HttpPost("complete-line")]
+        public async Task<IActionResult> CompleteLine([FromBody] CompleteChecklistLineDto dto)
+        {
+            try
+            {
+                var completedBy =
+                    !string.IsNullOrWhiteSpace(dto.adjusted_by)
+                        ? dto.adjusted_by
+                        : User.Identity?.Name ?? "admin";
+
+                var result = await _deliveryChecklistService.CompleteLineAsync(dto, completedBy);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.ToString()
+                });
+            }
+        }
+
+        [HttpPost("update-line-lot")]
+        public async Task<IActionResult> UpdateChecklistLineLot([FromBody] UpdateChecklistLineLotDto dto)
+        {
+            try
+            {
+                var result = await _deliveryChecklistService.UpdateChecklistLineLotAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("available-lots-for-line/{checklistLineId:long}")]
+        public async Task<IActionResult> GetAvailableLotsForChecklistLine(long checklistLineId)
+        {
+            try
+            {
+                var result = await _deliveryChecklistService.GetAvailableLotsForChecklistLineAsync(checklistLineId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.ToString()
+                });
+            }
+        }
+
+        [HttpPost("replace-checklist-lots")]
+        public async Task<IActionResult> ReplaceChecklistLots([FromBody] ReplaceChecklistLotsDto dto)
+        {
+            try
+            {
+                var result = await _deliveryChecklistService.ReplaceChecklistLotsAsync(dto);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
     }
 }

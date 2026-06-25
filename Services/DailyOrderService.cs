@@ -53,6 +53,7 @@ namespace inventory_api.Services
         return new DailyOrderListDto
         {
             OrderId = h.order_id,
+            OrderLineId = l.order_line_id,
             ClassName = h.class_name ?? "",
             Year = h.date_ordered?.Year ?? 0,
             Month = h.date_ordered?.ToString("MMMM") ?? "",
@@ -62,7 +63,7 @@ namespace inventory_api.Services
             ProductDescription = p?.product_description ?? "",
             RequiredQty = l.required_qty,
             AllocatedQty = l.allocated_qty,
-            RemainingQty = l.remaining_qty,
+            RemainingQty = Math.Max(0, l.required_qty - l.dispatched_qty),
             DispatchedQty = l.dispatched_qty,
             CreatedBy = h.created_by,
 
@@ -314,7 +315,7 @@ namespace inventory_api.Services
                             0,
                             l.required_qty - l.dispatched_qty - l.allocated_qty
                         ),
-                        RemainingQty = l.remaining_qty,
+                        RemainingQty = Math.Max(0, l.required_qty - l.dispatched_qty),
 
                         AvailableBeforeAllocation = totalAvailableStock,
                         TotalAvailableStock = totalAvailableStock,
@@ -1302,6 +1303,121 @@ namespace inventory_api.Services
                 RemainingQty = line.remaining_qty,
                 AllocationStatus = line.allocation_status,
                 OrderStatus = order.status
+            };
+        }
+
+        public async Task<object> DeleteOrderLineAsync(long orderId, long orderLineId)
+        {
+            var order = await _context.DailyOrderHeaders
+                .Include(h => h.Lines)
+                .FirstOrDefaultAsync(x => x.order_id == orderId && !x.is_deleted);
+
+            if (order == null)
+                throw new Exception("Order not found.");
+
+            var line = order.Lines.FirstOrDefault(x => x.order_line_id == orderLineId);
+
+            if (line == null)
+                throw new Exception("Order line not found.");
+
+            if (await HasActiveChecklistLineAsync(line.order_line_id))
+                throw new Exception("Cannot delete this line because it belongs to an active delivery checklist.");
+
+            if (line.allocated_qty > 0)
+                throw new Exception("Cannot delete this line because it is already allocated. Clear allocation first.");
+
+            if (line.dispatched_qty > 0)
+                throw new Exception("Cannot delete this line because it is already dispatched.");
+
+            // Delete any allocation records for this line
+            var allocations = await _context.DailyOrderAllocations
+                .Where(x => x.order_line_id == orderLineId)
+                .ToListAsync();
+
+            if (allocations.Any())
+                _context.DailyOrderAllocations.RemoveRange(allocations);
+
+            _context.DailyOrderLines.Remove(line);
+
+            // If this was the last line, soft delete the header
+            if (order.Lines.Count == 1)
+            {
+                order.is_deleted = true;
+                order.deleted_at = DateTime.UtcNow;
+                order.updated_at = DateTime.UtcNow;
+            }
+            else
+            {
+                await RecomputeDailyOrderHeaderStatusAsync(order);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return new
+            {
+                Message = "Order line deleted successfully."
+            };
+        }
+
+        public async Task<object> AddOrderLineAsync(
+    long orderId,
+    AddDailyOrderLineRequest request)
+        {
+            var order = await _context.DailyOrderHeaders
+                .Include(h => h.Lines)
+                .FirstOrDefaultAsync(x => x.order_id == orderId && !x.is_deleted);
+
+            if (order == null)
+                throw new Exception("Order not found.");
+
+            var status = (order.status ?? "").Trim().ToUpper();
+
+            if (status == "READY FOR DISPATCH" || status == "COMPLETED")
+                throw new Exception("Cannot add product to this order status.");
+
+            if (string.IsNullOrWhiteSpace(request.ProductId))
+                throw new Exception("Product is required.");
+
+            if (request.RequiredQty <= 0)
+                throw new Exception("Required qty must be greater than zero.");
+
+            var product = await _context.Products
+                .FirstOrDefaultAsync(x => x.product_id == request.ProductId);
+
+            if (product == null)
+                throw new Exception("Product not found.");
+
+            var duplicate = order.Lines.Any(x =>
+                x.product_id == request.ProductId &&
+                x.dispatched_qty <= 0);
+
+            if (duplicate)
+                throw new Exception("This product already exists in this order.");
+
+            var line = new DailyOrderLine
+            {
+                order_id = order.order_id,
+                product_id = product.product_id,
+                product_name = product.product_name,
+                required_qty = request.RequiredQty,
+                allocated_qty = 0,
+                remaining_qty = request.RequiredQty,
+                dispatched_qty = 0,
+                allocation_status = "Not Allocated",
+                status = "PENDING",
+                created_at = DateTime.UtcNow,
+                updated_at = DateTime.UtcNow
+            };
+
+            _context.DailyOrderLines.Add(line);
+
+            await RecomputeDailyOrderHeaderStatusAsync(order);
+            await _context.SaveChangesAsync();
+
+            return new
+            {
+                Message = "Product line added successfully.",
+                OrderId = order.order_id
             };
         }
 

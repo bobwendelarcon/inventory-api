@@ -173,6 +173,38 @@ namespace inventory_api.Controllers
             }
         }
 
+        [HttpDelete("{orderId}/lines/{orderLineId}")]
+        public async Task<IActionResult> DeleteOrderLine(long orderId, long orderLineId)
+        {
+            try
+            {
+                var result = await _service.DeleteOrderLineAsync(orderId, orderLineId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpPost("{orderId}/lines")]
+        public async Task<IActionResult> AddOrderLine(
+    long orderId,
+    [FromBody] AddDailyOrderLineRequest request)
+        {
+            try
+            {
+                var result = await _service.AddOrderLineAsync(orderId, request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+
+
         [HttpPost("{orderId}/back-to-allocation")]
         public async Task<IActionResult> BackToAllocation(long orderId)
         {
