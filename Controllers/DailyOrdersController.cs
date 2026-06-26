@@ -15,17 +15,28 @@ namespace inventory_api.Controllers
             _service = service;
         }
 
-      
+
 
         [HttpGet]
         public async Task<IActionResult> GetAll(
-            [FromQuery] string? className,
-            [FromQuery] int? year,
-            [FromQuery] string? month,
-            [FromQuery] string? status,
-            [FromQuery] string? search)
+     [FromQuery] string? className,
+     [FromQuery] int? year,
+     [FromQuery] string? month,
+     [FromQuery] string? status,
+     [FromQuery] string? search,
+     [FromQuery] string? sortBy,
+     [FromQuery] string? sortDir)
         {
-            var result = await _service.GetAllAsync(className, year, month, status, search);
+            var result = await _service.GetAllAsync(
+                className,
+                year,
+                month,
+                status,
+                search,
+                sortBy,
+                sortDir
+            );
+
             return Ok(result);
         }
 

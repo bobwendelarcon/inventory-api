@@ -32,7 +32,9 @@ namespace inventory_api.Services
      int? year,
      string? month,
      string? status,
-     string? search)
+     string? search,
+     string? sortBy,
+     string? sortDir)
         {
             var headers = await _context.DailyOrderHeaders
      .Where(h => !h.is_deleted)
@@ -150,6 +152,36 @@ namespace inventory_api.Services
             }
 
             var filteredList = result.ToList();
+
+            var isDesc = (sortDir ?? "asc").Trim().ToLower() == "desc";
+            var sortKey = (sortBy ?? "deliveryDate").Trim();
+
+            filteredList = sortKey switch
+            {
+                "dateOrdered" => isDesc
+                    ? filteredList.OrderByDescending(x => x.DateOrdered).ToList()
+                    : filteredList.OrderBy(x => x.DateOrdered).ToList(),
+
+                "customer" => isDesc
+                    ? filteredList.OrderByDescending(x => x.CustomerName).ToList()
+                    : filteredList.OrderBy(x => x.CustomerName).ToList(),
+
+                "product" => isDesc
+                    ? filteredList.OrderByDescending(x => x.ProductName).ToList()
+                    : filteredList.OrderBy(x => x.ProductName).ToList(),
+
+                "remainingQty" => isDesc
+                    ? filteredList.OrderByDescending(x => x.RemainingQty).ToList()
+                    : filteredList.OrderBy(x => x.RemainingQty).ToList(),
+
+                "requiredQty" => isDesc
+                    ? filteredList.OrderByDescending(x => x.RequiredQty).ToList()
+                    : filteredList.OrderBy(x => x.RequiredQty).ToList(),
+
+                _ => isDesc
+                    ? filteredList.OrderByDescending(x => x.DeliveryDate ?? DateTime.MaxValue).ToList()
+                    : filteredList.OrderBy(x => x.DeliveryDate ?? DateTime.MaxValue).ToList()
+            };
 
             var grouped = filteredList.GroupBy(x => x.OrderId);
 
