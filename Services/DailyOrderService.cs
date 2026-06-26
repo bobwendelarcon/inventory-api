@@ -28,13 +28,15 @@ namespace inventory_api.Services
         // GET ALL (FOR TABLE)
         // =========================================
         public async Task<DailyOrderListResponse> GetAllAsync(
-     string? className,
-     int? year,
-     string? month,
-     string? status,
-     string? search,
-     string? sortBy,
-     string? sortDir)
+       string? className,
+       int? year,
+       string? month,
+       string? status,
+       string? search,
+       string? sortBy,
+       string? sortDir,
+       int page = 1,
+       int pageSize = 50)
         {
             var headers = await _context.DailyOrderHeaders
      .Where(h => !h.is_deleted)
@@ -223,10 +225,24 @@ namespace inventory_api.Services
             };
 
 
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 50 : pageSize;
+
+            var totalRecords = filteredList.Count;
+
+            var pagedData = filteredList
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
             return new DailyOrderListResponse
             {
                 Summary = summary,
-                Data = filteredList
+                Data = pagedData,
+                TotalRecords = totalRecords,
+                Page = page,
+                PageSize = pageSize,
+                HasMore = page * pageSize < totalRecords
             };
         }
 

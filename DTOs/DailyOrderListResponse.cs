@@ -4,6 +4,11 @@
     {
         public DailyOrderSummaryDto Summary { get; set; } = new();
         public List<DailyOrderListDto> Data { get; set; } = new();
+
+        public int TotalRecords { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public bool HasMore { get; set; }
     }
 
     public class DailyOrderSummaryDto
