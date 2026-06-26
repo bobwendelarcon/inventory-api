@@ -49,7 +49,25 @@ namespace inventory_api.Services
             var products = await _context.Products.ToListAsync();
             var productDict = products.ToDictionary(x => x.product_id, x => x);
 
-          var result = headers
+            var users = await _context.Users
+    .AsNoTracking()
+    .ToListAsync();
+
+            var userDict = users
+     .SelectMany(u => new[]
+     {
+        new { Key = (u.user_id ?? "").Trim().ToLower(), Value = u.full_name },
+        new { Key = (u.username ?? "").Trim().ToLower(), Value = u.full_name },
+        new { Key = (u.full_name ?? "").Trim().ToLower(), Value = u.full_name }
+     })
+     .Where(x => !string.IsNullOrWhiteSpace(x.Key))
+     .GroupBy(x => x.Key)
+     .ToDictionary(
+         g => g.Key,
+         g => g.First().Value
+     );
+
+            var result = headers
     .SelectMany(h => h.Lines.Select(l =>
     {
         productDict.TryGetValue(l.product_id, out var p);
@@ -69,7 +87,11 @@ namespace inventory_api.Services
             AllocatedQty = l.allocated_qty,
             RemainingQty = Math.Max(0, l.required_qty - l.dispatched_qty),
             DispatchedQty = l.dispatched_qty,
-            CreatedBy = h.created_by,
+            CreatedBy = userDict.TryGetValue(
+        (h.created_by ?? "").Trim().ToLower(),
+        out var fullName)
+    ? fullName
+    : h.created_by,
 
             // 🔥 ADD THESE
             Uom = p?.uom ?? "",
