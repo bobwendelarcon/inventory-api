@@ -49,6 +49,24 @@ namespace inventory_api.Controllers
         }
 
 
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged(
+    [FromQuery] string? search,
+    [FromQuery] string? type,
+    [FromQuery] string? region,
+    [FromQuery] bool? isDeleted,
+    [FromQuery] string? agentId,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 50,
+    [FromQuery] string sort = "partner_id_asc")
+        {
+            var result = await _partnerService.GetPagedAsync(
+                search, type, region, isDeleted, agentId, page, pageSize, sort);
+
+            return Ok(result);
+        }
+
+
         [HttpDelete("reset")]
 public async Task<IActionResult> ResetAll()
 {

@@ -190,5 +190,106 @@ namespace inventory_api.Services
             _context.Partners.RemoveRange(partners);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<PagedResultDto<PartnerListDto>> GetPagedAsync(
+    string? search,
+    string? type,
+    string? region,
+    bool? isDeleted,
+    string? agentId,
+    int page = 1,
+    int pageSize = 50,
+    string sort = "partner_id_asc")
+        {
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 50 : pageSize;
+            pageSize = pageSize > 100 ? 100 : pageSize;
+
+            var query =
+                from p in _context.Partners.AsNoTracking()
+                join a in _context.Partners.AsNoTracking()
+                    on p.agent_id equals a.partner_id into agentJoin
+                from agent in agentJoin.DefaultIfEmpty()
+                select new
+                {
+                    p.partner_id,
+                    p.partner_name,
+                    p.address,
+                    p.contact,
+                    p.partner_type,
+                    p.region,
+                    p.agent_id,
+                    agent_name = agent != null ? agent.partner_name : "",
+                    p.is_deleted,
+                    p.created_at,
+                    p.updated_at
+                };
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                string s = search.Trim();
+
+                query = query.Where(x =>
+                    x.partner_id.Contains(s) ||
+                    x.partner_name.Contains(s) ||
+                    (x.address ?? "").Contains(s) ||
+                    (x.contact ?? "").Contains(s) ||
+                    (x.agent_name ?? "").Contains(s));
+            }
+
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+                query = query.Where(x => x.partner_type == type);
+            }
+
+            if (!string.IsNullOrWhiteSpace(region))
+            {
+                query = query.Where(x => x.region == region);
+            }
+
+            if (!string.IsNullOrWhiteSpace(agentId))
+            {
+                query = query.Where(x => x.agent_id == agentId);
+            }
+
+            if (isDeleted.HasValue)
+            {
+                query = query.Where(x => x.is_deleted == isDeleted.Value);
+            }
+
+            query = sort == "partner_id_desc"
+                ? query.OrderByDescending(x => x.partner_id)
+                : query.OrderBy(x => x.partner_id);
+
+            int totalRecords = await query.CountAsync();
+
+            var data = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new PartnerListDto
+                {
+                    partner_id = x.partner_id,
+                    partner_name = x.partner_name,
+                    address = x.address ?? "",
+                    contact_no = x.contact ?? "",
+                    partner_type = x.partner_type ?? "",
+                    region = x.region ?? "",
+                    agent_id = x.agent_id ?? "",
+                    agent_name = x.agent_name ?? "",
+                    is_deleted = x.is_deleted,
+                    created_at = x.created_at.ToString("yyyy-MM-dd HH:mm:ss"),
+                    updated_at = x.updated_at.ToString("yyyy-MM-dd HH:mm:ss")
+                })
+                .ToListAsync();
+
+            return new PagedResultDto<PartnerListDto>
+            {
+                page = page,
+                pageSize = pageSize,
+                totalRecords = totalRecords,
+                totalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                data = data
+            };
+        }
     }
 }
