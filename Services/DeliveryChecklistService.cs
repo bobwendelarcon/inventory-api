@@ -1185,9 +1185,10 @@ WHERE order_line_id = @order_line_id
                 }
 
 
-
                 string updateOrderHeaderSql = @"
 UPDATE daily_order_header h
+INNER JOIN delivery_checklist_header dch
+    ON dch.checklist_id = @checklist_id
 SET h.status = CASE
     WHEN NOT EXISTS (
         SELECT 1
@@ -1198,6 +1199,16 @@ SET h.status = CASE
     THEN 'COMPLETED'
     ELSE 'PARTIALLY DELIVERED'
 END,
+h.date_delivered = CASE
+    WHEN NOT EXISTS (
+        SELECT 1
+        FROM daily_order_line l
+        WHERE l.order_id = h.order_id
+          AND IFNULL(l.dispatched_qty, 0) < IFNULL(l.required_qty, 0)
+    )
+    THEN dch.delivery_date
+    ELSE h.date_delivered
+END,
 h.updated_at = @updated_at
 WHERE h.order_id = @order_id;";
 
@@ -1205,6 +1216,7 @@ WHERE h.order_id = @order_id;";
                 {
                     cmd.Parameters.AddWithValue("@order_id", orderId);
                     cmd.Parameters.AddWithValue("@updated_at", DateTime.UtcNow);
+                    cmd.Parameters.AddWithValue("@checklist_id", dto.checklist_id);
                     await cmd.ExecuteNonQueryAsync();
                 }
 

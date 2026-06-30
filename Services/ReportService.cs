@@ -69,12 +69,12 @@ namespace inventory_api.Services
 
 
             if (filter.DateFrom.HasValue)
-                data = data.Where(x => x.date_ordered >= filter.DateFrom.Value).ToList();
+                data = data.Where(x => x.date_delivered >= filter.DateFrom.Value.Date).ToList();
 
             if (filter.DateTo.HasValue)
             {
                 var toDate = filter.DateTo.Value.Date.AddDays(1);
-                data = data.Where(x => x.date_ordered < toDate).ToList();
+                data = data.Where(x => x.date_delivered < toDate).ToList();
             }
 
             if (!string.IsNullOrWhiteSpace(filter.CustomerId))
@@ -162,25 +162,55 @@ namespace inventory_api.Services
             if (!string.IsNullOrWhiteSpace(filter.Region))
                 rows = rows.Where(x => x.Region == filter.Region.ToUpper()).ToList();
 
-            var total = rows.Count;
+            var totalRecords = rows.Count;
             var onTime = rows.Count(x => x.KpiStatus == "ON TIME");
             var delayed = rows.Count(x => x.KpiStatus == "DELAYED");
+
+            var page = filter.Page <= 0 ? 1 : filter.Page;
+            var pageSize = filter.PageSize <= 0 ? 25 : filter.PageSize;
+
+            // Prevent users from requesting an extremely large page.
+            pageSize = Math.Min(pageSize, 100);
+
+            var totalPages = totalRecords == 0
+                ? 1
+                : (int)Math.Ceiling(totalRecords / (decimal)pageSize);
+
+            var pagedItems = rows
+                .OrderByDescending(x => x.DateDelivered)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
 
             return new DeliveryKpiReportDto
             {
                 Summary = new DeliveryKpiSummaryDto
                 {
-                    TotalDeliveries = total,
-                    OnTimePercent = total == 0 ? 0 : Math.Round((decimal)onTime / total * 100, 2),
-                    DelayedPercent = total == 0 ? 0 : Math.Round((decimal)delayed / total * 100, 2),
-                    AverageDeliveryDays = total == 0
-    ? 0
-    : Math.Round(Convert.ToDecimal(rows.Average(x => x.DeliveryDays)), 2)
+                    TotalDeliveries = totalRecords,
+                    OnTimePercent = totalRecords == 0
+                        ? 0
+                        : Math.Round((decimal)onTime / totalRecords * 100, 2),
+
+                    DelayedPercent = totalRecords == 0
+                        ? 0
+                        : Math.Round((decimal)delayed / totalRecords * 100, 2),
+
+                    AverageDeliveryDays = totalRecords == 0
+                        ? 0
+                        : Math.Round(Convert.ToDecimal(rows.Average(x => x.DeliveryDays)), 2)
                 },
-                Items = rows
-                    .OrderByDescending(x => x.DateDelivered)
-                    .ToList()
+
+                Page = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages,
+                HasPrevious = page > 1,
+                HasNext = page < totalPages,
+
+                Items = pagedItems
             };
+
+
         }
 
         public async Task<NearExpiryReportDto> GetNearExpiryAsync(ReportFilterDto filter)
@@ -230,15 +260,37 @@ namespace inventory_api.Services
             if (filter.MonthsLeft.HasValue)
                 data = data.Where(x => x.MonthsLeft <= filter.MonthsLeft.Value).ToList();
 
+            var totalRecords = data.Count;
+
+            var page = filter.Page <= 0 ? 1 : filter.Page;
+            var pageSize = filter.PageSize <= 0 ? 25 : filter.PageSize;
+            pageSize = Math.Min(pageSize, 100);
+
+            var totalPages = totalRecords == 0
+                ? 1
+                : (int)Math.Ceiling(totalRecords / (decimal)pageSize);
+
+            var pagedItems = data
+                .OrderBy(x => x.ExpirationDate)
+                .ThenBy(x => x.ProductName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
             return new NearExpiryReportDto
             {
-                TotalLots = data.Count,
+                TotalLots = totalRecords,
                 ExpiredLots = data.Count(x => x.ExpiryStatus == "EXPIRED"),
                 NearExpiryLots = data.Count(x => x.ExpiryStatus == "NEAR"),
-                Items = data
-                    .OrderBy(x => x.ExpirationDate)
-                    .ThenBy(x => x.ProductName)
-                    .ToList()
+
+                Page = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages,
+                HasPrevious = page > 1,
+                HasNext = page < totalPages,
+
+                Items = pagedItems
             };
         }
 
@@ -285,17 +337,39 @@ namespace inventory_api.Services
             if (!string.IsNullOrWhiteSpace(filter.StockStatus))
                 data = data.Where(x => x.StockStatus == filter.StockStatus.ToUpper()).ToList();
 
+            var totalRecords = data.Count;
+
+            var page = filter.Page <= 0 ? 1 : filter.Page;
+            var pageSize = filter.PageSize <= 0 ? 25 : filter.PageSize;
+            pageSize = Math.Min(pageSize, 100);
+
+            var totalPages = totalRecords == 0
+                ? 1
+                : (int)Math.Ceiling(totalRecords / (decimal)pageSize);
+
+            var pagedItems = data
+                .OrderBy(x => x.ProductName)
+                .ThenBy(x => x.BranchName)
+                .ThenBy(x => x.ExpirationDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
             return new InventoryReportDto
             {
                 TotalStockQty = data.Sum(x => x.Quantity),
-                TotalLots = data.Count,
+                TotalLots = totalRecords,
                 ExpiredLots = data.Count(x => x.ExpiryStatus == "EXPIRED"),
                 NearExpiryLots = data.Count(x => x.ExpiryStatus == "NEAR"),
-                Items = data
-                    .OrderBy(x => x.ProductName)
-                    .ThenBy(x => x.BranchName)
-                    .ThenBy(x => x.ExpirationDate)
-                    .ToList()
+
+                Page = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages,
+                HasPrevious = page > 1,
+                HasNext = page < totalPages,
+
+                Items = pagedItems
             };
         }
 

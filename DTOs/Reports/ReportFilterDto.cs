@@ -14,5 +14,8 @@
         public string? ExpiryStatus { get; set; } // EXPIRED, NEAR, SAFE
         public string? StockStatus { get; set; } // WITH_STOCK, ZERO, LOW
         public int? MonthsLeft { get; set; }
+
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 25;
     }
 }

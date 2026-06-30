@@ -26,5 +26,12 @@
     {
         public DeliveryKpiSummaryDto Summary { get; set; } = new();
         public List<DeliveryKpiRowDto> Items { get; set; } = new();
+
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalRecords { get; set; }
+        public int TotalPages { get; set; }
+        public bool HasPrevious { get; set; }
+        public bool HasNext { get; set; }
     }
 }
