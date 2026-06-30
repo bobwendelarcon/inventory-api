@@ -145,7 +145,12 @@ string stockStatus = "",
                 query = query.Where(x => x.created_at.Date < toDateOnly);
             }
 
-            if (stockStatus == "zero")
+            if (stockStatus == "available")
+            {
+                // Show all inventory except zero or negative stock
+                query = query.Where(x => x.qty > 0);
+            }
+            else if (stockStatus == "zero")
             {
                 query = query.Where(x => x.qty <= 0);
             }
