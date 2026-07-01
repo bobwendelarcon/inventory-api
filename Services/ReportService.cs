@@ -198,9 +198,11 @@ namespace inventory_api.Services
                         ? 0
                         : Math.Round((decimal)delayed / totalRecords * 100, 2),
 
-                    AverageDeliveryDays = totalRecords == 0
-                        ? 0
-                        : Math.Round(Convert.ToDecimal(rows.Average(x => x.DeliveryDays)), 2)
+                    AverageDeliveryDays = rows.Any(x => x.DeliveryDays > 0)
+    ? Math.Round(Convert.ToDecimal(rows
+        .Where(x => x.DeliveryDays > 0)
+        .Average(x => x.DeliveryDays)), 2)
+    : 0
                 },
 
                 Page = page,
