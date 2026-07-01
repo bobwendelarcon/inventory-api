@@ -16,6 +16,7 @@
         public string Region { get; set; } = "";
         public DateTime? DateOrdered { get; set; }
         public DateTime? DateDelivered { get; set; }
+        public DateTime? DeliveryDate { get; set; }
         public int DeliveryDays { get; set; }
         public int TargetDays { get; set; }
         public string KpiStatus { get; set; } = "";

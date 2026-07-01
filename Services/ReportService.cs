@@ -61,6 +61,7 @@ namespace inventory_api.Services
                     CustomerRegion = customer != null ? customer.region : "",
                     order.route_name,
                     order.date_ordered,
+                    order.delivery_date,
                     order.date_delivered
                 }
             ).ToListAsync();
@@ -126,13 +127,14 @@ namespace inventory_api.Services
 
             var rows = data.Select(x =>
             {
-                if (x.date_ordered == null || x.date_delivered == null)
+                if (x.delivery_date == null || x.date_delivered == null)
                     return null;
 
-                var orderedDate = x.date_ordered.Value.Date;
+                var deliveryDate = x.delivery_date.Value.Date;
                 var deliveredDate = x.date_delivered.Value.Date;
 
-                var days = Math.Max(0, (deliveredDate - orderedDate).Days);
+                var days = (deliveredDate - deliveryDate).Days;
+
 
                 var region = (x.CustomerRegion ?? "").ToUpper();
 
@@ -147,6 +149,7 @@ namespace inventory_api.Services
                     RouteName = x.route_name ?? "",
                     Region = region,
                     DateOrdered = x.date_ordered,
+                    DeliveryDate = x.delivery_date,
                     DateDelivered = x.date_delivered,
                     DeliveryDays = days,
                     TargetDays = targetDays,
