@@ -136,7 +136,6 @@ namespace inventory_api.Services
             //    var selectedStatus = status.Trim().ToUpper();
             //    result = result.Where(x => (x.Status ?? "").Trim().ToUpper() == selectedStatus);
             //}
-
             if (!string.IsNullOrWhiteSpace(status))
             {
                 var selectedStatus = status.Trim().ToUpper();
@@ -149,7 +148,16 @@ namespace inventory_api.Services
                 }
                 else if (selectedStatus == "ALL")
                 {
-                    // no filter → show everything
+                    // no filter
+                }
+                else if (selectedStatus == "OVERDUE")
+                {
+                    result = result.Where(x =>
+                        x.DeliveryDate.HasValue &&
+                        x.DeliveryDate.Value.Date < today &&
+                        (x.Status ?? "").Trim().ToUpper() != "COMPLETED" &&
+                        (x.Status ?? "").Trim().ToUpper() != "CANCELLED"
+                    );
                 }
                 else
                 {
@@ -160,12 +168,10 @@ namespace inventory_api.Services
             }
             else
             {
-                // fallback (default behavior)
                 result = result.Where(x =>
                     (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
                 );
             }
-
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var keyword = search.Trim().ToLower();
@@ -238,12 +244,13 @@ namespace inventory_api.Services
      ),
 
                 Overdue = grouped.Count(g =>
-                    g.Any(x =>
-                        x.DeliveryDate.HasValue &&
-                        x.DeliveryDate.Value.Date < today &&
-                        (g.First().Status ?? "").Trim().ToUpper() != "COMPLETED"
-                    )
-     )
+    g.Any(x =>
+        x.DeliveryDate.HasValue &&
+        x.DeliveryDate.Value.Date < today &&
+        (g.First().Status ?? "").Trim().ToUpper() != "COMPLETED" &&
+        (g.First().Status ?? "").Trim().ToUpper() != "CANCELLED"
+    )
+)
             };
 
 
