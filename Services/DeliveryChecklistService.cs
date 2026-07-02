@@ -606,6 +606,13 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
             h.driver_name,
             h.status,
         h.created_by AS createdBy,
+       (
+    SELECT GROUP_CONCAT(DISTINCT it.dr_no ORDER BY it.dr_no SEPARATOR ', ')
+    FROM inventory_transactions it
+    WHERE it.checklist_id = h.checklist_id
+      AND IFNULL(it.is_deleted,0)=0
+      AND IFNULL(it.dr_no,'') <> ''
+) AS dr_numbers,
             
             COUNT(DISTINCT l.customer_name) AS total_customers
         FROM delivery_checklist_header h
@@ -614,6 +621,8 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
             AND IFNULL(l.is_deleted, 0) = 0
         LEFT JOIN users u
             ON h.created_by = u.user_id
+
+
         WHERE IFNULL(h.is_deleted, 0) = 0
           AND (@date IS NULL OR DATE(h.delivery_date) = @date)
           AND (@status IS NULL OR UPPER(h.status) = UPPER(@status))
@@ -625,6 +634,14 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
                 OR h.truck_name LIKE CONCAT('%', @search, '%')
                 OR h.driver_name LIKE CONCAT('%', @search, '%')
                 OR u.full_name LIKE CONCAT('%', @search, '%')
+OR EXISTS
+(
+    SELECT 1
+    FROM inventory_transactions it
+    WHERE it.checklist_id = h.checklist_id
+      AND IFNULL(it.is_deleted,0)=0
+      AND it.dr_no LIKE CONCAT('%', @search, '%')
+)
               )
         GROUP BY
             h.checklist_id,
@@ -660,6 +677,9 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
                     truck_name = reader["truck_name"] == DBNull.Value ? null : reader["truck_name"]?.ToString(),
                     driver_name = reader["driver_name"] == DBNull.Value ? null : reader["driver_name"]?.ToString(),
                     status = reader["status"] == DBNull.Value ? null : reader["status"]?.ToString(),
+                    dr_numbers = reader["dr_numbers"] == DBNull.Value
+    ? ""
+    : reader["dr_numbers"].ToString(),
                     createdBy = reader["createdBy"] == DBNull.Value
         ? ""
         : reader["createdBy"].ToString(),
@@ -717,6 +737,7 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
             driver_name,
             helper_name,
             status,
+
             remarks
         FROM delivery_checklist_header
         WHERE checklist_id = @checklist_id
@@ -760,7 +781,17 @@ SELECT
     b.branch_name AS branch_name,
 
     dcl.lot_no,
-    dcl.uom,
+    dcl.lot_no,
+
+(
+    SELECT GROUP_CONCAT(DISTINCT it.dr_no ORDER BY it.dr_no SEPARATOR ', ')
+    FROM inventory_transactions it
+    WHERE it.checklist_line_id = dcl.checklist_line_id
+      AND IFNULL(it.is_deleted, 0) = 0
+      AND IFNULL(it.dr_no, '') <> ''
+) AS dr_no,
+
+dcl.uom,
     dcl.pack_uom,
     dcl.pack_qty,
 
@@ -772,6 +803,7 @@ SELECT
     dcl.released_qty,
     dcl.remaining_qty,
     dcl.status,
+
     dcl.remarks
 FROM delivery_checklist_line dcl
 LEFT JOIN products p
@@ -808,6 +840,7 @@ ORDER BY dcl.product_name ASC, dcl.expiration_date ASC, dcl.lot_no ASC;";
                         ? null
                         : reader["branch_name"]?.ToString(),
                         lot_no = reader["lot_no"] == DBNull.Value ? null : reader["lot_no"]?.ToString(),
+                        dr_no = reader["dr_no"] == DBNull.Value ? null : reader["dr_no"]?.ToString(),
                         manufacturing_date = reader["manufacturing_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["manufacturing_date"]),
                         expiration_date = reader["expiration_date"] == DBNull.Value ? null : Convert.ToDateTime(reader["expiration_date"]),
 

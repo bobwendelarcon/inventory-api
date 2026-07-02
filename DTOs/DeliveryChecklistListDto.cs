@@ -15,5 +15,6 @@
         public string? lot_no { get; set; }
         public DateTime? manufacturing_date { get; set; }
         public DateTime? expiration_date { get; set; }
+        public string? dr_numbers { get; set; }
     }
 }
