@@ -237,8 +237,7 @@ namespace inventory_api.Services
      int page = 1,
      int pageSize = 30,
      string lot_no = "",
-     string genericName = "",
-     string brandName = "",
+     string search="",
      string type = "",
      string from = "",
      string to = "",
@@ -259,18 +258,18 @@ namespace inventory_api.Services
 
             if (!string.IsNullOrWhiteSpace(scanned_by) || !string.IsNullOrWhiteSpace(full_name))
             {
-                var search = !string.IsNullOrWhiteSpace(full_name)
+                var userSearch = !string.IsNullOrWhiteSpace(full_name)
                     ? full_name.Trim()
                     : scanned_by.Trim();
 
                 var userIds = await _context.Users
-                    .Where(u => u.full_name.Contains(search))
+                    .Where(u => u.full_name.Contains(userSearch))
                     .Select(u => u.user_id)
                     .ToListAsync();
 
                 query = query.Where(x =>
-                    x.scanned_by.Contains(search) ||   // match user_id (user001)
-                    userIds.Contains(x.scanned_by)     // match full_name (Bob)
+                    x.scanned_by.Contains(userSearch) ||
+                    userIds.Contains(x.scanned_by)
                 );
             }
 
@@ -300,25 +299,14 @@ namespace inventory_api.Services
                 query = query.Where(x => x.created_at < toDate);
             }
 
-            if (!string.IsNullOrWhiteSpace(genericName) || !string.IsNullOrWhiteSpace(brandName))
+            if (!string.IsNullOrWhiteSpace(search))
             {
-                var productQuery = _context.Products.AsQueryable();
+                var keyword = search.Trim();
 
-                if (!string.IsNullOrWhiteSpace(genericName))
-                {
-                    var keyword = genericName.Trim();
-                    productQuery = productQuery.Where(p =>
-                        p.product_name.Contains(keyword));
-                }
-
-                if (!string.IsNullOrWhiteSpace(brandName))
-                {
-                    var keyword = brandName.Trim();
-                    productQuery = productQuery.Where(p =>
-                        p.product_description.Contains(keyword));
-                }
-
-                var productIds = await productQuery
+                var productIds = await _context.Products
+                    .Where(p =>
+                        p.product_name.Contains(keyword) ||
+                        p.product_description.Contains(keyword))
                     .Select(p => p.product_id)
                     .ToListAsync();
 

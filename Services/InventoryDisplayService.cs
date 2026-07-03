@@ -17,16 +17,16 @@ namespace inventory_api.Services
             int page = 1,
             int pageSize = 30,
             string lot_no = "",
-           string genericName = "",
-string brandName = "",
+           string search = "",
            string warehouse = "",
 string category = "",
 string stockStatus = "",
             string expiryStatus = "",
             string months = "",
             string from = "",
-            string to = "",
-            string order = "desc"
+string to = "",
+string sortBy = "lot",
+string order = "desc"
         )
         {
             TimeZoneInfo phTimeZone;
@@ -108,24 +108,15 @@ string stockStatus = "",
 
             //if (!string.IsNullOrWhiteSpace(product))
             //    query = query.Where(x => x.description.Contains(product));
-            if (!string.IsNullOrWhiteSpace(genericName))
+            if (!string.IsNullOrWhiteSpace(search))
             {
-                var keyword = genericName.Trim();
+                var keyword = search.Trim();
 
                 query = query.Where(x =>
-                    x.description.Contains(keyword)
-                );
-            }
-
-            if (!string.IsNullOrWhiteSpace(brandName))
-            {
-                var keyword = brandName.Trim();
-
-                query = query.Where(x =>
+                    x.description.Contains(keyword) ||
                     x.product_description.Contains(keyword)
                 );
             }
-
 
             if (!string.IsNullOrWhiteSpace(warehouse))
                 query = query.Where(x => x.branch_id == warehouse);
@@ -237,9 +228,29 @@ string stockStatus = "",
                 }
             }
 
-            query = order?.ToLower() == "asc"
-                ? query.OrderBy(x => x.lot_no)
-                : query.OrderByDescending(x => x.lot_no);
+            var sort = sortBy?.ToLower();
+            var dir = order?.ToLower();
+
+            query = sort switch
+            {
+                "generic" => dir == "asc"
+                    ? query.OrderBy(x => x.description)
+                           .ThenBy(x => x.lot_no)
+                    : query.OrderByDescending(x => x.description)
+                           .ThenByDescending(x => x.lot_no),
+
+                "brand" => dir == "asc"
+                    ? query.OrderBy(x => x.product_description)
+                           .ThenBy(x => x.description)
+                           .ThenBy(x => x.lot_no)
+                    : query.OrderByDescending(x => x.product_description)
+                           .ThenByDescending(x => x.description)
+                           .ThenByDescending(x => x.lot_no),
+
+                _ => dir == "asc"
+                    ? query.OrderBy(x => x.lot_no)
+                    : query.OrderByDescending(x => x.lot_no)
+            };
 
             var total = await query.CountAsync();
 

@@ -28,20 +28,20 @@ namespace inventory_api.Controllers
 
         [HttpGet]
         public async Task<IActionResult> GetInventoryDisplay(
-      int page = 1,
-      int pageSize = 30,
-      string lot_no = "",
-      string genericName = "",
-      string brandName = "",
-      string warehouse = "",
-      string category = "",
-      string stockStatus = "",
-      string expiryStatus = "",
-      string months = "",
-      string from = "",
-      string to = "",
-      string order = "desc"
-  )
+       int page = 1,
+       int pageSize = 30,
+       string lot_no = "",
+       string search = "",
+       string warehouse = "",
+       string category = "",
+       string stockStatus = "",
+       string expiryStatus = "",
+       string months = "",
+       string from = "",
+       string to = "",
+       string sortBy = "lot",
+       string order = "desc"
+   )
         {
             try
             {
@@ -49,8 +49,7 @@ namespace inventory_api.Controllers
                     page,
                     pageSize,
                     lot_no,
-                    genericName,
-                    brandName,
+                    search,
                     warehouse,
                     category,
                     stockStatus,
@@ -58,6 +57,7 @@ namespace inventory_api.Controllers
                     months,
                     from,
                     to,
+                    sortBy,
                     order
                 );
 
