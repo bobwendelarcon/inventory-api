@@ -214,5 +214,57 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
+        [HttpPost("complete-lines")]
+        public async Task<IActionResult> CompleteLines(
+    [FromBody] CompleteChecklistLinesDto dto)
+        {
+            try
+            {
+                var completedBy =
+                    !string.IsNullOrWhiteSpace(dto.adjusted_by)
+                        ? dto.adjusted_by
+                        : User.Identity?.Name ?? "admin";
+
+                var result = await _deliveryChecklistService
+                    .CompleteLinesAsync(dto, completedBy);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpPost("complete-customer")]
+        public async Task<IActionResult> CompleteCustomer(
+    [FromBody] CompleteChecklistCustomerDto dto)
+        {
+            try
+            {
+                var completedBy =
+                    !string.IsNullOrWhiteSpace(dto.adjusted_by)
+                        ? dto.adjusted_by
+                        : User.Identity?.Name ?? "admin";
+
+                var result = await _deliveryChecklistService
+                    .CompleteCustomerAsync(dto, completedBy);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
     }
 }

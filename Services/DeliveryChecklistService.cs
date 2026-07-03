@@ -46,6 +46,15 @@ namespace inventory_api.Services
             public string lot_no { get; set; } = "";
         }
 
+        private class ChecklistLineCompletionData
+        {
+            public long checklist_line_id { get; set; }
+            public string product_id { get; set; } = "";
+            public string? branch_id { get; set; }
+            public string? lot_no { get; set; }
+            public decimal quantity { get; set; }
+        }
+
         public async Task<object> CreateChecklistAsync(CreateChecklistDto dto, string createdBy)
         {
             ValidateCreateChecklist(dto);
@@ -495,19 +504,25 @@ WHERE
     IFNULL(oh.is_deleted, 0) = 0
     AND ol.allocated_qty > 0
     AND UPPER(TRIM(oh.status)) = 'READY FOR DISPATCH'
-    AND NOT EXISTS
-    (
-        SELECT 1
-        FROM delivery_checklist_line dcl
-        INNER JOIN delivery_checklist_header dch
-            ON dcl.checklist_id = dch.checklist_id
-        WHERE 
-            dcl.order_id = ol.order_id
-            AND dcl.product_id = ol.product_id
-            AND IFNULL(dcl.is_deleted, 0) = 0
-            AND IFNULL(dch.is_deleted, 0) = 0
-            AND UPPER(TRIM(dch.status)) IN ('READY', 'LOADING', 'PARTIAL')
-    )
+   AND NOT EXISTS
+(
+    SELECT 1
+    FROM delivery_checklist_line dcl
+    INNER JOIN delivery_checklist_header dch
+        ON dcl.checklist_id = dch.checklist_id
+    WHERE 
+        dcl.order_line_id = ol.order_line_id
+        AND IFNULL(dcl.is_deleted, 0) = 0
+        AND IFNULL(dch.is_deleted, 0) = 0
+        AND UPPER(TRIM(dch.status)) IN 
+        (
+            'READY',
+            'LOADING',
+            'PARTIAL',
+            'PARTIALLY_COMPLETED',
+            'COMPLETED'
+        )
+)
 ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
 
             /// string sql = @"
@@ -1305,7 +1320,197 @@ WHERE checklist_id = @checklist_id;";
             }
         }
 
+        public async Task<object> CompleteCustomerAsync(
+    CompleteChecklistCustomerDto dto,
+    string completedBy)
+        {
+            if (dto.checklist_id <= 0)
+                throw new Exception("Invalid checklist.");
 
+            if (string.IsNullOrWhiteSpace(dto.customer_name))
+                throw new Exception("Customer is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.dr_no))
+                throw new Exception("DR No is required.");
+
+            var lines = await GetReadyChecklistLinesByCustomerAsync(
+                dto.checklist_id,
+                dto.customer_name);
+
+            if (lines.Count == 0)
+                throw new Exception("No READY lines found for this customer.");
+
+            foreach (var line in lines)
+            {
+                var single = new CompleteChecklistLineDto
+                {
+                    checklist_id = dto.checklist_id,
+                    checklist_line_id = line.checklist_line_id,
+
+                    product_id = line.product_id,
+                    branch_id = line.branch_id,
+                    lot_no = line.lot_no,
+                    quantity = line.quantity,
+
+                    adjustment_type = "DEDUCT",
+                    adjusted_by = completedBy,
+                    reference_type = "DELIVERY_CHECKLIST",
+
+                    dr_no = dto.dr_no,
+                    inv_no = dto.inv_no,
+                    po_no = dto.po_no,
+                    remarks = dto.remarks
+                };
+
+                await CompleteLineAsync(single, completedBy);
+            }
+
+            return new
+            {
+                success = true,
+                message = $"{lines.Count} line(s) completed for {dto.customer_name}."
+            };
+        }
+
+        public async Task<object> CompleteLinesAsync(CompleteChecklistLinesDto dto, string completedBy)
+        {
+            if (dto.checklist_id <= 0)
+                throw new Exception("Invalid checklist.");
+
+            if (dto.checklist_line_ids == null || dto.checklist_line_ids.Count == 0)
+                throw new Exception("Please select at least one checklist line.");
+
+            if (string.IsNullOrWhiteSpace(dto.dr_no))
+                throw new Exception("DR No is required.");
+
+            var completedCount = 0;
+
+            foreach (var lineId in dto.checklist_line_ids.Distinct())
+            {
+                var line = await GetChecklistLineForCompletionAsync(dto.checklist_id, lineId);
+
+                var singleDto = new CompleteChecklistLineDto
+                {
+                    checklist_id = dto.checklist_id,
+                    checklist_line_id = line.checklist_line_id,
+
+                    product_id = line.product_id,
+                    lot_no = line.lot_no,
+                    branch_id = line.branch_id,
+
+                    adjustment_type = "DEDUCT",
+                    quantity = line.quantity,
+
+                    adjusted_by = completedBy,
+                    reference_type = "DELIVERY_CHECKLIST",
+
+                    dr_no = dto.dr_no,
+                    inv_no = dto.inv_no,
+                    po_no = dto.po_no,
+                    remarks = dto.remarks
+                };
+
+                await CompleteLineAsync(singleDto, completedBy);
+                completedCount++;
+            }
+
+            return new
+            {
+                success = true,
+                message = $"{completedCount} checklist line(s) completed successfully."
+            };
+        }
+        private async Task<List<ChecklistLineCompletionData>> GetReadyChecklistLinesByCustomerAsync(
+    long checklistId,
+    string customerName)
+        {
+            var result = new List<ChecklistLineCompletionData>();
+
+            using var conn = new MySqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            string sql = @"
+SELECT
+    checklist_line_id,
+    product_id,
+    branch_id,
+    lot_no,
+    checklist_qty
+FROM delivery_checklist_line
+WHERE checklist_id = @checklist_id
+  AND UPPER(TRIM(customer_name)) = UPPER(TRIM(@customer_name))
+  AND UPPER(TRIM(status)) = 'READY'
+  AND IFNULL(is_deleted, 0) = 0
+ORDER BY product_name ASC, expiration_date ASC, lot_no ASC;";
+
+            using var cmd = new MySqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@checklist_id", checklistId);
+            cmd.Parameters.AddWithValue("@customer_name", customerName);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                result.Add(new ChecklistLineCompletionData
+                {
+                    checklist_line_id = Convert.ToInt64(reader["checklist_line_id"]),
+                    product_id = reader["product_id"]?.ToString() ?? "",
+                    branch_id = reader["branch_id"]?.ToString(),
+                    lot_no = reader["lot_no"]?.ToString(),
+                    quantity = reader["checklist_qty"] == DBNull.Value
+                        ? 0
+                        : Convert.ToDecimal(reader["checklist_qty"])
+                });
+            }
+
+            return result;
+        }
+        private async Task<ChecklistLineCompletionData> GetChecklistLineForCompletionAsync(
+    long checklistId,
+    long checklistLineId)
+        {
+            using var conn = new MySqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            string sql = @"
+SELECT
+    checklist_line_id,
+    product_id,
+    branch_id,
+    lot_no,
+    checklist_qty,
+    status
+FROM delivery_checklist_line
+WHERE checklist_id = @checklist_id
+  AND checklist_line_id = @checklist_line_id
+  AND IFNULL(is_deleted, 0) = 0
+LIMIT 1;";
+
+            using var cmd = new MySqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@checklist_id", checklistId);
+            cmd.Parameters.AddWithValue("@checklist_line_id", checklistLineId);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            if (!await reader.ReadAsync())
+                throw new Exception($"Checklist line not found: {checklistLineId}");
+
+            var status = reader["status"]?.ToString() ?? "";
+
+            if (!string.Equals(status, "READY", StringComparison.OrdinalIgnoreCase))
+                throw new Exception($"Checklist line {checklistLineId} is not READY.");
+
+            return new ChecklistLineCompletionData
+            {
+                checklist_line_id = Convert.ToInt64(reader["checklist_line_id"]),
+                product_id = reader["product_id"]?.ToString() ?? "",
+                branch_id = reader["branch_id"]?.ToString(),
+                lot_no = reader["lot_no"]?.ToString(),
+                quantity = reader["checklist_qty"] == DBNull.Value
+                    ? 0
+                    : Convert.ToDecimal(reader["checklist_qty"])
+            };
+        }
 
 
         public async Task<object> UpdateChecklistLineLotAsync(UpdateChecklistLineLotDto dto)
