@@ -1416,8 +1416,12 @@ namespace inventory_api.Services
 
             _context.DailyOrderLines.Remove(line);
 
+            // VERY IMPORTANT
+            // Remove the line from the in-memory collection also
+            order.Lines.Remove(line);
+
             // If this was the last line, soft delete the header
-            if (order.Lines.Count == 1)
+            if (!order.Lines.Any())
             {
                 order.is_deleted = true;
                 order.deleted_at = DateTime.UtcNow;
