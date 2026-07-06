@@ -245,7 +245,8 @@ namespace inventory_api.Services
      string full_name = "",
      string reference = "",
      string warehouse = "",
-     string order = "desc"
+     string order = "desc",
+     string customer = ""
  )
         {
             var query = _context.InventoryTransactions.AsQueryable();
@@ -275,6 +276,19 @@ namespace inventory_api.Services
 
             if (!string.IsNullOrWhiteSpace(warehouse))
                 query = query.Where(x => x.branch_id == warehouse);
+
+            if (!string.IsNullOrWhiteSpace(customer))
+            {
+                var keyword = customer.Trim();
+
+                query = query.Where(x =>
+                    !string.IsNullOrWhiteSpace(x.customer_id) &&
+                    _context.Partners.Any(p =>
+                        p.partner_id == x.customer_id &&
+                        p.partner_name.Contains(keyword)
+                    )
+                );
+            }
 
             if (!string.IsNullOrWhiteSpace(reference))
             {
@@ -435,6 +449,8 @@ namespace inventory_api.Services
                 { "page", page },
                 { "pageSize", pageSize }
             };
+
+          
         }
 
         public async Task<List<Dictionary<string, object>>> GetHistoryByLotAsync(

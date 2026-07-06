@@ -85,7 +85,8 @@ namespace inventory_api.Controllers
     string full_name = "",
     string reference = "",
     string warehouse = "",
-    string order = "desc"
+    string order = "desc",
+    string customer = ""
 )
         {
             var result = await _service.GetAllAsync(
@@ -100,7 +101,8 @@ namespace inventory_api.Controllers
      full_name,
      reference,
      warehouse,
-     order
+     order,
+     customer
  );
 
             return Ok(result);
