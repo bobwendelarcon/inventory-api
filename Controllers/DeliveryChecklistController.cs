@@ -266,5 +266,24 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
+        [HttpPost("delete-line/{checklistLineId:long}")]
+        public async Task<IActionResult> DeleteChecklistLine(long checklistLineId)
+        {
+            try
+            {
+                var result = await _deliveryChecklistService.DeleteChecklistLineAsync(checklistLineId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
     }
 }

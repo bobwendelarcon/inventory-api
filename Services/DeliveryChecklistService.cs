@@ -1915,6 +1915,103 @@ WHERE order_line_id = @order_line_id
         }
 
 
+        public async Task<object> DeleteChecklistLineAsync(long checklistLineId)
+        {
+            if (checklistLineId <= 0)
+                throw new Exception("Invalid checklist line.");
+
+            using var conn = new MySqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            using var transaction = await conn.BeginTransactionAsync();
+
+            try
+            {
+                long checklistId = 0;
+                string status = "";
+
+                string checkSql = @"
+SELECT checklist_id, status
+FROM delivery_checklist_line
+WHERE checklist_line_id = @checklist_line_id
+  AND IFNULL(is_deleted, 0) = 0
+LIMIT 1;";
+
+                using (var cmd = new MySqlCommand(checkSql, conn, transaction))
+                {
+                    cmd.Parameters.AddWithValue("@checklist_line_id", checklistLineId);
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+
+                    if (!await reader.ReadAsync())
+                        throw new Exception("Checklist line not found.");
+
+                    checklistId = Convert.ToInt64(reader["checklist_id"]);
+                    status = reader["status"]?.ToString() ?? "";
+                }
+
+                if (!string.Equals(status, "READY", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(status, "LOADING", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new Exception("Only READY or LOADING checklist line can be deleted.");
+                }
+
+                string deleteSql = @"
+UPDATE delivery_checklist_line
+SET is_deleted = 1,
+    updated_at = @updated_at
+WHERE checklist_line_id = @checklist_line_id;";
+
+                using (var cmd = new MySqlCommand(deleteSql, conn, transaction))
+                {
+                    cmd.Parameters.AddWithValue("@checklist_line_id", checklistLineId);
+                    cmd.Parameters.AddWithValue("@updated_at", DateTime.UtcNow);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                string countSql = @"
+SELECT COUNT(*)
+FROM delivery_checklist_line
+WHERE checklist_id = @checklist_id
+  AND IFNULL(is_deleted, 0) = 0;";
+
+                long remainingLines;
+
+                using (var cmd = new MySqlCommand(countSql, conn, transaction))
+                {
+                    cmd.Parameters.AddWithValue("@checklist_id", checklistId);
+                    remainingLines = Convert.ToInt64(await cmd.ExecuteScalarAsync());
+                }
+
+                if (remainingLines == 0)
+                {
+                    string deleteHeaderSql = @"
+UPDATE delivery_checklist_header
+SET is_deleted = 1,
+    updated_at = @updated_at
+WHERE checklist_id = @checklist_id;";
+
+                    using var cmd = new MySqlCommand(deleteHeaderSql, conn, transaction);
+                    cmd.Parameters.AddWithValue("@checklist_id", checklistId);
+                    cmd.Parameters.AddWithValue("@updated_at", DateTime.UtcNow);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                await transaction.CommitAsync();
+
+                return new
+                {
+                    success = true,
+                    message = "Checklist line deleted successfully."
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
 
 
     }
