@@ -128,6 +128,20 @@ public async Task<IActionResult> ResetAll()
         }
 
 
+        [HttpGet("{productId}/stock-lots")]
+        public async Task<IActionResult> GetProductStockLots(string productId)
+        {
+            var result = await _productService.GetProductStockLotsAsync(productId);
+            return Ok(result);
+        }
+
+        [HttpPut("{productId}/status")]
+        public async Task<IActionResult> ToggleStatus(string productId, [FromQuery] bool isDeleted)
+        {
+            await _productService.UpdateStatusAsync(productId, isDeleted);
+            return Ok(new { message = "Product status updated successfully." });
+        }
+
 
     }
 

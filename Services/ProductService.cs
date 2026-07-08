@@ -260,6 +260,68 @@ namespace inventory_api.Services
             return true;
         }
 
+        public async Task UpdateStatusAsync(string productId, bool isDeleted)
+        {
+            var product = await _context.Products
+                .FirstOrDefaultAsync(x => x.product_id == productId);
+
+            if (product == null)
+                throw new Exception("Product not found.");
+
+            product.is_deleted = isDeleted;
+            product.updated_at = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<object> GetProductStockLotsAsync(string productId)
+        {
+            var lots = await (
+                from lot in _context.ProductLotNumbers
+                join p in _context.Products
+                    on lot.product_id equals p.product_id
+                join b in _context.Branches
+                    on lot.branch_id equals b.branch_id into branchJoin
+                from b in branchJoin.DefaultIfEmpty()
+                where lot.product_id == productId
+                      && lot.quantity > 0
+                      && !lot.is_deleted
+                orderby b.branch_name, lot.lot_no
+                select new
+                {
+                    lot_no = lot.lot_no,
+                    quantity = lot.quantity,
+                    uom = p.uom ?? "",
+                    pack_qty = p.pack_qty ?? 0,
+                    pack_uom = p.pack_uom ?? "",
+                    location = b != null ? b.branch_name : lot.branch_id
+                })
+                .ToListAsync();
+
+            var product = await (
+       from p in _context.Products
+       join c in _context.Categories
+           on p.catg_id equals c.catg_id into catJoin
+       from c in catJoin.DefaultIfEmpty()
+       where p.product_id == productId
+       select new
+       {
+           p.product_id,
+           p.product_name,
+           p.product_description,
+           category_name = c != null ? c.catg_name : ""
+       }
+   ).FirstOrDefaultAsync();
+
+            return new
+            {
+                canInactivate = lots.Count == 0,
+                product,
+                lots
+            };
+
+
+        }
         public async Task ResetAllAsync()
         {
             var products = await _context.Products.ToListAsync();
