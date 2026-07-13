@@ -11,12 +11,16 @@
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\inventorydisplayservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\inventorydisplaycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\inventorydisplaycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\inventorycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\inventorycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\firestoretestcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\firestoretestcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\inventorydisplaycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\inventorydisplaycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\dtos\\inventoryprintsummarydto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -201,10 +205,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\dtos\\replacechecklistlotsdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:dtos\\replacechecklistlotsdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\firestoretestcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\firestoretestcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\dtos\\productlookupdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -642,40 +642,41 @@
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "InventoryController.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryController.cs",
-              "RelativeDocumentMoniker": "Controllers\\InventoryController.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryController.cs",
-              "RelativeToolTip": "Controllers\\InventoryController.cs",
-              "ViewState": "AgIAAJIAAAAAAAAAAAA5wLcAAAAqAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-28T06:38:01.173Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "InventoryDisplayController.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryDisplayController.cs",
-              "RelativeDocumentMoniker": "Controllers\\InventoryDisplayController.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryDisplayController.cs",
-              "RelativeToolTip": "Controllers\\InventoryDisplayController.cs",
-              "ViewState": "AgIAAEoAAAAAAAAAAAAwwGwAAAAJAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-16T00:43:03.204Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 1,
               "Title": "InventoryDisplayService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\InventoryDisplayService.cs",
               "RelativeDocumentMoniker": "Services\\InventoryDisplayService.cs",
               "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\InventoryDisplayService.cs",
               "RelativeToolTip": "Services\\InventoryDisplayService.cs",
-              "ViewState": "AgIAAJgBAAAAAAAAAAAwwKkBAAArAAAAAAAAAA==",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAlwBcAAAAlAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-06-11T08:16:43.133Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "FirestoreTestController.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\FirestoreTestController.cs",
+              "RelativeDocumentMoniker": "Controllers\\FirestoreTestController.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\FirestoreTestController.cs",
+              "RelativeToolTip": "Controllers\\FirestoreTestController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-25T00:58:30.602Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "InventoryController.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryController.cs",
+              "RelativeDocumentMoniker": "Controllers\\InventoryController.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryController.cs",
+              "RelativeToolTip": "Controllers\\InventoryController.cs",
+              "ViewState": "AgIAAJMAAAAAAAAAAAAgwLcAAAAqAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-28T06:38:01.173Z",
               "EditorCaption": ""
             },
             {
@@ -694,6 +695,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 4,
+              "Title": "InventoryDisplayController.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryDisplayController.cs",
+              "RelativeDocumentMoniker": "Controllers\\InventoryDisplayController.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryDisplayController.cs",
+              "RelativeToolTip": "Controllers\\InventoryDisplayController.cs",
+              "ViewState": "AgIAAEEAAAAAAAAAAAAQwIIAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-16T00:43:03.204Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
               "Title": "InventoryPrintSummaryDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\InventoryPrintSummaryDto.cs",
               "RelativeDocumentMoniker": "DTOs\\InventoryPrintSummaryDto.cs",
@@ -705,7 +719,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Program.cs",
               "RelativeDocumentMoniker": "Program.cs",
@@ -717,7 +731,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "AppDbContext.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Data\\AppDbContext.cs",
               "RelativeDocumentMoniker": "Data\\AppDbContext.cs",
@@ -729,7 +743,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "ProductLotNumberService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\ProductLotNumberService.cs",
               "RelativeDocumentMoniker": "Services\\ProductLotNumberService.cs",
@@ -741,7 +755,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "ProductController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\ProductController.cs",
               "RelativeDocumentMoniker": "Controllers\\ProductController.cs",
@@ -753,7 +767,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "InventoryTransactionService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\InventoryTransactionService.cs",
               "RelativeDocumentMoniker": "Services\\InventoryTransactionService.cs",
@@ -765,7 +779,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "ChecklistOutResponseDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\ChecklistOutResponseDto.cs",
               "RelativeDocumentMoniker": "DTOs\\ChecklistOutResponseDto.cs",
@@ -777,7 +791,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 12,
               "Title": "CreateInventoryTransactionDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\CreateInventoryTransactionDto.cs",
               "RelativeDocumentMoniker": "DTOs\\CreateInventoryTransactionDto.cs",
@@ -789,7 +803,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "InventoryReservedDetailsDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\InventoryReservedDetailsDto.cs",
               "RelativeDocumentMoniker": "DTOs\\InventoryReservedDetailsDto.cs",
@@ -801,7 +815,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 14,
               "Title": "InventoryDisplayDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\InventoryDisplayDto.cs",
               "RelativeDocumentMoniker": "Models\\InventoryDisplayDto.cs",
@@ -813,7 +827,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 16,
               "Title": "Product.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Product.cs",
               "RelativeDocumentMoniker": "Models\\Product.cs",
@@ -825,7 +839,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 15,
               "Title": "ProductService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\ProductService.cs",
               "RelativeDocumentMoniker": "Services\\ProductService.cs",
@@ -837,7 +851,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 17,
               "Title": "ProductLotNumber.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\ProductLotNumber.cs",
               "RelativeDocumentMoniker": "Models\\ProductLotNumber.cs",
@@ -849,7 +863,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 18,
               "Title": "DeliveryChecklistController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\DeliveryChecklistController.cs",
               "RelativeDocumentMoniker": "Controllers\\DeliveryChecklistController.cs",
@@ -861,7 +875,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 19,
               "Title": "DeliveryChecklistService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\DeliveryChecklistService.cs",
               "RelativeDocumentMoniker": "Services\\DeliveryChecklistService.cs",
@@ -873,7 +887,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 20,
               "Title": "DeliveryChecklistListDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\DeliveryChecklistListDto.cs",
               "RelativeDocumentMoniker": "DTOs\\DeliveryChecklistListDto.cs",
@@ -885,7 +899,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 21,
               "Title": "DeliveryChecklistListDetailsDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\DeliveryChecklistListDetailsDto.cs",
               "RelativeDocumentMoniker": "DTOs\\DeliveryChecklistListDetailsDto.cs",
@@ -897,7 +911,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 22,
+              "DocumentIndex": 23,
               "Title": "DashboardService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\DashboardService.cs",
               "RelativeDocumentMoniker": "Services\\DashboardService.cs",
@@ -909,7 +923,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 23,
+              "DocumentIndex": 24,
               "Title": "DailyOrdersController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\DailyOrdersController.cs",
               "RelativeDocumentMoniker": "Controllers\\DailyOrdersController.cs",
@@ -921,7 +935,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
+              "DocumentIndex": 22,
               "Title": "DailyOrderService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\DailyOrderService.cs",
               "RelativeDocumentMoniker": "Services\\DailyOrderService.cs",
@@ -933,7 +947,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 24,
+              "DocumentIndex": 25,
               "Title": "HealthController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\HealthController.cs",
               "RelativeDocumentMoniker": "Controllers\\HealthController.cs",
@@ -945,7 +959,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 28,
+              "DocumentIndex": 29,
               "Title": "CompleteChecklistLinesDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\CompleteChecklistLinesDto.cs",
               "RelativeDocumentMoniker": "DTOs\\CompleteChecklistLinesDto.cs",
@@ -957,7 +971,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 26,
               "Title": "InventoryTransaction.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\InventoryTransaction.cs",
               "RelativeDocumentMoniker": "Models\\InventoryTransaction.cs",
@@ -969,7 +983,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 26,
+              "DocumentIndex": 27,
               "Title": "ChecklistOutController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\ChecklistOutController.cs",
               "RelativeDocumentMoniker": "Controllers\\ChecklistOutController.cs",
@@ -981,7 +995,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 27,
+              "DocumentIndex": 28,
               "Title": "CompleteChecklistCustomerDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\CompleteChecklistCustomerDto.cs",
               "RelativeDocumentMoniker": "DTOs\\CompleteChecklistCustomerDto.cs",
@@ -993,7 +1007,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 29,
+              "DocumentIndex": 30,
               "Title": "CompleteChecklistLineDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\CompleteChecklistLineDto.cs",
               "RelativeDocumentMoniker": "DTOs\\CompleteChecklistLineDto.cs",
@@ -1005,7 +1019,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 30,
+              "DocumentIndex": 31,
               "Title": "PurchaseOrderService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\PurchaseOrders\\PurchaseOrderService.cs",
               "RelativeDocumentMoniker": "Services\\Purchasing\\PurchaseOrders\\PurchaseOrderService.cs",
@@ -1017,7 +1031,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 33,
+              "DocumentIndex": 34,
               "Title": "DashboardController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\DashboardController.cs",
               "RelativeDocumentMoniker": "Controllers\\DashboardController.cs",
@@ -1029,7 +1043,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 34,
+              "DocumentIndex": 35,
               "Title": "DeliverKpiReportDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Reports\\DeliverKpiReportDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Reports\\DeliverKpiReportDto.cs",
@@ -1041,7 +1055,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 31,
+              "DocumentIndex": 32,
               "Title": "ReportService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\ReportService.cs",
               "RelativeDocumentMoniker": "Services\\ReportService.cs",
@@ -1053,7 +1067,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 35,
+              "DocumentIndex": 36,
               "Title": "CreateDailyOrderListDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\CreateDailyOrderListDto.cs",
               "RelativeDocumentMoniker": "DTOs\\CreateDailyOrderListDto.cs",
@@ -1065,7 +1079,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 32,
+              "DocumentIndex": 33,
               "Title": "ReportsController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\ReportsController.cs",
               "RelativeDocumentMoniker": "Controllers\\ReportsController.cs",
@@ -1077,7 +1091,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 36,
+              "DocumentIndex": 37,
               "Title": "inventory_api.http",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\inventory_api.http",
               "RelativeDocumentMoniker": "inventory_api.http",
@@ -1089,7 +1103,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 37,
+              "DocumentIndex": 38,
               "Title": "PartnersController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\PartnersController.cs",
               "RelativeDocumentMoniker": "Controllers\\PartnersController.cs",
@@ -1101,7 +1115,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 38,
+              "DocumentIndex": 39,
               "Title": "NearExpiryReportDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Reports\\NearExpiryReportDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Reports\\NearExpiryReportDto.cs",
@@ -1113,7 +1127,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 39,
+              "DocumentIndex": 40,
               "Title": "InventoryReportDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Reports\\InventoryReportDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Reports\\InventoryReportDto.cs",
@@ -1125,7 +1139,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 43,
+              "DocumentIndex": 44,
               "Title": "CreatePartnerDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\CreatePartnerDto.cs",
               "RelativeDocumentMoniker": "DTOs\\CreatePartnerDto.cs",
@@ -1137,7 +1151,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 41,
+              "DocumentIndex": 42,
               "Title": "PartnerService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\PartnerService.cs",
               "RelativeDocumentMoniker": "Services\\PartnerService.cs",
@@ -1149,7 +1163,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 40,
+              "DocumentIndex": 41,
               "Title": "ReportFilterDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Reports\\ReportFilterDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Reports\\ReportFilterDto.cs",
@@ -1161,7 +1175,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 42,
+              "DocumentIndex": 43,
               "Title": "PartnerListDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\PartnerListDto.cs",
               "RelativeDocumentMoniker": "DTOs\\PartnerListDto.cs",
@@ -1173,7 +1187,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 44,
+              "DocumentIndex": 45,
               "Title": "ChecklistOutService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\ChecklistOutService.cs",
               "RelativeDocumentMoniker": "Services\\ChecklistOutService.cs",
@@ -1185,7 +1199,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 45,
+              "DocumentIndex": 46,
               "Title": "DailyOrderListResponse.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\DailyOrderListResponse.cs",
               "RelativeDocumentMoniker": "DTOs\\DailyOrderListResponse.cs",
@@ -1197,7 +1211,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 47,
+              "DocumentIndex": 48,
               "Title": "DailyOrderLine.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\DailyOrderLine.cs",
               "RelativeDocumentMoniker": "Models\\DailyOrderLine.cs",
@@ -1209,7 +1223,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 46,
+              "DocumentIndex": 47,
               "Title": "AddDailyOrderLineRequest.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\AddDailyOrderLineRequest.cs",
               "RelativeDocumentMoniker": "DTOs\\AddDailyOrderLineRequest.cs",
@@ -1221,7 +1235,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 48,
+              "DocumentIndex": 49,
               "Title": "UpdateChecklistLineLotDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\UpdateChecklistLineLotDto.cs",
               "RelativeDocumentMoniker": "DTOs\\UpdateChecklistLineLotDto.cs",
@@ -1233,7 +1247,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 49,
+              "DocumentIndex": 50,
               "Title": "ReplaceChecklistLotsDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\ReplaceChecklistLotsDto.cs",
               "RelativeDocumentMoniker": "DTOs\\ReplaceChecklistLotsDto.cs",
@@ -1242,18 +1256,6 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-06-25T02:44:08.338Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 50,
-              "Title": "FirestoreTestController.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\FirestoreTestController.cs",
-              "RelativeDocumentMoniker": "Controllers\\FirestoreTestController.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\FirestoreTestController.cs",
-              "RelativeToolTip": "Controllers\\FirestoreTestController.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-25T00:58:30.602Z"
             },
             {
               "$type": "Document",
