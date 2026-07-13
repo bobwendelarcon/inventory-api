@@ -359,7 +359,7 @@ string order = "desc"
         public async Task<List<InventoryPrintSummaryDto>> GetPrintSummaryAsync(
     string search = "",
     string warehouse = "",
-    string category = "",
+    string categories = "",
     string stockStatus = "",
     string order = "asc")
         {
@@ -398,10 +398,25 @@ string order = "desc"
             }
 
             // Category filter
-            if (!string.IsNullOrWhiteSpace(category))
+            if (!string.IsNullOrWhiteSpace(categories))
             {
-                productQuery = productQuery.Where(x =>
-                    x.category_name == category);
+                var selectedCategories =
+                    categories
+                        .Split(
+                            '|',
+                            StringSplitOptions.RemoveEmptyEntries |
+                            StringSplitOptions.TrimEntries
+                        )
+                        .ToList();
+
+                if (selectedCategories.Count > 0)
+                {
+                    productQuery = productQuery.Where(x =>
+                        selectedCategories.Contains(
+                            x.category_name
+                        )
+                    );
+                }
             }
 
             var products = await productQuery.ToListAsync();

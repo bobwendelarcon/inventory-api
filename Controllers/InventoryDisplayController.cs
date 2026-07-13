@@ -76,23 +76,23 @@ namespace inventory_api.Controllers
         // NEW: Grouped inventory summary for printing
         [HttpGet("print-summary")]
         public async Task<IActionResult> GetInventoryPrintSummary(
-            string search = "",
-            string warehouse = "",
-            string category = "",
-            string stockStatus = "",
-            string order = "asc"
-        )
+    string search = "",
+    string warehouse = "",
+    string categories = "",
+    string stockStatus = "",
+    string order = "asc")
         {
             try
             {
                 var result =
-                    await _inventoryDisplayService.GetPrintSummaryAsync(
-                        search,
-                        warehouse,
-                        category,
-                        stockStatus,
-                        order
-                    );
+                    await _inventoryDisplayService
+                        .GetPrintSummaryAsync(
+                            search,
+                            warehouse,
+                            categories,
+                            stockStatus,
+                            order
+                        );
 
                 return Ok(result);
             }
@@ -100,12 +100,13 @@ namespace inventory_api.Controllers
             {
                 return StatusCode(500, new
                 {
-                    message = "Failed to load inventory print summary.",
+                    message =
+                        "Failed to load inventory print summary.",
+
                     error = ex.Message
                 });
             }
         }
-
         [HttpPut("update-lot-dates")]
         public async Task<IActionResult> UpdateLotDates(
             [FromBody] UpdateLotDatesDto dto)
