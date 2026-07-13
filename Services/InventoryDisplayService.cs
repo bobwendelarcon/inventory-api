@@ -354,6 +354,266 @@ string order = "desc"
             };
         }
 
+
+
+        public async Task<List<InventoryPrintSummaryDto>> GetPrintSummaryAsync(
+    string search = "",
+    string warehouse = "",
+    string category = "",
+    string stockStatus = "",
+    string order = "asc")
+        {
+            // Start from Products so products without inventory lots
+            // will still be included with quantity 0.
+            var productQuery =
+                from product in _context.Products
+
+                join categoryData in _context.Categories
+                    on product.catg_id equals categoryData.catg_id into categoryJoin
+                from categoryData in categoryJoin.DefaultIfEmpty()
+
+                select new
+                {
+                    product_id = product.product_id,
+                    product_name = product.product_name ?? "",
+                    product_description = product.product_description ?? "",
+                    category_name = categoryData != null
+                        ? categoryData.catg_name ?? ""
+                        : "",
+
+                    uom = product.uom ?? "",
+                    pack_qty = (decimal)(product.pack_qty ?? 0),
+                    pack_uom = product.pack_uom ?? "",
+                    stock_level = product.stock_level
+                };
+
+            // Product search
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                string keyword = search.Trim();
+
+                productQuery = productQuery.Where(x =>
+                    x.product_name.Contains(keyword) ||
+                    x.product_description.Contains(keyword));
+            }
+
+            // Category filter
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                productQuery = productQuery.Where(x =>
+                    x.category_name == category);
+            }
+
+            var products = await productQuery.ToListAsync();
+
+            // Load inventory lots.
+            var lotQuery = _context.ProductLotNumbers
+                .Where(x => !x.is_deleted);
+
+            // Warehouse filter
+            if (!string.IsNullOrWhiteSpace(warehouse))
+            {
+                lotQuery = lotQuery.Where(x =>
+                    x.branch_id == warehouse);
+            }
+
+            var lots = await lotQuery
+                .Select(x => new
+                {
+                    product_id = x.product_id,
+                    branch_id = x.branch_id,
+                    lot_no = x.lot_no ?? "",
+                    quantity = (decimal)x.quantity
+                })
+                .ToListAsync();
+
+            // Load reserved quantities from daily order allocations.
+            var allocationQuery =
+                from allocation in _context.DailyOrderAllocations
+
+                join line in _context.DailyOrderLines
+                    on allocation.order_line_id equals line.order_line_id
+
+                join header in _context.DailyOrderHeaders
+                    on line.order_id equals header.order_id
+
+                where !header.is_deleted
+                      && allocation.allocated_qty > 0
+
+                select new
+                {
+                    product_id = allocation.product_id,
+                    branch_id = allocation.branch_id,
+                    lot_no = allocation.lot_no ?? "",
+                    reserved_qty = allocation.allocated_qty
+                };
+
+            // Apply the same warehouse filter to reservations.
+            if (!string.IsNullOrWhiteSpace(warehouse))
+            {
+                allocationQuery = allocationQuery.Where(x =>
+                    x.branch_id == warehouse);
+            }
+
+            var allocations = await allocationQuery.ToListAsync();
+
+            var result = products.Select(product =>
+            {
+                // Get all lots belonging to the product.
+                var productLots = lots
+                    .Where(x =>
+                        (x.product_id ?? "").Trim() ==
+                        (product.product_id ?? "").Trim())
+                    .ToList();
+
+                decimal totalOnHand = productLots.Sum(x => x.quantity);
+
+                decimal totalReserved = 0;
+
+                foreach (var lot in productLots)
+                {
+                    decimal lotReserved = allocations
+                        .Where(a =>
+                            (a.product_id ?? "").Trim() ==
+                            (lot.product_id ?? "").Trim() &&
+
+                            (a.branch_id ?? "").Trim() ==
+                            (lot.branch_id ?? "").Trim() &&
+
+                            (a.lot_no ?? "").Trim() ==
+                            (lot.lot_no ?? "").Trim())
+                        .Sum(a => a.reserved_qty);
+
+                    totalReserved += lotReserved;
+                }
+
+                decimal availableQty =
+                    Math.Max(0, totalOnHand - totalReserved);
+
+                string packDisplay = FormatPackForPrint(
+                    availableQty,
+                    product.pack_qty,
+                    product.pack_uom,
+                    product.uom
+                );
+
+                return new InventoryPrintSummaryDto
+                {
+                    product_id = product.product_id,
+                    product_name = product.product_name,
+                    product_description = product.product_description,
+                    category_name = product.category_name,
+
+                    available_qty = availableQty,
+
+                    uom = product.uom,
+                    pack_qty = product.pack_qty,
+                    pack_uom = product.pack_uom,
+
+                    pack_display = packDisplay
+                };
+            }).ToList();
+
+            // Apply stock-status filter after total available qty is calculated.
+            if (!string.IsNullOrWhiteSpace(stockStatus))
+            {
+                stockStatus = stockStatus.Trim().ToLower();
+
+                if (stockStatus == "zero")
+                {
+                    result = result
+                        .Where(x => x.available_qty <= 0)
+                        .ToList();
+                }
+                else if (stockStatus == "available")
+                {
+                    result = result
+                        .Where(x => x.available_qty > 0)
+                        .ToList();
+                }
+                else if (stockStatus == "normal")
+                {
+                    result = result
+                        .Where(x => x.available_qty > 0)
+                        .ToList();
+                }
+            }
+
+            // Sorting
+            if (string.Equals(order, "desc",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                result = result
+                    .OrderByDescending(x => x.product_name)
+                    .ThenByDescending(x => x.product_description)
+                    .ToList();
+            }
+            else
+            {
+                result = result
+                    .OrderBy(x => x.product_name)
+                    .ThenBy(x => x.product_description)
+                    .ToList();
+            }
+
+            return result;
+        }
+
+
+        private static string FormatPackForPrint(
+    decimal quantity,
+    decimal packQty,
+    string packUom,
+    string baseUom)
+        {
+            if (quantity <= 0)
+            {
+                return packQty > 0 && !string.IsNullOrWhiteSpace(packUom)
+                    ? $"0 {packUom}"
+                    : $"0 {baseUom}";
+            }
+
+            if (packQty <= 0 || string.IsNullOrWhiteSpace(packUom))
+            {
+                return $"{FormatNumber(quantity)} {baseUom}";
+            }
+
+            decimal fullPackDecimal = Math.Floor(quantity / packQty);
+            decimal remainder = quantity - (fullPackDecimal * packQty);
+
+            var parts = new List<string>();
+
+            if (fullPackDecimal > 0)
+            {
+                parts.Add(
+                    $"{FormatNumber(fullPackDecimal)} {packUom}"
+                );
+            }
+
+            if (remainder > 0)
+            {
+                parts.Add(
+                    $"{FormatNumber(remainder)} {baseUom}"
+                );
+            }
+
+            if (parts.Count == 0)
+            {
+                return $"0 {packUom}";
+            }
+
+            return string.Join(" & ", parts);
+        }
+
+        private static string FormatNumber(decimal value)
+        {
+            return value % 1 == 0
+                ? value.ToString("0")
+                : value.ToString("0.##");
+        }
+
+
+
         public async Task<List<string>> GetInventoryCategoriesAsync()
         {
             return await (
