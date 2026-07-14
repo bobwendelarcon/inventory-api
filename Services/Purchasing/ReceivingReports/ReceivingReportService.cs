@@ -60,30 +60,35 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
             {
                 po.PoId,
                 po.PoNo,
+                po.PrintedPoNo,
                 po.SupplierId,
                 SupplierName = supplierName ?? "",
                 po.DeliveryDate,
                 po.Status,
+
                 Lines = po.Lines
-                    .Where(x => x.BalanceQty > 0 && x.Status != "CLOSED")
-                    .Select(x => new
-                    {
-                        x.PoLineId,
-                        x.MaterialId,
-                        MaterialCode = _context.Materials
-                            .Where(m => m.material_id == x.MaterialId)
-                            .Select(m => m.material_code)
-                            .FirstOrDefault() ?? "",
-                        MaterialName = _context.Materials
-                            .Where(m => m.material_id == x.MaterialId)
-                            .Select(m => m.material_name)
-                            .FirstOrDefault() ?? "",
-                        x.PoQty,
-                        PreviouslyReceivedQty = x.ReceivedQty,
-                        x.BalanceQty,
-                        x.Uom
-                    })
-                    .ToList()
+         .Where(x => x.BalanceQty > 0 && x.Status != "CLOSED")
+         .Select(x => new
+         {
+             x.PoLineId,
+             x.MaterialId,
+
+             MaterialCode = _context.Materials
+                 .Where(m => m.material_id == x.MaterialId)
+                 .Select(m => m.material_code)
+                 .FirstOrDefault() ?? "",
+
+             MaterialName = _context.Materials
+                 .Where(m => m.material_id == x.MaterialId)
+                 .Select(m => m.material_name)
+                 .FirstOrDefault() ?? "",
+
+             x.PoQty,
+             PreviouslyReceivedQty = x.ReceivedQty,
+             x.BalanceQty,
+             x.Uom
+         })
+         .ToList()
             };
         }
 
@@ -125,7 +130,8 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
 
             foreach (var lineDto in validLines)
             {
-                var poLine = po.Lines.FirstOrDefault(x => x.PoLineId == lineDto.PoLineId);
+                var poLine = po.Lines
+                    .FirstOrDefault(x => x.PoLineId == lineDto.PoLineId);
 
                 if (poLine == null)
                     throw new Exception("Invalid PO line selected.");
@@ -133,29 +139,41 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                 if (poLine.BalanceQty <= 0)
                     throw new Exception("Selected PO line has no remaining balance.");
 
-                if (lineDto.ReceiveQty > poLine.BalanceQty)
-                    throw new Exception("Receive quantity cannot exceed balance quantity.");
+                var isOverReceived =
+                    lineDto.ReceiveQty > poLine.BalanceQty;
+
+                var overReceivedQty =
+                    isOverReceived
+                        ? lineDto.ReceiveQty - poLine.BalanceQty
+                        : 0m;
+
+                if (isOverReceived &&
+                    string.IsNullOrWhiteSpace(lineDto.Remarks))
+                {
+                    throw new Exception(
+                        $"Remarks are required for over-receiving material ID {poLine.MaterialId}."
+                    );
+                }
 
                 rr.Lines.Add(new ReceivingReportLine
                 {
                     PoLineId = poLine.PoLineId,
                     MaterialId = poLine.MaterialId,
+
                     PoQty = poLine.PoQty,
                     PreviouslyReceivedQty = poLine.ReceivedQty,
                     BalanceQty = poLine.BalanceQty,
                     ReceiveQty = lineDto.ReceiveQty,
+
                     AcceptedQty = 0,
                     RejectedQty = 0,
+
                     Uom = poLine.Uom,
                     Remarks = lineDto.Remarks,
+
                     Status = "PENDING",
                     CreatedAt = DateTime.Now
                 });
-
-                //poLine.ReceivedQty += lineDto.ReceiveQty;
-                //poLine.BalanceQty = poLine.PoQty - poLine.ReceivedQty;
-                //poLine.Status = poLine.BalanceQty <= 0 ? "CLOSED" : "PARTIAL";
-                //poLine.UpdatedAt = DateTime.Now;
             }
 
             //var allClosed = po.Lines.All(x => x.BalanceQty <= 0);
@@ -285,25 +303,95 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
 
         public async Task CommitAsync(int rrId, string userId)
         {
-            var rr = await _context.ReceivingReportHeaders
-                .Include(x => x.Lines)
-                .FirstOrDefaultAsync(x => x.RrId == rrId);
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
 
-            if (rr == null)
-                throw new Exception("RR not found.");
+            try
+            {
+                var rr = await _context.ReceivingReportHeaders
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x => x.RrId == rrId);
 
-            if (rr.Status != "ACCEPTED")
-                throw new Exception("Only accepted RR can be committed.");
+                if (rr == null)
+                    throw new Exception("RR not found.");
 
-            // Inventory update will be added here next.
-            // Do not update inventory during RR creation.
+                if (rr.Status == "COMMITTED")
+                    throw new Exception("Receiving Report is already committed.");
 
-            rr.Status = "COMMITTED";
-            rr.CommittedBy = userId;
-            rr.CommittedAt = DateTime.Now;
-            rr.UpdatedAt = DateTime.Now;
+                if (rr.Status != "ACCEPTED")
+                    throw new Exception("Only accepted RR can be committed.");
 
-            await _context.SaveChangesAsync();
+                var po = await _context.PurchaseOrderHeaders
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x => x.PoId == rr.PoId);
+
+                if (po == null)
+                    throw new Exception("Purchase Order not found.");
+
+                foreach (var rrLine in rr.Lines)
+                {
+                    var poLine = po.Lines
+                        .FirstOrDefault(x =>
+                            x.PoLineId == rrLine.PoLineId);
+
+                    if (poLine == null)
+                    {
+                        throw new Exception(
+                            $"Purchase Order line {rrLine.PoLineId} was not found."
+                        );
+                    }
+
+                    if (rrLine.AcceptedQty <= 0)
+                        continue;
+
+                    poLine.ReceivedQty += rrLine.AcceptedQty;
+
+                    poLine.BalanceQty = Math.Max(
+                        0m,
+                        poLine.PoQty - poLine.ReceivedQty
+                    );
+
+                    poLine.Status =
+                        poLine.BalanceQty <= 0
+                            ? "CLOSED"
+                            : "PARTIAL";
+
+                    poLine.UpdatedAt = DateTime.Now;
+                }
+
+                var allClosed =
+                    po.Lines.All(x => x.BalanceQty <= 0);
+
+                var anyReceived =
+                    po.Lines.Any(x => x.ReceivedQty > 0);
+
+                if (allClosed)
+                {
+                    po.Status = "FULLY_RECEIVED";
+                }
+                else if (anyReceived)
+                {
+                    po.Status = "PARTIALLY_RECEIVED";
+                }
+
+                po.UpdatedAt = DateTime.Now;
+
+                rr.Status = "COMMITTED";
+                rr.CommittedBy = userId;
+                rr.CommittedAt = DateTime.Now;
+                rr.UpdatedAt = DateTime.Now;
+
+                // Inventory update will be added here.
+                // Inventory should use rrLine.AcceptedQty.
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<List<ReceivingReportListDto>> GetAllAsync()
@@ -379,6 +467,10 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                         BalanceQty = l.BalanceQty,
                         ReceiveQty = l.ReceiveQty,
                         AcceptedQty = l.AcceptedQty,
+
+                        IsOverReceived = l.IsOverReceived,
+                        OverReceivedQty = l.OverReceivedQty,
+
                         RejectedQty = l.RejectedQty,
                         Uom = l.Uom,
                         Remarks = l.Remarks,
@@ -410,6 +502,51 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
             }
 
             return $"{prefix}{nextNo:0000}";
+        }
+
+        public async Task<List<ReceivingCalendarDto>> GetReceivingCalendarAsync(
+    DateTime startDate,
+    DateTime endDate)
+        {
+            var data = await _context.PurchaseOrderHeaders
+                .Where(po =>
+                    po.DeliveryDate.HasValue &&
+                    po.DeliveryDate.Value >= startDate &&
+                    po.DeliveryDate.Value < endDate &&
+                    (
+                        po.Status == "APPROVED" ||
+                        po.Status == "PARTIALLY_RECEIVED"
+                    ))
+                .OrderBy(po => po.DeliveryDate)
+                .ThenBy(po => po.PoNo)
+                .Select(po => new ReceivingCalendarDto
+                {
+                    PoId = po.PoId,
+                    PoNo = po.PoNo,
+
+                    DeliveryDate = po.DeliveryDate.Value,
+
+                    SupplierId = po.SupplierId,
+
+                    SupplierName = _context.Suppliers
+                        .Where(s => s.SupplierId == po.SupplierId)
+                        .Select(s => s.SupplierName)
+                        .FirstOrDefault() ?? "",
+
+                    Status = po.Status,
+                    TotalAmount = po.TotalAmount,
+
+                    MaterialCount = po.Lines.Count(),
+
+                    TotalPoQty = po.Lines.Sum(x => x.PoQty),
+
+                    TotalReceivedQty = po.Lines.Sum(x => x.ReceivedQty),
+
+                    TotalBalanceQty = po.Lines.Sum(x => x.BalanceQty)
+                })
+                .ToListAsync();
+
+            return data;
         }
     }
 }

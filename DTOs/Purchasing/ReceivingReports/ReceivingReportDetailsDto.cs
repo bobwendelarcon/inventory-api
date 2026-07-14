@@ -46,6 +46,9 @@
         public decimal AcceptedQty { get; set; }
         public decimal RejectedQty { get; set; }
 
+        public bool IsOverReceived { get; set; }
+        public decimal OverReceivedQty { get; set; }
+
         public string Uom { get; set; } = string.Empty;
         public string? Remarks { get; set; }
         public string Status { get; set; } = string.Empty;

@@ -238,7 +238,6 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
         public async Task<List<PurchaseOrderListDto>> GetAllAsync()
         {
             var data = await _context.PurchaseOrderHeaders
-                .Include(x => x.Lines)
                 .OrderByDescending(x => x.PoId)
                 .Select(x => new PurchaseOrderListDto
                 {
@@ -253,7 +252,14 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
 
                     TotalAmount = x.TotalAmount,
                     Status = x.Status,
+
                     CreatedBy = x.CreatedBy,
+
+                    CreatedByName = _context.Users
+    .Where(u => u.user_id == x.CreatedBy)
+    .Select(u => u.full_name)
+    .FirstOrDefault() ?? x.CreatedBy,
+
                     CreatedAt = x.CreatedAt
                 })
                 .ToListAsync();

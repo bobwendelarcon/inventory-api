@@ -14,6 +14,7 @@
 
         public string Status { get; set; } = string.Empty;
 
+        public string CreatedByName { get; set; }
         public string CreatedBy { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; }

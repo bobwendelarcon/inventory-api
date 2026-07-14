@@ -157,5 +157,15 @@ namespace inventory_api.Controllers.Purchasing.ReceivingReports
 
             return Ok(data);
         }
+
+        [HttpGet("calendar")]
+        public async Task<IActionResult> GetCalendar(
+    [FromQuery] DateTime start,
+    [FromQuery] DateTime end)
+        {
+            var data = await _service.GetReceivingCalendarAsync(start, end);
+
+            return Ok(data);
+        }
     }
 }
