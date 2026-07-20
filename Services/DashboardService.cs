@@ -98,16 +98,19 @@ namespace inventory_api.Services
            .GetProductSummaryAsync();
 
             dto.LowStockProducts =
-                allProductInventorySummary
-                    .Where(x =>
-                        x.StockStatus == "LOW STOCK" ||
-                        x.StockStatus == "OUT OF STOCK")
-                    .OrderBy(x => x.CategoryName)
-                    .ThenBy(x =>
-                        x.StockStatus == "OUT OF STOCK" ? 0 : 1)
-                    .ThenByDescending(x => x.DeficitQty)
-                    .ThenBy(x => x.ProductName)
-                    .ToList();
+    allProductInventorySummary
+        .Where(x =>
+            x.StockLevel > 0 &&
+            (
+                x.StockStatus == "LOW STOCK" ||
+                x.StockStatus == "OUT OF STOCK"
+            ))
+        .OrderBy(x => x.CategoryName)
+        .ThenBy(x =>
+            x.StockStatus == "OUT OF STOCK" ? 0 : 1)
+        .ThenByDescending(x => x.DeficitQty)
+        .ThenBy(x => x.ProductName)
+        .ToList();
 
             dto.LowStock = dto.LowStockProducts.Count;
 
@@ -292,9 +295,7 @@ namespace inventory_api.Services
                 .Take(5)
                 .ToList();
 
-            dto.LowStock = alerts.Count(x =>
-                x.AlertType == "OUT OF STOCK" ||
-                x.AlertType == "LOW STOCK");
+            dto.LowStock = dto.LowStockProducts.Count;
 
             // =========================
             // COMPLETED TODAY
