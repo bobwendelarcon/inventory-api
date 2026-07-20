@@ -3,17 +3,15 @@
     public class CreatePurchaseOrderDto
     {
         public int CanvassId { get; set; }
-
         public int SupplierId { get; set; }
 
         public DateTime PoDate { get; set; }
 
+        // Kept for backward compatibility and one-time delivery.
         public DateTime? DeliveryDate { get; set; }
 
         public string? PaymentTerms { get; set; }
-
         public string? SupplierAddress { get; set; }
-
         public string? RequestedBy { get; set; }
 
         public decimal OtherCharges { get; set; }
@@ -23,12 +21,13 @@
         public string? CreatedBy { get; set; }
 
         public List<CreatePurchaseOrderLineDto> Lines { get; set; } = new();
+
+        public List<CreatePurchaseOrderScheduleDto> Schedules { get; set; } = new();
     }
 
     public class CreatePurchaseOrderLineDto
     {
         public int CanvassLineId { get; set; }
-
         public int? QuoteId { get; set; }
 
         public int MaterialId { get; set; }
@@ -38,9 +37,25 @@
         public string Uom { get; set; } = string.Empty;
 
         public decimal? QuotationUnitPrice { get; set; }
-
         public decimal PoUnitPrice { get; set; }
 
         public string? Remarks { get; set; }
+    }
+
+    public class CreatePurchaseOrderScheduleDto
+    {
+        public DateTime ScheduledDate { get; set; }
+
+        public string? Remarks { get; set; }
+
+        public List<CreatePurchaseOrderScheduleLineDto> Lines { get; set; } = new();
+    }
+
+    public class CreatePurchaseOrderScheduleLineDto
+    {
+        // Used to match the DTO line to the newly saved PO line.
+        public int CanvassLineId { get; set; }
+
+        public decimal ScheduledQty { get; set; }
     }
 }

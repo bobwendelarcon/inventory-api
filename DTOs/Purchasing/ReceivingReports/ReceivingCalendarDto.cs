@@ -2,7 +2,13 @@
 {
     public class ReceivingCalendarDto
     {
+        public int ScheduleId { get; set; }
+
+        public int ScheduleNo { get; set; }
+
         public int PoId { get; set; }
+
+        public string? PrintedPoNo { get; set; }
 
         public string PoNo { get; set; } = string.Empty;
 

@@ -82,6 +82,7 @@ namespace inventory_api.Services.Manufacturing.Materials
                     x.pack_qty,
                     x.minimum_stock,
                     x.description,
+                    x.is_lot_tracked,
                     x.is_active
                 })
                 .ToListAsync();
@@ -122,6 +123,7 @@ namespace inventory_api.Services.Manufacturing.Materials
                     x.pack_qty,
                     x.minimum_stock,
                     x.description,
+                    x.is_lot_tracked,
                     x.is_active,
                     x.created_at,
                     x.updated_at
@@ -183,6 +185,7 @@ namespace inventory_api.Services.Manufacturing.Materials
                 pack_qty = dto.pack_qty,
                 minimum_stock = dto.minimum_stock,
                 description = dto.description,
+                is_lot_tracked = dto.is_lot_tracked,
                 is_active = true,
                 is_deleted = false,
                 created_at = DateTime.UtcNow
@@ -253,6 +256,7 @@ namespace inventory_api.Services.Manufacturing.Materials
             material.pack_qty = dto.pack_qty;
             material.minimum_stock = dto.minimum_stock;
             material.description = dto.description;
+            material.is_lot_tracked = dto.is_lot_tracked;
             material.updated_at = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -327,7 +331,8 @@ namespace inventory_api.Services.Manufacturing.Materials
                         ? x.SubCategory.subcategory_name
                         : null,
 
-                    x.uom
+                    x.uom,
+                    x.is_lot_tracked
                 })
                 .ToListAsync();
 

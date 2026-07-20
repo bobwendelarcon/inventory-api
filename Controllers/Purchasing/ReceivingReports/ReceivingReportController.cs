@@ -1,4 +1,5 @@
-﻿using inventory_api.DTOs.Purchasing.ReceivingReports;
+﻿using inventory_api.DTOs.Purchasing.PurchaseOrders;
+using inventory_api.DTOs.Purchasing.ReceivingReports;
 using inventory_api.Services.Purchasing.ReceivingReports;
 using Microsoft.AspNetCore.Mvc;
 
@@ -26,23 +27,33 @@ namespace inventory_api.Controllers.Purchasing.ReceivingReports
             });
         }
 
-        [HttpGet("create-options/{poId}")]
-        public async Task<IActionResult> GetCreateOptions(int poId)
+        [HttpGet("create-options/{scheduleId}")]
+        public async Task<IActionResult> GetCreateOptions(int scheduleId)
         {
             try
             {
-                var data = await _service.GetCreateOptionsAsync(poId);
+                var data = await _service.GetCreateOptionsAsync(scheduleId);
 
                 if (data == null)
-                    return NotFound(new { message = "Purchase Order not found." });
+                {
+                    return NotFound(new
+                    {
+                        message = "Delivery schedule not found."
+                    });
+                }
 
                 return Ok(data);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new
+                {
+                    message = ex.GetBaseException().Message
+                });
             }
         }
+
+
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateReceivingReportDto dto)
@@ -65,80 +76,19 @@ namespace inventory_api.Controllers.Purchasing.ReceivingReports
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new
+                {
+                    message = ex.GetBaseException().Message
+                });
             }
         }
 
-        [HttpPost("{id}/submit-qc")]
-        public async Task<IActionResult> SubmitForQc(int id)
-        {
-            try
-            {
-                await _service.SubmitForQcAsync(id);
-                return Ok(new { message = "RR submitted for QC." });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
+      
+     
 
-        [HttpPost("{id}/accept")]
-        public async Task<IActionResult> Accept(int id)
-        {
-            try
-            {
-                var userId = User.FindFirst("user_id")?.Value
-                             ?? User.FindFirst("UserId")?.Value
-                             ?? "";
+ 
 
-                await _service.AcceptAsync(id, userId);
-
-                return Ok(new { message = "RR accepted by QC." });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        [HttpPost("{id}/reject")]
-        public async Task<IActionResult> Reject(int id)
-        {
-            try
-            {
-                var userId = User.FindFirst("user_id")?.Value
-                             ?? User.FindFirst("UserId")?.Value
-                             ?? "";
-
-                await _service.RejectAsync(id, userId);
-
-                return Ok(new { message = "RR rejected by QC." });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        [HttpPost("{id}/commit")]
-        public async Task<IActionResult> Commit(int id)
-        {
-            try
-            {
-                var userId = User.FindFirst("user_id")?.Value
-                             ?? User.FindFirst("UserId")?.Value
-                             ?? "";
-
-                await _service.CommitAsync(id, userId);
-
-                return Ok(new { message = "RR committed successfully." });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
+ 
 
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -166,6 +116,78 @@ namespace inventory_api.Controllers.Purchasing.ReceivingReports
             var data = await _service.GetReceivingCalendarAsync(start, end);
 
             return Ok(data);
+        }
+
+
+
+        [HttpGet("schedules/{scheduleId}")]
+        public async Task<IActionResult> GetScheduleDetails(
+    int scheduleId)
+        {
+            try
+            {
+                var data =
+                    await _service.GetScheduleDetailsAsync(
+                        scheduleId
+                    );
+
+                if (data == null)
+                {
+                    return NotFound(new
+                    {
+                        message = "Delivery schedule not found."
+                    });
+                }
+
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.GetBaseException().Message
+                });
+            }
+        }
+
+        [HttpPost("schedules/{scheduleId}/reschedule-remaining")]
+        public async Task<IActionResult> RescheduleRemaining(
+    int scheduleId,
+    [FromBody] RescheduleRemainingDeliveryDto dto)
+        {
+            try
+            {
+                var userId =
+                    !string.IsNullOrWhiteSpace(dto.CreatedBy)
+                        ? dto.CreatedBy
+                        : User.FindFirst("user_id")?.Value
+                          ?? User.FindFirst("UserId")?.Value
+                          ?? "";
+
+                var newScheduleIds =
+    await _service.RescheduleRemainingAsync(
+        scheduleId,
+        dto,
+        userId
+    );
+
+                return Ok(new
+                {
+                    message =
+                        newScheduleIds.Count == 1
+                            ? "Remaining delivery rescheduled successfully."
+                            : $"{newScheduleIds.Count} delivery schedules created successfully.",
+
+                    schedule_ids = newScheduleIds
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.GetBaseException().Message
+                });
+            }
         }
     }
 }

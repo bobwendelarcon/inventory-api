@@ -43,7 +43,16 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
 
         public async Task<int> CreateAsync(CreatePurchaseOrderDto dto, string userId)
         {
-            var canvass = await _context.PurchasingCanvassHeaders
+
+
+            await using var transaction =
+    await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+
+
+                var canvass = await _context.PurchasingCanvassHeaders
                 .FirstOrDefaultAsync(x => x.CanvassId == dto.CanvassId);
 
             if (canvass == null)
@@ -61,7 +70,96 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
             if (dto.Lines == null || !dto.Lines.Any())
                 throw new Exception("Purchase Order must have at least one material.");
 
-            var poNo = await GeneratePoNoAsync();
+
+                var hasPlannedSchedules =
+        dto.Schedules != null &&
+        dto.Schedules.Any();
+
+                if (!hasPlannedSchedules && !dto.DeliveryDate.HasValue)
+                {
+                    throw new Exception(
+                        "A delivery date or at least one planned delivery schedule is required."
+                    );
+                }
+
+                if (hasPlannedSchedules)
+                {
+                    foreach (var schedule in dto.Schedules)
+                    {
+                        if (schedule.ScheduledDate == default)
+                        {
+                            throw new Exception(
+                                "Every planned delivery schedule must have a delivery date."
+                            );
+                        }
+
+                        if (schedule.Lines == null ||
+                            !schedule.Lines.Any(x => x.ScheduledQty > 0))
+                        {
+                            throw new Exception(
+                                "Every planned delivery schedule must contain at least one quantity."
+                            );
+                        }
+
+                        var duplicateScheduleLines = schedule.Lines
+                            .GroupBy(x => x.CanvassLineId)
+                            .Where(x => x.Count() > 1)
+                            .Select(x => x.Key)
+                            .ToList();
+
+                        if (duplicateScheduleLines.Any())
+                        {
+                            throw new Exception(
+                                "A planned schedule contains duplicate material lines."
+                            );
+                        }
+                    }
+
+                    var scheduledTotals = dto.Schedules
+                        .SelectMany(x => x.Lines)
+                        .Where(x => x.ScheduledQty > 0)
+                        .GroupBy(x => x.CanvassLineId)
+                        .ToDictionary(
+                            x => x.Key,
+                            x => x.Sum(y => y.ScheduledQty)
+                        );
+
+                    foreach (var poLineDto in dto.Lines)
+                    {
+                        scheduledTotals.TryGetValue(
+                            poLineDto.CanvassLineId,
+                            out var scheduledTotal
+                        );
+
+                        if (Math.Abs(scheduledTotal - poLineDto.PoQty) > 0.0001m)
+                        {
+                            throw new Exception(
+                                $"The total scheduled quantity must equal the PO quantity " +
+                                $"for canvass line {poLineDto.CanvassLineId}. " +
+                                $"PO Qty: {poLineDto.PoQty:N4}; " +
+                                $"Scheduled: {scheduledTotal:N4}."
+                            );
+                        }
+                    }
+
+                    var invalidCanvassLineIds = scheduledTotals.Keys
+                        .Where(canvassLineId =>
+                            dto.Lines.All(x =>
+                                x.CanvassLineId != canvassLineId))
+                        .ToList();
+
+                    if (invalidCanvassLineIds.Any())
+                    {
+                        throw new Exception(
+                            "One or more planned schedule lines do not belong to this Purchase Order."
+                        );
+                    }
+                }
+
+
+                var poNo = await GeneratePoNoAsync();
+
+
 
             var subtotal = dto.Lines.Sum(x => x.PoQty * x.PoUnitPrice);
             var totalAmount = subtotal + dto.OtherCharges;
@@ -72,7 +170,9 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
                 CanvassId = dto.CanvassId,
                 SupplierId = dto.SupplierId,
                 PoDate = dto.PoDate,
-                DeliveryDate = dto.DeliveryDate,
+                DeliveryDate = hasPlannedSchedules
+    ? dto.Schedules.Min(x => x.ScheduledDate).Date
+    : dto.DeliveryDate?.Date,
                 PaymentTerms = dto.PaymentTerms,
                 Remarks = dto.Remarks,
                 Status = "DRAFT",
@@ -115,6 +215,8 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
                     throw new Exception("Selected material does not match the selected recommended supplier.");
             }
 
+            var now = DateTime.Now;
+
             foreach (var line in dto.Lines)
             {
                 if (line.PoQty <= 0)
@@ -144,15 +246,135 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
                     BalanceQty = line.PoQty,
 
                     Status = "OPEN",
-                    CreatedAt = DateTime.Now
+                    CreatedAt = now
                 });
             }
 
             _context.PurchaseOrderHeaders.Add(header);
-            await _context.SaveChangesAsync();
-            await UpdateMprfPoStatusAsync(dto.CanvassId);
 
-            return header.PoId;
+            /*
+             * Save the PO first so that PoId and PoLineId values
+             * are generated before creating schedule records.
+             */
+            await _context.SaveChangesAsync();
+
+                var schedulesToCreate =
+                    new List<PurchaseOrderDeliverySchedule>();
+
+                if (hasPlannedSchedules)
+                {
+                    var scheduleNo = 1;
+
+                    foreach (var scheduleDto in dto.Schedules
+                                 .OrderBy(x => x.ScheduledDate))
+                    {
+                        var schedule =
+                            new PurchaseOrderDeliverySchedule
+                            {
+                                PoId = header.PoId,
+                                ScheduleNo = scheduleNo,
+                                ScheduledDate = scheduleDto.ScheduledDate.Date,
+                                Status = "OPEN",
+
+                                Remarks =
+                                    string.IsNullOrWhiteSpace(scheduleDto.Remarks)
+                                        ? $"Planned delivery schedule #{scheduleNo}."
+                                        : scheduleDto.Remarks,
+
+                                CreatedBy = userId,
+                                CreatedAt = now
+                            };
+
+                        foreach (var scheduleLineDto in scheduleDto.Lines
+                                     .Where(x => x.ScheduledQty > 0))
+                        {
+                            var poLine = header.Lines
+                                .FirstOrDefault(x =>
+                                    x.CanvassLineId ==
+                                    scheduleLineDto.CanvassLineId);
+
+                            if (poLine == null)
+                            {
+                                throw new Exception(
+                                    "A planned delivery line could not be matched to the Purchase Order."
+                                );
+                            }
+
+                            schedule.Lines.Add(
+                                new PurchaseOrderDeliveryScheduleLine
+                                {
+                                    PoLineId = poLine.PoLineId,
+
+                                    ScheduledQty =
+                                        scheduleLineDto.ScheduledQty,
+
+                                    ReceivedQty = 0,
+
+                                    BalanceQty =
+                                        scheduleLineDto.ScheduledQty,
+
+                                    Status = "OPEN",
+
+                                    CreatedAt = now
+                                }
+                            );
+                        }
+
+                        schedulesToCreate.Add(schedule);
+                        scheduleNo++;
+                    }
+                }
+                else
+                {
+                    var initialSchedule =
+                        new PurchaseOrderDeliverySchedule
+                        {
+                            PoId = header.PoId,
+                            ScheduleNo = 1,
+                            ScheduledDate = dto.DeliveryDate!.Value.Date,
+                            Status = "OPEN",
+                            Remarks = "Initial delivery schedule.",
+                            CreatedBy = userId,
+                            CreatedAt = now
+                        };
+
+                    foreach (var poLine in header.Lines)
+                    {
+                        initialSchedule.Lines.Add(
+                            new PurchaseOrderDeliveryScheduleLine
+                            {
+                                PoLineId = poLine.PoLineId,
+
+                                ScheduledQty = poLine.PoQty,
+                                ReceivedQty = 0,
+                                BalanceQty = poLine.PoQty,
+
+                                Status = "OPEN",
+                                CreatedAt = now
+                            }
+                        );
+                    }
+
+                    schedulesToCreate.Add(initialSchedule);
+                }
+
+                _context.PurchaseOrderDeliverySchedules
+                    .AddRange(schedulesToCreate);
+
+                await _context.SaveChangesAsync();
+                await UpdateMprfPoStatusAsync(dto.CanvassId);
+
+                await transaction.CommitAsync();
+
+                return header.PoId;
+
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+
         }
 
 
@@ -163,12 +385,18 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
 
             if (canvass == null)
                 return null;
+            var requestingDepartment = await _context.PurchasingMprfHeaders
+    .Where(x => x.mprf_id == canvass.MprfId)
+    .Select(x => x.category)
+    .FirstOrDefaultAsync();
 
             var activeCanvassLineIds = await _context.PurchaseOrderLines
                 .Where(pol => pol.Header != null && pol.Header.Status != "CANCELLED")
                 .Select(pol => pol.CanvassLineId)
                 .Distinct()
                 .ToListAsync();
+
+
 
             var remaining = await (
                 from cl in _context.PurchasingCanvassLines
@@ -214,6 +442,7 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
 
             return new
             {
+                requesting_department = requestingDepartment ?? "",
                 suppliers = remaining
                     .GroupBy(x => new { x.SupplierId, x.SupplierName, x.SupplierAddress, x.PaymentTerms })
                     .Select(g => new
@@ -382,15 +611,38 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
                 throw new Exception("Purchase Order not found.");
 
             if (po.Lines.Any(x => x.ReceivedQty > 0))
-                throw new Exception("Cannot cancel PO because it already has received quantity.");
+            {
+                throw new Exception(
+                    "Cannot cancel PO because it already has received quantity."
+                );
+            }
+
+            var schedules = await _context.PurchaseOrderDeliverySchedules
+                .Include(x => x.Lines)
+                .Where(x => x.PoId == poId)
+                .ToListAsync();
+
+            var now = DateTime.Now;
 
             po.Status = "CANCELLED";
-            po.UpdatedAt = DateTime.Now;
+            po.UpdatedAt = now;
 
             foreach (var line in po.Lines)
             {
                 line.Status = "CANCELLED";
-                line.UpdatedAt = DateTime.Now;
+                line.UpdatedAt = now;
+            }
+
+            foreach (var schedule in schedules)
+            {
+                schedule.Status = "CANCELLED";
+                schedule.UpdatedAt = now;
+
+                foreach (var scheduleLine in schedule.Lines)
+                {
+                    scheduleLine.Status = "CANCELLED";
+                    scheduleLine.UpdatedAt = now;
+                }
             }
 
             await _context.SaveChangesAsync();
@@ -403,6 +655,8 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
                 .FirstOrDefaultAsync(x => x.CanvassId == canvassId);
 
             if (canvass == null) return;
+
+       
 
             var mprf = await _context.PurchasingMprfHeaders
                 .FirstOrDefaultAsync(x => x.mprf_id == canvass.MprfId);
@@ -418,14 +672,31 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
                 select q.SupplierId
             ).Distinct().CountAsync();
 
+            var poStatuses = await _context.PurchaseOrderHeaders
+    .Where(po => po.CanvassId == canvassId)
+    .Select(po => po.Status)
+    .ToListAsync();
+
+            var hasAnyPo = poStatuses.Any();
+
+            var allPosCancelled =
+                hasAnyPo &&
+                poStatuses.All(x => x == "CANCELLED");
+
             var totalActivePoSuppliers = await _context.PurchaseOrderHeaders
-                .Where(po => po.CanvassId == canvassId
-                             && po.Status != "CANCELLED")
+                .Where(po =>
+                    po.CanvassId == canvassId &&
+                    po.Status != "CANCELLED")
                 .Select(po => po.SupplierId)
                 .Distinct()
                 .CountAsync();
 
-            if (totalRecommendedSuppliers > 0 &&
+            if (allPosCancelled)
+            {
+                mprf.status = "CANCELLED";
+            }
+            else if (
+                totalRecommendedSuppliers > 0 &&
                 totalActivePoSuppliers >= totalRecommendedSuppliers)
             {
                 mprf.status = "PO_CREATED";

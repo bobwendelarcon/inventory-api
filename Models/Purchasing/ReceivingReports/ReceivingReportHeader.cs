@@ -1,4 +1,6 @@
-﻿namespace inventory_api.Models.Purchasing.ReceivingReports
+﻿using inventory_api.Models.Purchasing.PurchaseOrders;
+
+namespace inventory_api.Models.Purchasing.ReceivingReports
 {
     public class ReceivingReportHeader
     {
@@ -6,6 +8,9 @@
         public string RrNo { get; set; } = string.Empty;
 
         public int PoId { get; set; }
+        public int? ScheduleId { get; set; }
+
+      
         public string PoNo { get; set; } = string.Empty;
         public int SupplierId { get; set; }
 
@@ -27,5 +32,6 @@
         public DateTime? CommittedAt { get; set; }
 
         public List<ReceivingReportLine> Lines { get; set; } = new();
+        public PurchaseOrderDeliverySchedule? DeliverySchedule { get; set; }
     }
 }

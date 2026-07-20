@@ -28,5 +28,7 @@
         public DateTime? UpdatedAt { get; set; }
 
         public PurchaseOrderHeader? Header { get; set; }
+
+        public List<PurchaseOrderDeliveryScheduleLine> DeliveryScheduleLines { get; set; } = new();
     }
 }

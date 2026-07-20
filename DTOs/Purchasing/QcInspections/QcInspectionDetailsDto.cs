@@ -40,12 +40,37 @@
 
         public string MaterialCode { get; set; } = string.Empty;
         public string MaterialName { get; set; } = string.Empty;
+        public bool IsLotTracked { get; set; }
 
         public decimal ReceivedQty { get; set; }
         public decimal AcceptedQty { get; set; }
         public decimal RejectedQty { get; set; }
 
+        public string? Remarks { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+
+        public List<QcInspectionLineLotDetailsDto> Lots { get; set; } = new();
+    }
+
+    public class QcInspectionLineLotDetailsDto
+    {
+        public int QcLineLotId { get; set; }
+
+        public string LotNo { get; set; } = string.Empty;
+
+        public DateTime? ManufacturingDate { get; set; }
+
+        public DateTime? ExpirationDate { get; set; }
+
+        public decimal ReceivedQty { get; set; }
+
+        public decimal AcceptedQty { get; set; }
+
+        public decimal RejectedQty { get; set; }
+
         public string? RejectionReason { get; set; }
+
         public string? Remarks { get; set; }
 
         public string Status { get; set; } = string.Empty;

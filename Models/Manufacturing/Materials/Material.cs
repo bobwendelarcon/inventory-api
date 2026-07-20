@@ -51,6 +51,9 @@ namespace inventory_api.Models.Manufacturing.Materials
         [Column("is_deleted")]
         public bool is_deleted { get; set; } = false;
 
+        [Column("is_lot_tracked")]
+        public bool is_lot_tracked { get; set; } = false;
+
         [Column("created_at")]
         public DateTime created_at { get; set; }
 

@@ -15,5 +15,7 @@
         public decimal minimum_stock { get; set; } = 0;
 
         public string? description { get; set; }
+
+        public bool is_lot_tracked { get; set; } = false;
     }
 }

@@ -1,5 +1,6 @@
 ﻿using inventory_api.Data;
 using inventory_api.DTOs.Purchasing.QcInspections;
+using inventory_api.Models.Purchasing.QcInspections;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Purchasing.QcInspections
@@ -68,174 +69,525 @@ namespace inventory_api.Services.Purchasing.QcInspections
                     CommittedBy = x.CommittedBy,
                     CommittedAt = x.CommittedAt,
 
-                    Lines = x.Lines.Select(l => new QcInspectionLineDetailsDto
-                    {
-                        QcLineId = l.QcLineId,
-                        RrLineId = l.RrLineId,
-                        PoLineId = l.PoLineId,
-                        MaterialId = l.MaterialId,
+                    Lines = x.Lines
+    .OrderBy(l => l.QcLineId)
+    .Select(l => new QcInspectionLineDetailsDto
+    {
+        QcLineId = l.QcLineId,
+        RrLineId = l.RrLineId,
+        PoLineId = l.PoLineId,
+        MaterialId = l.MaterialId,
 
-                        MaterialCode = _context.Materials
-                            .Where(m => m.material_id == l.MaterialId)
-                            .Select(m => m.material_code)
-                            .FirstOrDefault() ?? "",
+        MaterialCode = _context.Materials
+            .Where(m => m.material_id == l.MaterialId)
+            .Select(m => m.material_code)
+            .FirstOrDefault() ?? "",
 
-                        MaterialName = _context.Materials
-                            .Where(m => m.material_id == l.MaterialId)
-                            .Select(m => m.material_name)
-                            .FirstOrDefault() ?? "",
+        MaterialName = _context.Materials
+            .Where(m => m.material_id == l.MaterialId)
+            .Select(m => m.material_name)
+            .FirstOrDefault() ?? "",
 
-                        ReceivedQty = l.ReceivedQty,
-                        AcceptedQty = l.AcceptedQty,
-                        RejectedQty = l.RejectedQty,
-                        RejectionReason = l.RejectionReason,
-                        Remarks = l.Remarks,
-                        Status = l.Status
-                    }).ToList()
+        IsLotTracked = _context.Materials
+    .Where(m => m.material_id == l.MaterialId)
+    .Select(m => m.is_lot_tracked)
+    .FirstOrDefault(),
+
+        ReceivedQty = l.ReceivedQty,
+        AcceptedQty = l.AcceptedQty,
+        RejectedQty = l.RejectedQty,
+        Remarks = l.Remarks,
+        Status = l.Status,
+
+        Lots = l.Lots
+            .OrderBy(lot => lot.QcLineLotId)
+            .Select(lot => new QcInspectionLineLotDetailsDto
+            {
+                QcLineLotId = lot.QcLineLotId,
+                LotNo = lot.LotNo,
+                ManufacturingDate = lot.ManufacturingDate,
+                ExpirationDate = lot.ExpirationDate,
+                ReceivedQty = lot.ReceivedQty,
+                AcceptedQty = lot.AcceptedQty,
+                RejectedQty = lot.RejectedQty,
+                RejectionReason = lot.RejectionReason,
+                Remarks = lot.Remarks,
+                Status = lot.Status
+            })
+            .ToList()
+    })
+    .ToList()
                 })
                 .FirstOrDefaultAsync();
         }
 
-        public async Task SaveInspectionAsync(int qcId, SaveQcInspectionDto dto, string userId)
+        public async Task SaveInspectionAsync(
+     int qcId,
+     SaveQcInspectionDto dto,
+     string userId)
         {
-            var qc = await _context.QcInspectionHeaders
-                .Include(x => x.Lines)
-                .FirstOrDefaultAsync(x => x.QcId == qcId);
 
-            if (qc == null)
-                throw new Exception("QC inspection not found.");
 
-            if (qc.Status != "FOR_INSPECTION")
-                throw new Exception("Only QC for inspection can be updated.");
 
-            if (dto.Lines == null || !dto.Lines.Any())
-                throw new Exception("QC inspection must have at least one line.");
 
-            foreach (var lineDto in dto.Lines)
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
             {
-                var line = qc.Lines.FirstOrDefault(x => x.QcLineId == lineDto.QcLineId);
+                var qc = await _context.QcInspectionHeaders
+     .Include(x => x.Lines)
+         .ThenInclude(x => x.Lots)
+     .FirstOrDefaultAsync(x => x.QcId == qcId);
 
-                if (line == null)
-                    throw new Exception("Invalid QC line.");
+                if (qc == null)
+                    throw new Exception("QC inspection not found.");
 
-                if (lineDto.AcceptedQty < 0 || lineDto.RejectedQty < 0)
-                    throw new Exception("Accepted and rejected quantity cannot be negative.");
+                if (qc.Status != "FOR_INSPECTION")
+                    throw new Exception(
+                        "Only QC inspections with FOR_INSPECTION status can be processed."
+                    );
 
-                if (lineDto.AcceptedQty + lineDto.RejectedQty != line.ReceivedQty)
-                    throw new Exception("Accepted quantity plus rejected quantity must equal received quantity.");
+                if (dto.Lines == null || !dto.Lines.Any())
+                    throw new Exception("QC inspection must have at least one line.");
 
-                line.AcceptedQty = lineDto.AcceptedQty;
-                line.RejectedQty = lineDto.RejectedQty;
-                line.RejectionReason = lineDto.RejectionReason;
-                line.Remarks = lineDto.Remarks;
+                var submittedQcLineIds = dto.Lines
+    .Select(x => x.QcLineId)
+    .ToHashSet();
 
-                if (lineDto.AcceptedQty == line.ReceivedQty)
-                    line.Status = "ACCEPTED";
-                else if (lineDto.RejectedQty == line.ReceivedQty)
-                    line.Status = "REJECTED";
-                else
-                    line.Status = "PARTIALLY_ACCEPTED";
+                var missingQcLines = qc.Lines
+                    .Where(x => !submittedQcLineIds.Contains(x.QcLineId))
+                    .Select(x => x.QcLineId)
+                    .ToList();
 
-                line.UpdatedAt = DateTime.Now;
+                if (missingQcLines.Any())
+                {
+                    throw new InvalidOperationException(
+                        $"All QC lines must be inspected. Missing QC line IDs: " +
+                        string.Join(", ", missingQcLines));
+                }
+
+                var duplicateQcLineId = dto.Lines
+    .GroupBy(x => x.QcLineId)
+    .FirstOrDefault(x => x.Count() > 1);
+
+                if (duplicateQcLineId != null)
+                {
+                    throw new InvalidOperationException(
+                        $"QC line {duplicateQcLineId.Key} was submitted more than once.");
+                }
+
+
+
+                var rr = await _context.ReceivingReportHeaders
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x => x.RrId == qc.RrId);
+
+                if (rr == null)
+                    throw new Exception("Receiving Report not found.");
+
+                if (rr.Status != "FOR_QC")
+                    throw new Exception(
+                        "Only Receiving Reports submitted for QC can be inspected."
+                    );
+
+                var po = await _context.PurchaseOrderHeaders
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x => x.PoId == qc.PoId);
+
+                if (po == null)
+                    throw new Exception("Purchase Order not found.");
+
+                var now = DateTime.Now;
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    throw new Exception("Inspector ID is required.");
+                }
+
+                var inspectorId = userId.Trim();
+
+                var materialIds = qc.Lines
+    .Select(x => x.MaterialId)
+    .Distinct()
+    .ToList();
+
+                var materialTracking = await _context.Materials
+                    .Where(x => materialIds.Contains(x.material_id))
+                    .Select(x => new
+                    {
+                        x.material_id,
+                        x.material_name,
+                        x.is_lot_tracked
+                    })
+                    .ToDictionaryAsync(
+                        x => x.material_id,
+                        x => x
+                    );
+
+                foreach (var lineDto in dto.Lines)
+                {
+                    var qcLine = qc.Lines.FirstOrDefault(
+                        x => x.QcLineId == lineDto.QcLineId
+                    );
+
+                    if (qcLine == null)
+                    {
+                        throw new Exception(
+                            $"QC line {lineDto.QcLineId} was not found."
+                        );
+                    }
+
+
+                    if (!materialTracking.TryGetValue(
+        qcLine.MaterialId,
+        out var material))
+                    {
+                        throw new InvalidOperationException(
+                            $"Material ID {qcLine.MaterialId} was not found.");
+                    }
+
+                    ValidateLots(
+                        qcLine,
+                        lineDto.Lots,
+                        material.is_lot_tracked,
+                        material.material_name
+                    );
+                    SyncQcLineLots(
+     qcLine,
+     lineDto,
+     inspectorId,
+     now
+ );
+
+
+                    var rrLine = rr.Lines.FirstOrDefault(
+                        x => x.RrLineId == qcLine.RrLineId
+                    );
+
+                    if (rrLine == null)
+                    {
+                        throw new Exception(
+                            $"Receiving Report line {qcLine.RrLineId} was not found."
+                        );
+                    }
+
+                    var poLine = po.Lines.FirstOrDefault(
+                        x => x.PoLineId == qcLine.PoLineId
+                    );
+
+                    if (poLine == null)
+                    {
+                        throw new Exception(
+                            $"Purchase Order line {qcLine.PoLineId} was not found."
+                        );
+                    }
+
+                    qcLine.AcceptedQty = lineDto.Lots.Sum(x => x.AcceptedQty);
+                    qcLine.RejectedQty = lineDto.Lots.Sum(x => x.RejectedQty);
+                    qcLine.Remarks = lineDto.Remarks;
+                    qcLine.Status = GetInspectionLineStatus(
+     qcLine.ReceivedQty,
+     qcLine.AcceptedQty,
+     qcLine.RejectedQty
+ );
+
+                    qcLine.UpdatedAt = now;
+
+                    rrLine.AcceptedQty = qcLine.AcceptedQty;
+                    rrLine.RejectedQty = qcLine.RejectedQty;
+                    rrLine.Status = qcLine.Status;
+                    rrLine.UpdatedAt = now;
+
+                    // Physical received quantity was already posted during RR creation.
+                    // Rejected quantity must be returned to the PO balance.
+
+
+                    // Accepted quantity will be posted to inventory next.
+                    if (qcLine.AcceptedQty > 0)
+                    {
+                        // await AddAcceptedQtyToInventoryAsync(
+                        //     qc,
+                        //     rr,
+                        //     qcLine,
+                        //     lineDto.AcceptedQty,
+                        //     inspectorId,
+                        //     now
+                        // );
+                    }
+                }
+
+                var totalReceived = qc.Lines.Sum(x => x.ReceivedQty);
+                var totalAccepted = qc.Lines.Sum(x => x.AcceptedQty);
+                var totalRejected = qc.Lines.Sum(x => x.RejectedQty);
+
+                qc.Decision = GetHeaderDecision(
+                    totalReceived,
+                    totalAccepted,
+                    totalRejected
+                );
+
+                qc.Status = "INSPECTED";
+                qc.InspectionDate = dto.InspectionDate ?? now;
+                qc.InspectorId = inspectorId;
+                qc.Remarks = dto.Remarks;
+               
+                qc.UpdatedAt = now;
+                //qc.CommittedBy = inspectorId;
+                //qc.CommittedAt = now;
+
+                rr.Status = "QA_COMPLETED";
+                rr.QcBy = inspectorId;
+                rr.QcAt = now;
+                //rr.CommittedBy = inspectorId;
+                //rr.CommittedAt = now;
+                rr.UpdatedAt = now;
+
+                var allPoLinesClosed = po.Lines.All(x => x.BalanceQty <= 0);
+                var hasReceivedQty = po.Lines.Any(x => x.ReceivedQty > 0);
+
+                po.Status = allPoLinesClosed
+                    ? "FULLY_RECEIVED"
+                    : hasReceivedQty
+                        ? "PARTIALLY_RECEIVED"
+                        : "APPROVED";
+
+                po.UpdatedAt = now;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+
+        private static void ValidateLots(
+      QcInspectionLine qcLine,
+      IReadOnlyCollection<SaveQcInspectionLineLotDto>? lots,
+      bool isLotTracked,
+      string materialName)
+        {
+            if (lots == null || lots.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Inspection quantities are required for {materialName}.");
             }
 
-            var totalAccepted = qc.Lines.Sum(x => x.AcceptedQty);
-            var totalRejected = qc.Lines.Sum(x => x.RejectedQty);
-            var totalReceived = qc.Lines.Sum(x => x.ReceivedQty);
+            /*
+             * Lot number rules only apply to lot-tracked materials.
+             */
+            if (isLotTracked)
+            {
+                var normalizedLotNumbers = lots
+                    .Select(x => x.LotNo?.Trim().ToUpperInvariant())
+                    .ToList();
 
+                if (normalizedLotNumbers.Any(string.IsNullOrWhiteSpace))
+                {
+                    throw new InvalidOperationException(
+                        $"Lot number is required for {materialName}.");
+                }
+
+                if (normalizedLotNumbers.Distinct().Count() !=
+                    normalizedLotNumbers.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"Duplicate lot numbers are not allowed for {materialName}.");
+                }
+            }
+
+            foreach (var lot in lots)
+            {
+                var displayReference =
+                    isLotTracked
+                        ? lot.LotNo?.Trim()
+                        : materialName;
+
+                if (lot.ReceivedQty <= 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Received quantity must be greater than zero for {displayReference}.");
+                }
+
+                if (lot.AcceptedQty < 0 ||
+                    lot.RejectedQty < 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Accepted and rejected quantities cannot be negative for {displayReference}.");
+                }
+
+                if (lot.AcceptedQty +
+                    lot.RejectedQty !=
+                    lot.ReceivedQty)
+                {
+                    throw new InvalidOperationException(
+                        $"Accepted plus rejected quantity must equal received quantity for {displayReference}.");
+                }
+
+                if (isLotTracked &&
+                    lot.ManufacturingDate.HasValue &&
+                    lot.ExpirationDate.HasValue &&
+                    lot.ExpirationDate.Value.Date <
+                    lot.ManufacturingDate.Value.Date)
+                {
+                    throw new InvalidOperationException(
+                        $"Expiration date cannot be earlier than manufacturing date for lot {lot.LotNo}.");
+                }
+
+                if (lot.RejectedQty > 0 &&
+                    string.IsNullOrWhiteSpace(
+                        lot.RejectionReason))
+                {
+                    throw new InvalidOperationException(
+                        $"Rejection reason is required for {displayReference}.");
+                }
+            }
+
+            var totalReceived =
+                lots.Sum(x => x.ReceivedQty);
+
+            if (totalReceived != qcLine.ReceivedQty)
+            {
+                throw new InvalidOperationException(
+                    $"Total inspected quantity for {materialName} must equal " +
+                    $"{qcLine.ReceivedQty}. Entered total: {totalReceived}.");
+            }
+        }
+
+
+        private void SyncQcLineLots(
+     QcInspectionLine qcLine,
+     SaveQcInspectionLineDto lineDto,
+     string userId,
+     DateTime now)
+        {
+            var submittedLotIds = lineDto.Lots
+                .Where(x => x.QcLineLotId.HasValue)
+                .Select(x => x.QcLineLotId!.Value)
+                .ToHashSet();
+
+            // Remove lots deleted from the frontend.
+            var lotsToRemove = qcLine.Lots
+     .Where(x =>
+         x.QcLineLotId > 0 &&
+         !submittedLotIds.Contains(x.QcLineLotId))
+     .ToList();
+
+            if (lotsToRemove.Any())
+            {
+                _context.QcInspectionLineLots.RemoveRange(lotsToRemove);
+            }
+
+
+
+
+
+            foreach (var lotDto in lineDto.Lots)
+            {
+                QcInspectionLineLot lot;
+
+                if (lotDto.QcLineLotId.HasValue)
+                {
+                    lot = qcLine.Lots.FirstOrDefault(
+                        x => x.QcLineLotId == lotDto.QcLineLotId.Value
+                    ) ?? throw new InvalidOperationException(
+                        $"QC lot ID {lotDto.QcLineLotId.Value} was not found " +
+                        $"under QC line {qcLine.QcLineId}."
+                    );
+
+                    lot.UpdatedAt = now;
+
+                    // Change this if your UpdatedBy property is int.
+                    lot.UpdatedBy = userId;
+                }
+                else
+                {
+                    lot = new QcInspectionLineLot
+                    {
+                        QcLineId = qcLine.QcLineId,
+                        CreatedAt = now,
+
+                        // Change this if your CreatedBy property is int.
+                        CreatedBy = userId
+                    };
+
+                    qcLine.Lots.Add(lot);
+                }
+
+                lot.LotNo =
+    string.IsNullOrWhiteSpace(lotDto.LotNo)
+        ? $"NON-LOT-QCL-{qcLine.QcLineId}"
+        : lotDto.LotNo.Trim();
+                lot.ManufacturingDate = lotDto.ManufacturingDate?.Date;
+                lot.ExpirationDate = lotDto.ExpirationDate?.Date;
+
+                lot.ReceivedQty = lotDto.ReceivedQty;
+                lot.AcceptedQty = lotDto.AcceptedQty;
+                lot.RejectedQty = lotDto.RejectedQty;
+
+                lot.RejectionReason =
+                    string.IsNullOrWhiteSpace(lotDto.RejectionReason)
+                        ? null
+                        : lotDto.RejectionReason.Trim();
+
+                lot.Remarks =
+                    string.IsNullOrWhiteSpace(lotDto.Remarks)
+                        ? null
+                        : lotDto.Remarks.Trim();
+
+                lot.Status = GetLotStatus(
+                    lotDto.ReceivedQty,
+                    lotDto.AcceptedQty,
+                    lotDto.RejectedQty
+                );
+            }
+        }
+
+        private static string GetLotStatus(
+    decimal receivedQty,
+    decimal acceptedQty,
+    decimal rejectedQty)
+        {
+            if (acceptedQty == receivedQty)
+                return "ACCEPTED";
+
+            if (rejectedQty == receivedQty)
+                return "REJECTED";
+
+            return "PARTIALLY_ACCEPTED";
+        }
+
+
+        private static string GetInspectionLineStatus(
+    decimal receivedQty,
+    decimal acceptedQty,
+    decimal rejectedQty)
+        {
+            if (acceptedQty == receivedQty)
+                return "ACCEPTED";
+
+            if (rejectedQty == receivedQty)
+                return "REJECTED";
+
+            return "PARTIALLY_ACCEPTED";
+        }
+
+        private static string GetHeaderDecision(
+            decimal totalReceived,
+            decimal totalAccepted,
+            decimal totalRejected)
+        {
             if (totalAccepted == totalReceived)
-            {
-                qc.Status = "ACCEPTED";
-                qc.Decision = "ACCEPTED";
-            }
-            else if (totalRejected == totalReceived)
-            {
-                qc.Status = "REJECTED";
-                qc.Decision = "REJECTED";
-            }
-            else
-            {
-                qc.Status = "PARTIALLY_ACCEPTED";
-                qc.Decision = "PARTIALLY_ACCEPTED";
-            }
+                return "ACCEPTED";
 
-            qc.InspectionDate = dto.InspectionDate ?? DateTime.Now;
-            qc.InspectorId = !string.IsNullOrWhiteSpace(dto.InspectorId)
-                ? dto.InspectorId
-                : userId;
+            if (totalRejected == totalReceived)
+                return "REJECTED";
 
-            qc.Remarks = dto.Remarks;
-            qc.UpdatedAt = DateTime.Now;
-
-            await _context.SaveChangesAsync();
+            return "PARTIALLY_ACCEPTED";
         }
-        public async Task CommitAsync(int qcId, string userId)
-        {
-            var qc = await _context.QcInspectionHeaders
-                .Include(x => x.Lines)
-                .FirstOrDefaultAsync(x => x.QcId == qcId);
-
-            if (qc == null)
-                throw new Exception("QC inspection not found.");
-
-            if (qc.Status != "ACCEPTED" && qc.Status != "PARTIALLY_ACCEPTED")
-                throw new Exception("Only accepted or partially accepted QC can be committed.");
-
-            var po = await _context.PurchaseOrderHeaders
-                .Include(x => x.Lines)
-                .FirstOrDefaultAsync(x => x.PoId == qc.PoId);
-
-            if (po == null)
-                throw new Exception("Purchase Order not found.");
-
-            foreach (var qcLine in qc.Lines)
-            {
-                if (qcLine.AcceptedQty <= 0)
-                    continue;
-
-                var poLine = po.Lines.FirstOrDefault(x => x.PoLineId == qcLine.PoLineId);
-
-                if (poLine == null)
-                    throw new Exception("PO line not found.");
-
-                // IMPORTANT:
-                // PO received_qty should now represent ACCEPTED quantity, not physical RR qty.
-                poLine.ReceivedQty += qcLine.AcceptedQty;
-                poLine.BalanceQty = poLine.PoQty - poLine.ReceivedQty;
-
-                if (poLine.BalanceQty <= 0)
-                {
-                    poLine.BalanceQty = 0;
-                    poLine.Status = "CLOSED";
-                }
-                else
-                {
-                    poLine.Status = "PARTIAL";
-                }
-
-                poLine.UpdatedAt = DateTime.Now;
-
-                // Material Inventory update will be added here depending on your existing table fields.
-                // For now, this is the correct place to insert inventory transaction.
-            }
-
-            var allClosed = po.Lines.All(x => x.BalanceQty <= 0);
-            var anyAccepted = po.Lines.Any(x => x.ReceivedQty > 0);
-
-            po.Status = allClosed
-                ? "FULLY_RECEIVED"
-                : anyAccepted
-                    ? "PARTIALLY_RECEIVED"
-                    : "APPROVED";
-
-            po.UpdatedAt = DateTime.Now;
-
-            qc.Status = "COMMITTED";
-            qc.CommittedBy = userId;
-            qc.CommittedAt = DateTime.Now;
-            qc.UpdatedAt = DateTime.Now;
-
-            await _context.SaveChangesAsync();
-        }
+      
     }
 }

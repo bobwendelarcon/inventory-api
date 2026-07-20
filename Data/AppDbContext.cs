@@ -87,6 +87,12 @@ namespace inventory_api.Data
         public DbSet<PurchaseOrderHeader> PurchaseOrderHeaders { get; set; }
         public DbSet<PurchaseOrderLine> PurchaseOrderLines { get; set; }
 
+        public DbSet<PurchaseOrderDeliverySchedule> PurchaseOrderDeliverySchedules  {get; set; }
+
+        public DbSet<PurchaseOrderDeliveryScheduleLine>
+            PurchaseOrderDeliveryScheduleLines
+        { get; set; }
+
 
         //Receiving
 
@@ -97,6 +103,9 @@ namespace inventory_api.Data
 
         public DbSet<QcInspectionHeader> QcInspectionHeaders { get; set; }
         public DbSet<QcInspectionLine> QcInspectionLines { get; set; }
+
+        public DbSet<QcInspectionLineLot> QcInspectionLineLots { get; set; }
+
 
 
 
@@ -345,6 +354,123 @@ namespace inventory_api.Data
                       .HasForeignKey(e => e.PoId);
             });
 
+
+            modelBuilder.Entity<PurchaseOrderDeliverySchedule>(entity =>
+            {
+                entity.ToTable("purchasing_po_delivery_schedule");
+
+                entity.HasKey(e => e.ScheduleId);
+
+                entity.Property(e => e.ScheduleId)
+                    .HasColumnName("schedule_id");
+
+                entity.Property(e => e.PoId)
+                    .HasColumnName("po_id");
+
+                entity.Property(e => e.ScheduleNo)
+                    .HasColumnName("schedule_no");
+
+                entity.Property(e => e.ScheduledDate)
+                    .HasColumnName("scheduled_date");
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status")
+                    .HasMaxLength(40);
+
+                entity.Property(e => e.RescheduledFromScheduleId)
+                    .HasColumnName("rescheduled_from_schedule_id");
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks");
+
+                entity.Property(e => e.CreatedBy)
+                    .HasColumnName("created_by");
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedBy)
+                    .HasColumnName("updated_by");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasIndex(e => new
+                {
+                    e.PoId,
+                    e.ScheduleNo
+                })
+                .IsUnique();
+
+                entity.HasOne(e => e.PurchaseOrder)
+                    .WithMany(e => e.DeliverySchedules)
+                    .HasForeignKey(e => e.PoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.RescheduledFromSchedule)
+                    .WithMany()
+                    .HasForeignKey(e => e.RescheduledFromScheduleId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<PurchaseOrderDeliveryScheduleLine>(entity =>
+            {
+                entity.ToTable("purchasing_po_delivery_schedule_line");
+
+                entity.HasKey(e => e.ScheduleLineId);
+
+                entity.Property(e => e.ScheduleLineId)
+                    .HasColumnName("schedule_line_id");
+
+                entity.Property(e => e.ScheduleId)
+                    .HasColumnName("schedule_id");
+
+                entity.Property(e => e.PoLineId)
+                    .HasColumnName("po_line_id");
+
+                entity.Property(e => e.ScheduledQty)
+                    .HasColumnName("scheduled_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.ReceivedQty)
+                    .HasColumnName("received_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.BalanceQty)
+                    .HasColumnName("balance_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status")
+                    .HasMaxLength(40);
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks");
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasIndex(e => new
+                {
+                    e.ScheduleId,
+                    e.PoLineId
+                })
+                .IsUnique();
+
+                entity.HasOne(e => e.Schedule)
+                    .WithMany(e => e.Lines)
+                    .HasForeignKey(e => e.ScheduleId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.PurchaseOrderLine)
+                    .WithMany(e => e.DeliveryScheduleLines)
+                    .HasForeignKey(e => e.PoLineId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             modelBuilder.Entity<PurchaseOrderLine>(entity =>
             {
                 entity.ToTable("purchasing_po_line");
@@ -401,6 +527,14 @@ namespace inventory_api.Data
                 entity.Property(e => e.QcAt).HasColumnName("qc_at");
                 entity.Property(e => e.CommittedBy).HasColumnName("committed_by");
                 entity.Property(e => e.CommittedAt).HasColumnName("committed_at");
+
+                entity.Property(e => e.ScheduleId)
+    .HasColumnName("schedule_id");
+
+                entity.HasOne(e => e.DeliverySchedule)
+                    .WithMany()
+                    .HasForeignKey(e => e.ScheduleId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasMany(e => e.Lines)
                       .WithOne(e => e.Header)
@@ -475,24 +609,65 @@ namespace inventory_api.Data
 
                 entity.HasKey(e => e.QcLineId);
 
-                entity.Property(e => e.QcLineId).HasColumnName("qc_line_id");
-                entity.Property(e => e.QcId).HasColumnName("qc_id");
+                entity.Property(e => e.QcLineId)
+                    .HasColumnName("qc_line_id");
 
-                entity.Property(e => e.RrLineId).HasColumnName("rr_line_id");
-                entity.Property(e => e.PoLineId).HasColumnName("po_line_id");
-                entity.Property(e => e.MaterialId).HasColumnName("material_id");
+                entity.Property(e => e.QcId)
+                    .HasColumnName("qc_id");
 
-                entity.Property(e => e.ReceivedQty).HasColumnName("received_qty");
-                entity.Property(e => e.AcceptedQty).HasColumnName("accepted_qty");
-                entity.Property(e => e.RejectedQty).HasColumnName("rejected_qty");
+                entity.Property(e => e.RrLineId)
+                    .HasColumnName("rr_line_id");
 
-                entity.Property(e => e.RejectionReason).HasColumnName("rejection_reason");
-                entity.Property(e => e.Remarks).HasColumnName("remarks");
+                entity.Property(e => e.PoLineId)
+                    .HasColumnName("po_line_id");
 
-                entity.Property(e => e.Status).HasColumnName("status");
+                entity.Property(e => e.MaterialId)
+                    .HasColumnName("material_id");
 
-                entity.Property(e => e.CreatedAt).HasColumnName("created_at");
-                entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+                entity.Property(e => e.ReceivedQty)
+                    .HasColumnName("received_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.AcceptedQty)
+                    .HasColumnName("accepted_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.RejectedQty)
+                    .HasColumnName("rejected_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks");
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status");
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasMany(e => e.Lots)
+                    .WithOne(e => e.QcLine)
+                    .HasForeignKey(e => e.QcLineId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+
+
+            modelBuilder.Entity<QcInspectionLineLot>(entity =>
+            {
+                entity.ToTable("purchasing_qc_line_lot");
+
+                entity.HasKey(e => e.QcLineLotId);
+
+                entity.HasIndex(e => new
+                {
+                    e.QcLineId,
+                    e.LotNo
+                })
+                .IsUnique();
             });
 
 

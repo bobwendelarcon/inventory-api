@@ -1,6 +1,7 @@
 ﻿using inventory_api.DTOs.Purchasing.QcInspections;
 using inventory_api.Services.Purchasing.QcInspections;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace inventory_api.Controllers.Purchasing.QcInspections
 {
@@ -10,7 +11,8 @@ namespace inventory_api.Controllers.Purchasing.QcInspections
     {
         private readonly QcInspectionService _service;
 
-        public QcInspectionController(QcInspectionService service)
+        public QcInspectionController(
+            QcInspectionService service)
         {
             _service = service;
         }
@@ -19,6 +21,7 @@ namespace inventory_api.Controllers.Purchasing.QcInspections
         public async Task<IActionResult> GetAll()
         {
             var data = await _service.GetAllAsync();
+
             return Ok(data);
         }
 
@@ -28,50 +31,59 @@ namespace inventory_api.Controllers.Purchasing.QcInspections
             var data = await _service.GetByIdAsync(id);
 
             if (data == null)
-                return NotFound(new { message = "QC inspection not found." });
+            {
+                return NotFound(new
+                {
+                    message = "QC inspection not found."
+                });
+            }
 
             return Ok(data);
         }
 
         [HttpPost("{id}/save-inspection")]
-        public async Task<IActionResult> SaveInspection(int id, [FromBody] SaveQcInspectionDto dto)
+        public async Task<IActionResult> SaveInspection(
+            int id,
+            [FromBody] SaveQcInspectionDto dto)
         {
             try
             {
-                var userId = User.FindFirst("user_id")?.Value
-                             ?? User.FindFirst("UserId")?.Value
-                             ?? "";
+                var userId =
+                    Request.Headers["X-User-Id"].FirstOrDefault()
+                    ?? User.FindFirstValue("user_id")
+                    ?? User.FindFirstValue("UserId")
+                    ?? User.FindFirstValue("userId")
+                    ?? User.FindFirstValue("id")
+                    ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue("sub")
+                    ?? User.Identity?.Name;
 
-                await _service.SaveInspectionAsync(id, dto, userId);
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message =
+                            "The logged-in user does not have a valid user ID."
+                    });
+                }
+
+                await _service.SaveInspectionAsync(
+                    id,
+                    dto,
+                    userId.Trim()
+                );
 
                 return Ok(new
                 {
-                    message = "QC inspection saved successfully."
+                    message =
+                        "QC inspection saved successfully."
                 });
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(new
                 {
                     message = ex.Message
-                });
-            }
-        }
-
-        [HttpPost("{id}/commit")]
-        public async Task<IActionResult> Commit(int id)
-        {
-            try
-            {
-                var userId = User.FindFirst("user_id")?.Value
-                             ?? User.FindFirst("UserId")?.Value
-                             ?? "";
-
-                await _service.CommitAsync(id, userId);
-
-                return Ok(new
-                {
-                    message = "QC inspection committed to inventory successfully."
                 });
             }
             catch (Exception ex)

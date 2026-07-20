@@ -2012,6 +2012,680 @@ WHERE checklist_id = @checklist_id;";
             }
         }
 
+        public async Task<List<ReadyForChecklistDto>>
+    GetAvailableLinesForChecklistAsync(long checklistId)
+        {
+            if (checklistId <= 0)
+                throw new Exception("Invalid checklist ID.");
+
+            using var conn = new MySqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            // Confirm that the checklist exists and can still be edited.
+            string checklistSql = @"
+        SELECT status
+        FROM delivery_checklist_header
+        WHERE checklist_id = @checklist_id
+          AND IFNULL(is_deleted, 0) = 0
+        LIMIT 1;";
+
+            string checklistStatus;
+
+            using (var cmd = new MySqlCommand(checklistSql, conn))
+            {
+                cmd.Parameters.AddWithValue(
+                    "@checklist_id",
+                    checklistId
+                );
+
+                var result = await cmd.ExecuteScalarAsync();
+
+                if (result == null || result == DBNull.Value)
+                    throw new KeyNotFoundException(
+                        "Delivery checklist not found."
+                    );
+
+                checklistStatus = result.ToString() ?? "";
+            }
+
+            checklistStatus =
+                checklistStatus.Trim().ToUpperInvariant();
+
+            // Do not add new customers after the checklist is completed.
+            if (checklistStatus == "COMPLETED")
+            {
+                throw new Exception(
+                    "Customers cannot be added to a completed checklist."
+                );
+            }
+
+            /*
+             * GetReadyForChecklistAsync already excludes order lines
+             * that are present in an existing active checklist.
+             */
+            return await GetReadyForChecklistAsync();
+        }
+
+        public async Task<object> AddLinesToChecklistAsync(
+    AddChecklistLinesDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (dto.checklist_id <= 0)
+                throw new Exception("Invalid checklist ID.");
+
+            if (dto.lines == null || dto.lines.Count == 0)
+                throw new Exception(
+                    "Please select at least one order line."
+                );
+
+            using var conn =
+                new MySqlConnection(_connectionString);
+
+            await conn.OpenAsync();
+
+            using var transaction =
+                await conn.BeginTransactionAsync();
+
+            try
+            {
+                // Confirm checklist exists and is editable
+                string headerSql = @"
+            SELECT status
+            FROM delivery_checklist_header
+            WHERE checklist_id = @checklist_id
+              AND IFNULL(is_deleted, 0) = 0
+            LIMIT 1;";
+
+                string checklistStatus;
+
+                using (var cmd =
+                    new MySqlCommand(headerSql, conn, transaction))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    var result =
+                        await cmd.ExecuteScalarAsync();
+
+                    if (result == null ||
+                        result == DBNull.Value)
+                    {
+                        throw new Exception(
+                            "Delivery checklist not found."
+                        );
+                    }
+
+                    checklistStatus =
+                        result.ToString() ?? "";
+                }
+
+                checklistStatus =
+                    checklistStatus.Trim().ToUpperInvariant();
+
+                if (checklistStatus != "READY" &&
+                    checklistStatus != "LOADING")
+                {
+                    throw new Exception(
+                        "Customers can only be added to a " +
+                        "READY or LOADING checklist."
+                    );
+                }
+
+                foreach (var line in dto.lines)
+                {
+                    // Prevent duplicate order line in this checklist
+                    string duplicateSql = @"
+                SELECT COUNT(*)
+                FROM delivery_checklist_line
+                WHERE checklist_id = @checklist_id
+                  AND order_line_id = @order_line_id
+                  AND IFNULL(is_deleted, 0) = 0;";
+
+                    using (var duplicateCmd =
+                        new MySqlCommand(
+                            duplicateSql,
+                            conn,
+                            transaction
+                        ))
+                    {
+                        duplicateCmd.Parameters.AddWithValue(
+                            "@checklist_id",
+                            dto.checklist_id
+                        );
+
+                        duplicateCmd.Parameters.AddWithValue(
+                            "@order_line_id",
+                            line.order_line_id
+                        );
+
+                        var duplicateCount =
+                            Convert.ToInt64(
+                                await duplicateCmd
+                                    .ExecuteScalarAsync()
+                            );
+
+                        if (duplicateCount > 0)
+                        {
+                            throw new Exception(
+                                $"Order line {line.order_line_id} " +
+                                "is already included in this checklist."
+                            );
+                        }
+                    }
+
+                    await ValidateChecklistLineAsync(
+                        conn,
+                        transaction,
+                        line
+                    );
+
+                    var allocationLots =
+                        await GetAllocationLotsAsync(
+                            conn,
+                            transaction,
+                            line.order_line_id
+                        );
+
+                    if (allocationLots.Count == 0)
+                    {
+                        throw new Exception(
+                            $"No allocated lots found for " +
+                            $"order line {line.order_line_id}."
+                        );
+                    }
+
+                    foreach (var lot in allocationLots)
+                    {
+                        await InsertChecklistLinePerLotAsync(
+                            conn,
+                            transaction,
+                            dto.checklist_id,
+                            line,
+                            lot
+                        );
+                    }
+                }
+
+                // Ensure header remains READY when adding to READY
+                string updateHeaderSql = @"
+            UPDATE delivery_checklist_header
+            SET updated_at = @updated_at
+            WHERE checklist_id = @checklist_id;";
+
+                using (var updateCmd =
+                    new MySqlCommand(
+                        updateHeaderSql,
+                        conn,
+                        transaction
+                    ))
+                {
+                    updateCmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    updateCmd.Parameters.AddWithValue(
+                        "@updated_at",
+                        DateTime.UtcNow
+                    );
+
+                    await updateCmd.ExecuteNonQueryAsync();
+                }
+
+                await transaction.CommitAsync();
+
+                return new
+                {
+                    success = true,
+                    message =
+                        $"{dto.lines.Count} order line(s) " +
+                        "added to the checklist."
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+
+        public async Task<object> RemoveCustomerFromChecklistAsync(
+    RemoveChecklistCustomerDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (dto.checklist_id <= 0)
+                throw new Exception("Invalid checklist ID.");
+
+            if (string.IsNullOrWhiteSpace(dto.customer_name))
+                throw new Exception("Customer is required.");
+
+            using var conn =
+                new MySqlConnection(_connectionString);
+
+            await conn.OpenAsync();
+
+            using var transaction =
+                await conn.BeginTransactionAsync();
+
+            try
+            {
+                // Check checklist status.
+                string headerSql = @"
+            SELECT status
+            FROM delivery_checklist_header
+            WHERE checklist_id = @checklist_id
+              AND IFNULL(is_deleted, 0) = 0
+            LIMIT 1;";
+
+                string headerStatus;
+
+                using (var cmd =
+                    new MySqlCommand(
+                        headerSql,
+                        conn,
+                        transaction
+                    ))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    var result =
+                        await cmd.ExecuteScalarAsync();
+
+                    if (result == null ||
+                        result == DBNull.Value)
+                    {
+                        throw new Exception(
+                            "Delivery checklist not found."
+                        );
+                    }
+
+                    headerStatus =
+                        result.ToString() ?? "";
+                }
+
+                headerStatus =
+                    headerStatus.Trim().ToUpperInvariant();
+
+                if (headerStatus != "READY" &&
+                    headerStatus != "LOADING" &&
+                    headerStatus != "PARTIALLY_COMPLETED")
+                {
+                    throw new Exception(
+                        "Customer cannot be removed from this checklist status."
+                    );
+                }
+
+                // Confirm the customer exists in this checklist.
+                string countSql = @"
+            SELECT
+                COUNT(*) AS total_lines,
+                SUM(
+                    CASE
+                        WHEN UPPER(TRIM(status)) = 'COMPLETED'
+                        THEN 1
+                        ELSE 0
+                    END
+                ) AS completed_lines
+            FROM delivery_checklist_line
+            WHERE checklist_id = @checklist_id
+              AND UPPER(TRIM(customer_name)) =
+                  UPPER(TRIM(@customer_name))
+              AND IFNULL(is_deleted, 0) = 0;";
+
+                long totalLines;
+                long completedLines;
+
+                using (var cmd =
+                    new MySqlCommand(
+                        countSql,
+                        conn,
+                        transaction
+                    ))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@customer_name",
+                        dto.customer_name.Trim()
+                    );
+
+                    using var reader =
+                        await cmd.ExecuteReaderAsync();
+
+                    await reader.ReadAsync();
+
+                    totalLines =
+                        reader["total_lines"] == DBNull.Value
+                            ? 0
+                            : Convert.ToInt64(
+                                reader["total_lines"]
+                            );
+
+                    completedLines =
+                        reader["completed_lines"] == DBNull.Value
+                            ? 0
+                            : Convert.ToInt64(
+                                reader["completed_lines"]
+                            );
+                }
+
+                if (totalLines <= 0)
+                    throw new Exception(
+                        "Customer was not found in this checklist."
+                    );
+
+                if (completedLines > 0)
+                {
+                    throw new Exception(
+                        "This customer cannot be removed because " +
+                        "one or more checklist lines are already completed."
+                    );
+                }
+
+                // Soft-delete all non-completed customer lines.
+                string removeSql = @"
+            UPDATE delivery_checklist_line
+            SET is_deleted = 1,
+                updated_at = @updated_at
+            WHERE checklist_id = @checklist_id
+              AND UPPER(TRIM(customer_name)) =
+                  UPPER(TRIM(@customer_name))
+              AND IFNULL(is_deleted, 0) = 0
+              AND UPPER(TRIM(status)) <> 'COMPLETED';";
+
+                int removedLines;
+
+                using (var cmd =
+                    new MySqlCommand(
+                        removeSql,
+                        conn,
+                        transaction
+                    ))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@customer_name",
+                        dto.customer_name.Trim()
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@updated_at",
+                        DateTime.UtcNow
+                    );
+
+                    removedLines =
+                        await cmd.ExecuteNonQueryAsync();
+                }
+
+                if (removedLines <= 0)
+                    throw new Exception(
+                        "No checklist lines were removed."
+                    );
+
+                // Count remaining active lines.
+                string remainingSql = @"
+            SELECT COUNT(*)
+            FROM delivery_checklist_line
+            WHERE checklist_id = @checklist_id
+              AND IFNULL(is_deleted, 0) = 0;";
+
+                long remainingLines;
+
+                using (var cmd =
+                    new MySqlCommand(
+                        remainingSql,
+                        conn,
+                        transaction
+                    ))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    remainingLines =
+                        Convert.ToInt64(
+                            await cmd.ExecuteScalarAsync()
+                        );
+                }
+
+                bool checklistDeleted = remainingLines == 0;
+
+                if (checklistDeleted)
+                {
+                    string deleteHeaderSql = @"
+                UPDATE delivery_checklist_header
+                SET is_deleted = 1,
+                    updated_at = @updated_at
+                WHERE checklist_id = @checklist_id;";
+
+                    using var cmd =
+                        new MySqlCommand(
+                            deleteHeaderSql,
+                            conn,
+                            transaction
+                        );
+
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@updated_at",
+                        DateTime.UtcNow
+                    );
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                else
+                {
+                    string updateHeaderSql = @"
+                UPDATE delivery_checklist_header
+                SET updated_at = @updated_at
+                WHERE checklist_id = @checklist_id;";
+
+                    using var cmd =
+                        new MySqlCommand(
+                            updateHeaderSql,
+                            conn,
+                            transaction
+                        );
+
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@updated_at",
+                        DateTime.UtcNow
+                    );
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
+                await transaction.CommitAsync();
+
+                return new
+                {
+                    success = true,
+                    message =
+                        $"{dto.customer_name} removed from checklist.",
+                    removed_lines = removedLines,
+                    checklist_deleted = checklistDeleted
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<object> UpdateTripInfoAsync(
+    UpdateChecklistTripInfoDto dto)
+        {
+            if (dto == null)
+                throw new Exception("Invalid request.");
+
+            if (dto.checklist_id <= 0)
+                throw new Exception("Invalid checklist ID.");
+
+            if (string.IsNullOrWhiteSpace(dto.route_name))
+                throw new Exception("Route is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.truck_name))
+                throw new Exception("Truck is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.driver_name))
+                throw new Exception("Driver is required.");
+
+            using var conn =
+                new MySqlConnection(_connectionString);
+
+            await conn.OpenAsync();
+
+            using var transaction =
+                await conn.BeginTransactionAsync();
+
+            try
+            {
+                string currentStatusSql = @"
+            SELECT status
+            FROM delivery_checklist_header
+            WHERE checklist_id = @checklist_id
+              AND IFNULL(is_deleted, 0) = 0
+            LIMIT 1;";
+
+                string currentStatus;
+
+                using (var cmd = new MySqlCommand(
+                    currentStatusSql,
+                    conn,
+                    transaction))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    var result =
+                        await cmd.ExecuteScalarAsync();
+
+                    if (result == null ||
+                        result == DBNull.Value)
+                    {
+                        throw new Exception(
+                            "Delivery checklist not found."
+                        );
+                    }
+
+                    currentStatus =
+                        result.ToString()?
+                            .Trim()
+                            .ToUpperInvariant() ?? "";
+                }
+
+                var editableStatuses = new[]
+                {
+            "READY",
+            "LOADING",
+            "PARTIAL",
+            "PARTIALLY_COMPLETED"
+        };
+
+                if (!editableStatuses.Contains(currentStatus))
+                {
+                    throw new Exception(
+                        "Route, truck, and driver cannot be " +
+                        "updated for a completed checklist."
+                    );
+                }
+
+                string updateSql = @"
+            UPDATE delivery_checklist_header
+            SET route_name = @route_name,
+                truck_name = @truck_name,
+                driver_name = @driver_name,
+                updated_at = @updated_at
+            WHERE checklist_id = @checklist_id
+              AND IFNULL(is_deleted, 0) = 0;";
+
+                using (var cmd = new MySqlCommand(
+                    updateSql,
+                    conn,
+                    transaction))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        dto.checklist_id
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@route_name",
+                        dto.route_name.Trim()
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@truck_name",
+                        dto.truck_name.Trim()
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@driver_name",
+                        dto.driver_name.Trim()
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@updated_at",
+                        DateTime.UtcNow
+                    );
+
+                    var rows =
+                        await cmd.ExecuteNonQueryAsync();
+
+                    if (rows <= 0)
+                    {
+                        throw new Exception(
+                            "Checklist trip information was not updated."
+                        );
+                    }
+                }
+
+                await transaction.CommitAsync();
+
+                return new
+                {
+                    success = true,
+                    message =
+                        "Route, truck, and driver updated successfully."
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
 
 
     }

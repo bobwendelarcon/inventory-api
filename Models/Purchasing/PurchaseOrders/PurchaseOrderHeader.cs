@@ -35,5 +35,7 @@
         public string? PrintedPoNo { get; set; }
 
         public List<PurchaseOrderLine> Lines { get; set; } = new();
+
+        public List<PurchaseOrderDeliverySchedule> DeliverySchedules { get; set; } = new();
     }
 }

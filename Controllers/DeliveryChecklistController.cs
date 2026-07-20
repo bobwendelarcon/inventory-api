@@ -285,5 +285,108 @@ namespace inventory_api.Controllers
             }
         }
 
+
+        [HttpGet("{checklistId:long}/available-lines")]
+        public async Task<IActionResult> GetAvailableLinesForChecklist(
+    long checklistId)
+        {
+            try
+            {
+                if (checklistId <= 0)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Invalid checklist ID."
+                    });
+                }
+
+                var result = await _deliveryChecklistService
+                    .GetAvailableLinesForChecklistAsync(checklistId);
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
+        [HttpPost("add-lines")]
+        public async Task<IActionResult> AddLinesToChecklist(
+    [FromBody] AddChecklistLinesDto dto)
+        {
+            try
+            {
+                var result = await _deliveryChecklistService
+                    .AddLinesToChecklistAsync(dto);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpPost("remove-customer")]
+        public async Task<IActionResult> RemoveCustomerFromChecklist(
+    [FromBody] RemoveChecklistCustomerDto dto)
+        {
+            try
+            {
+                var result = await _deliveryChecklistService
+                    .RemoveCustomerFromChecklistAsync(dto);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpPost("update-trip-info")]
+        public async Task<IActionResult> UpdateTripInfo(
+    [FromBody] UpdateChecklistTripInfoDto dto)
+        {
+            try
+            {
+                var result = await _deliveryChecklistService
+                    .UpdateTripInfoAsync(dto);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
     }
 }
