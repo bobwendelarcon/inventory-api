@@ -1,4 +1,5 @@
-﻿using inventory_api.DTOs;
+﻿using Google.Api;
+using inventory_api.DTOs;
 using inventory_api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -28,38 +29,40 @@ namespace inventory_api.Controllers
 
         [HttpGet]
         public async Task<IActionResult> GetInventoryDisplay(
-            int page = 1,
-            int pageSize = 30,
-            string lot_no = "",
-            string search = "",
-            string warehouse = "",
-            string category = "",
-            string stockStatus = "",
-            string expiryStatus = "",
-            string months = "",
-            string from = "",
-            string to = "",
-            string sortBy = "lot",
-            string order = "desc"
-        )
+       int page = 1,
+       int pageSize = 30,
+       string productId = "",
+       string lot_no = "",
+       string search = "",
+       string warehouse = "",
+       string category = "",
+       string stockStatus = "",
+       string expiryStatus = "",
+       string months = "",
+       string from = "",
+       string to = "",
+       string sortBy = "lot",
+       string order = "desc")
         {
             try
             {
-                var result = await _inventoryDisplayService.GetAllAsync(
-                    page,
-                    pageSize,
-                    lot_no,
-                    search,
-                    warehouse,
-                    category,
-                    stockStatus,
-                    expiryStatus,
-                    months,
-                    from,
-                    to,
-                    sortBy,
-                    order
-                );
+                var result =
+                    await _inventoryDisplayService.GetAllAsync(
+                        page,
+                        pageSize,
+                        productId,
+                        lot_no,
+                        search,
+                        warehouse,
+                        category,
+                        stockStatus,
+                        expiryStatus,
+                        months,
+                        from,
+                        to,
+                        sortBy,
+                        order
+                    );
 
                 return Ok(result);
             }
@@ -124,6 +127,42 @@ namespace inventory_api.Controllers
                 {
                     success = false,
                     message = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("stock-overview")]
+        public async Task<IActionResult> GetStockOverview(
+      int page = 1,
+      int pageSize = 25,
+      string search = "",
+      string warehouse = "",
+      string categories = "",
+      string stockStatus = "",
+      string order = "asc")
+        {
+            try
+            {
+                var result =
+                    await _inventoryDisplayService
+                        .GetProductSummaryPagedAsync(
+                            page,
+                            pageSize,
+                            search,
+                            warehouse,
+                            categories,
+                            stockStatus,
+                            order
+                        );
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Failed to load stock overview.",
+                    error = ex.Message
                 });
             }
         }

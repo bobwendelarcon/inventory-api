@@ -14,20 +14,20 @@ namespace inventory_api.Services
         }
 
         public async Task<Dictionary<string, object>> GetAllAsync(
-            int page = 1,
-            int pageSize = 30,
-            string lot_no = "",
-           string search = "",
-           string warehouse = "",
-string category = "",
-string stockStatus = "",
-            string expiryStatus = "",
-            string months = "",
-            string from = "",
-string to = "",
-string sortBy = "lot",
-string order = "desc"
-        )
+     int page = 1,
+     int pageSize = 30,
+     string productId = "",
+     string lot_no = "",
+     string search = "",
+     string warehouse = "",
+     string category = "",
+     string stockStatus = "",
+     string expiryStatus = "",
+     string months = "",
+     string from = "",
+     string to = "",
+     string sortBy = "lot",
+     string order = "desc")
         {
             TimeZoneInfo phTimeZone;
 
@@ -56,7 +56,8 @@ string order = "desc"
                     on lot.branch_id equals branch.branch_id into branchJoin
                 from branch in branchJoin.DefaultIfEmpty()
 
-                where !lot.is_deleted
+                where !lot.is_deleted && !productData.is_deleted
+
                 //select new
                 //{
                 //    product_id = lot.product_id,
@@ -103,8 +104,27 @@ string order = "desc"
                     expiration_date = lot.expiration_date
                 };
 
+
+            if (!string.IsNullOrWhiteSpace(productId))
+            {
+                var selectedProductId = productId.Trim();
+
+                query = query.Where(x =>
+                    x.product_id == selectedProductId
+                );
+            }
+
             if (!string.IsNullOrWhiteSpace(lot_no))
-                query = query.Where(x => x.lot_no.Contains(lot_no));
+            {
+                query = query.Where(x =>
+                    x.lot_no.Contains(lot_no)
+                );
+            }
+
+
+
+            //if (!string.IsNullOrWhiteSpace(lot_no))
+            //    query = query.Where(x => x.lot_no.Contains(lot_no));
 
             //if (!string.IsNullOrWhiteSpace(product))
             //    query = query.Where(x => x.description.Contains(product));
@@ -356,222 +376,41 @@ string order = "desc"
 
 
 
-        public async Task<List<InventoryPrintSummaryDto>> GetPrintSummaryAsync(
-    string search = "",
-    string warehouse = "",
-    string categories = "",
-    string stockStatus = "",
-    string order = "asc")
+        public async Task<List<InventoryPrintSummaryDto>>
+         GetPrintSummaryAsync(
+             string search = "",
+             string warehouse = "",
+             string categories = "",
+             string stockStatus = "",
+             string order = "asc")
         {
-            // Start from Products so products without inventory lots
-            // will still be included with quantity 0.
-            var productQuery =
-                from product in _context.Products
-
-                join categoryData in _context.Categories
-                    on product.catg_id equals categoryData.catg_id into categoryJoin
-                from categoryData in categoryJoin.DefaultIfEmpty()
-
-                select new
-                {
-                    product_id = product.product_id,
-                    product_name = product.product_name ?? "",
-                    product_description = product.product_description ?? "",
-                    category_name = categoryData != null
-                        ? categoryData.catg_name ?? ""
-                        : "",
-
-                    uom = product.uom ?? "",
-                    pack_qty = (decimal)(product.pack_qty ?? 0),
-                    pack_uom = product.pack_uom ?? "",
-                    stock_level = product.stock_level
-                };
-
-            // Product search
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                string keyword = search.Trim();
-
-                productQuery = productQuery.Where(x =>
-                    x.product_name.Contains(keyword) ||
-                    x.product_description.Contains(keyword));
-            }
-
-            // Category filter
-            if (!string.IsNullOrWhiteSpace(categories))
-            {
-                var selectedCategories =
-                    categories
-                        .Split(
-                            '|',
-                            StringSplitOptions.RemoveEmptyEntries |
-                            StringSplitOptions.TrimEntries
-                        )
-                        .ToList();
-
-                if (selectedCategories.Count > 0)
-                {
-                    productQuery = productQuery.Where(x =>
-                        selectedCategories.Contains(
-                            x.category_name
-                        )
-                    );
-                }
-            }
-
-            var products = await productQuery.ToListAsync();
-
-            // Load inventory lots.
-            var lotQuery = _context.ProductLotNumbers
-                .Where(x => !x.is_deleted);
-
-            // Warehouse filter
-            if (!string.IsNullOrWhiteSpace(warehouse))
-            {
-                lotQuery = lotQuery.Where(x =>
-                    x.branch_id == warehouse);
-            }
-
-            var lots = await lotQuery
-                .Select(x => new
-                {
-                    product_id = x.product_id,
-                    branch_id = x.branch_id,
-                    lot_no = x.lot_no ?? "",
-                    quantity = (decimal)x.quantity
-                })
-                .ToListAsync();
-
-            // Load reserved quantities from daily order allocations.
-            var allocationQuery =
-                from allocation in _context.DailyOrderAllocations
-
-                join line in _context.DailyOrderLines
-                    on allocation.order_line_id equals line.order_line_id
-
-                join header in _context.DailyOrderHeaders
-                    on line.order_id equals header.order_id
-
-                where !header.is_deleted
-                      && allocation.allocated_qty > 0
-
-                select new
-                {
-                    product_id = allocation.product_id,
-                    branch_id = allocation.branch_id,
-                    lot_no = allocation.lot_no ?? "",
-                    reserved_qty = allocation.allocated_qty
-                };
-
-            // Apply the same warehouse filter to reservations.
-            if (!string.IsNullOrWhiteSpace(warehouse))
-            {
-                allocationQuery = allocationQuery.Where(x =>
-                    x.branch_id == warehouse);
-            }
-
-            var allocations = await allocationQuery.ToListAsync();
-
-            var result = products.Select(product =>
-            {
-                // Get all lots belonging to the product.
-                var productLots = lots
-                    .Where(x =>
-                        (x.product_id ?? "").Trim() ==
-                        (product.product_id ?? "").Trim())
-                    .ToList();
-
-                decimal totalOnHand = productLots.Sum(x => x.quantity);
-
-                decimal totalReserved = 0;
-
-                foreach (var lot in productLots)
-                {
-                    decimal lotReserved = allocations
-                        .Where(a =>
-                            (a.product_id ?? "").Trim() ==
-                            (lot.product_id ?? "").Trim() &&
-
-                            (a.branch_id ?? "").Trim() ==
-                            (lot.branch_id ?? "").Trim() &&
-
-                            (a.lot_no ?? "").Trim() ==
-                            (lot.lot_no ?? "").Trim())
-                        .Sum(a => a.reserved_qty);
-
-                    totalReserved += lotReserved;
-                }
-
-                decimal availableQty =
-                    Math.Max(0, totalOnHand - totalReserved);
-
-                string packDisplay = FormatPackForPrint(
-                    availableQty,
-                    product.pack_qty,
-                    product.pack_uom,
-                    product.uom
+            var productSummary =
+                await GetProductSummaryAsync(
+                    search,
+                    warehouse,
+                    categories,
+                    stockStatus,
+                    order
                 );
 
-                return new InventoryPrintSummaryDto
+            return productSummary
+                .Select(x => new InventoryPrintSummaryDto
                 {
-                    product_id = product.product_id,
-                    product_name = product.product_name,
-                    product_description = product.product_description,
-                    category_name = product.category_name,
+                    product_id = x.ProductId,
+                    product_name = x.ProductName,
+                    product_description =
+                        x.ProductDescription,
 
-                    available_qty = availableQty,
+                    category_name = x.CategoryName,
 
-                    uom = product.uom,
-                    pack_qty = product.pack_qty,
-                    pack_uom = product.pack_uom,
+                    available_qty = x.AvailableQty,
 
-                    pack_display = packDisplay
-                };
-            }).ToList();
-
-            // Apply stock-status filter after total available qty is calculated.
-            if (!string.IsNullOrWhiteSpace(stockStatus))
-            {
-                stockStatus = stockStatus.Trim().ToLower();
-
-                if (stockStatus == "zero")
-                {
-                    result = result
-                        .Where(x => x.available_qty <= 0)
-                        .ToList();
-                }
-                else if (stockStatus == "available")
-                {
-                    result = result
-                        .Where(x => x.available_qty > 0)
-                        .ToList();
-                }
-                else if (stockStatus == "normal")
-                {
-                    result = result
-                        .Where(x => x.available_qty > 0)
-                        .ToList();
-                }
-            }
-
-            // Sorting
-            if (string.Equals(order, "desc",
-                StringComparison.OrdinalIgnoreCase))
-            {
-                result = result
-                    .OrderByDescending(x => x.product_name)
-                    .ThenByDescending(x => x.product_description)
-                    .ToList();
-            }
-            else
-            {
-                result = result
-                    .OrderBy(x => x.product_name)
-                    .ThenBy(x => x.product_description)
-                    .ToList();
-            }
-
-            return result;
+                    uom = x.Uom,
+                    pack_qty = x.PackQty,
+                    pack_uom = x.PackUom,
+                    pack_display = x.PackDisplay
+                })
+                .ToList();
         }
 
 
@@ -637,9 +476,13 @@ string order = "desc"
                     on lot.product_id equals product.product_id
                 join category in _context.Categories
                     on product.catg_id equals category.catg_id
-                where !lot.is_deleted
-                      && category.catg_name != null
-                      && category.catg_name != ""
+                where
+     !lot.is_deleted &&
+     !product.is_deleted &&
+     category.catg_name != null &&
+     category.catg_name != ""
+
+
                 select category.catg_name
             )
             .Distinct()
@@ -692,5 +535,291 @@ string order = "desc"
                 message = "Lot dates updated successfully."
             };
         }
+
+        public async Task<List<InventoryProductSummaryDto>> GetProductSummaryAsync(
+     string search = "",
+     string warehouse = "",
+     string categories = "",
+     string stockStatus = "",
+     string order = "asc")
+        {
+            var productQuery =
+     from product in _context.Products
+     where !product.is_deleted
+
+     join categoryData in _context.Categories
+         on product.catg_id equals categoryData.catg_id
+         into categoryJoin
+
+     from categoryData in categoryJoin.DefaultIfEmpty()
+
+     select new
+     {
+         product_id = product.product_id,
+         product_name = product.product_name ?? "",
+         product_description = product.product_description ?? "",
+         category_name = categoryData != null
+             ? categoryData.catg_name ?? ""
+             : "Uncategorized",
+         uom = product.uom ?? "",
+         pack_qty = (decimal)(product.pack_qty ?? 0),
+         pack_uom = product.pack_uom ?? "",
+         stock_level = product.stock_level
+     };
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                string keyword = search.Trim();
+
+                productQuery = productQuery.Where(x =>
+                    x.product_name.Contains(keyword) ||
+                    x.product_description.Contains(keyword));
+            }
+
+            if (!string.IsNullOrWhiteSpace(categories))
+            {
+                var selectedCategories = categories
+                    .Split(
+                        '|',
+                        StringSplitOptions.RemoveEmptyEntries |
+                        StringSplitOptions.TrimEntries
+                    )
+                    .ToList();
+
+                if (selectedCategories.Count > 0)
+                {
+                    productQuery = productQuery.Where(x =>
+                        selectedCategories.Contains(x.category_name));
+                }
+            }
+
+            var products = await productQuery.ToListAsync();
+
+            var lotQuery = _context.ProductLotNumbers
+                .Where(x => !x.is_deleted);
+
+            if (!string.IsNullOrWhiteSpace(warehouse))
+            {
+                lotQuery = lotQuery.Where(x =>
+                    x.branch_id == warehouse);
+            }
+
+            var lots = await lotQuery
+                .Select(x => new
+                {
+                    product_id = x.product_id,
+                    branch_id = x.branch_id,
+                    lot_no = x.lot_no ?? "",
+                    quantity = (decimal)x.quantity
+                })
+                .ToListAsync();
+
+            var allocationQuery =
+                from allocation in _context.DailyOrderAllocations
+
+                join line in _context.DailyOrderLines
+                    on allocation.order_line_id equals line.order_line_id
+
+                join header in _context.DailyOrderHeaders
+                    on line.order_id equals header.order_id
+
+                where !header.is_deleted
+                      && allocation.allocated_qty > 0
+
+                select new
+                {
+                    product_id = allocation.product_id,
+                    branch_id = allocation.branch_id,
+                    lot_no = allocation.lot_no ?? "",
+                    reserved_qty = allocation.allocated_qty
+                };
+
+            if (!string.IsNullOrWhiteSpace(warehouse))
+            {
+                allocationQuery = allocationQuery.Where(x =>
+                    x.branch_id == warehouse);
+            }
+
+            var allocations =
+                await allocationQuery.ToListAsync();
+
+            var result = products.Select(product =>
+            {
+                var productLots = lots
+                    .Where(x =>
+                        (x.product_id ?? "").Trim() ==
+                        (product.product_id ?? "").Trim())
+                    .ToList();
+
+                decimal totalQty =
+                    productLots.Sum(x => x.quantity);
+
+                decimal reservedQty = 0;
+
+                foreach (var lot in productLots)
+                {
+                    reservedQty += allocations
+                        .Where(a =>
+                            (a.product_id ?? "").Trim() ==
+                            (lot.product_id ?? "").Trim() &&
+
+                            (a.branch_id ?? "").Trim() ==
+                            (lot.branch_id ?? "").Trim() &&
+
+                            (a.lot_no ?? "").Trim() ==
+                            (lot.lot_no ?? "").Trim())
+                        .Sum(a => a.reserved_qty);
+                }
+
+                decimal availableQty =
+                    Math.Max(0, totalQty - reservedQty);
+
+                string stockStatusValue;
+
+                if (totalQty <= 0)
+                {
+                    stockStatusValue = "OUT OF STOCK";
+                }
+                else if (
+                    product.stock_level > 0 &&
+                    totalQty <= product.stock_level)
+                {
+                    stockStatusValue = "LOW STOCK";
+                }
+                else
+                {
+                    stockStatusValue = "NORMAL";
+                }
+
+                decimal deficitQty =
+                    Math.Max(
+                        product.stock_level - totalQty,
+                        0
+                    );
+
+                return new InventoryProductSummaryDto
+                {
+                    ProductId = product.product_id,
+                    ProductName = product.product_name,
+                    ProductDescription =
+                        product.product_description,
+
+                    CategoryName = product.category_name,
+
+                    TotalQty = totalQty,
+                    ReservedQty = reservedQty,
+                    AvailableQty = availableQty,
+
+                    StockLevel = product.stock_level,
+                    DeficitQty = deficitQty,
+
+                    Uom = product.uom,
+                    PackQty = product.pack_qty,
+                    PackUom = product.pack_uom,
+
+                    PackDisplay = FormatPackForPrint(
+                        availableQty,
+                        product.pack_qty,
+                        product.pack_uom,
+                        product.uom
+                    ),
+
+                    StockStatus = stockStatusValue
+                };
+            }).ToList();
+
+            if (!string.IsNullOrWhiteSpace(stockStatus))
+            {
+                var normalizedStatus =
+                    stockStatus.Trim().ToLower();
+
+                if (normalizedStatus == "zero")
+                {
+                    result = result
+                        .Where(x =>
+                            x.StockStatus == "OUT OF STOCK")
+                        .ToList();
+                }
+                else if (normalizedStatus == "low")
+                {
+                    result = result
+                        .Where(x =>
+                            x.StockStatus == "LOW STOCK")
+                        .ToList();
+                }
+                else if (normalizedStatus == "low-or-zero")
+                {
+                    result = result
+                        .Where(x =>
+                            x.StockStatus == "LOW STOCK" ||
+                            x.StockStatus == "OUT OF STOCK")
+                        .ToList();
+                }
+                else if (normalizedStatus == "normal")
+                {
+                    result = result
+                        .Where(x =>
+                            x.StockStatus == "NORMAL")
+                        .ToList();
+                }
+            }
+
+            result = string.Equals(
+                order,
+                "desc",
+                StringComparison.OrdinalIgnoreCase)
+                ? result
+                    .OrderByDescending(x => x.CategoryName)
+                    .ThenByDescending(x => x.ProductName)
+                    .ToList()
+                : result
+                    .OrderBy(x => x.CategoryName)
+                    .ThenBy(x => x.ProductName)
+                    .ToList();
+
+
+            return result;
+        }
+
+
+        public async Task<Dictionary<string, object>>
+            GetProductSummaryPagedAsync(
+                int page = 1,
+                int pageSize = 25,
+                string search = "",
+                string warehouse = "",
+                string categories = "",
+                string stockStatus = "",
+                string order = "asc")
+        {
+            var result = await GetProductSummaryAsync(
+                search,
+                warehouse,
+                categories,
+                stockStatus,
+                order);
+
+            page = Math.Max(page, 1);
+            pageSize = Math.Clamp(pageSize, 10, 100);
+
+            var total = result.Count;
+
+            var pagedData = result
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return new Dictionary<string, object>
+    {
+        { "data", pagedData },
+        { "total", total },
+        { "page", page },
+        { "pageSize", pageSize },
+        { "totalPages", (int)Math.Ceiling(total / (double)pageSize) }
+    };
+        }
+
+
+
     }
 }

@@ -7,10 +7,15 @@ namespace inventory_api.Services
     public class DashboardService
     {
         private readonly AppDbContext _context;
+        private readonly InventoryDisplayService _inventoryDisplayService;
 
-        public DashboardService(AppDbContext context)
+        public DashboardService(
+     AppDbContext context,
+     InventoryDisplayService inventoryDisplayService)
         {
             _context = context;
+            _inventoryDisplayService =
+                inventoryDisplayService;
         }
         public async Task<DashboardDto> GetDashboardAsync()
         {
@@ -88,52 +93,52 @@ namespace inventory_api.Services
             // LOW STOCK / OUT OF STOCK
             // =========================
 
-            var stockData = await _context.InventoryTransactions
-                .GroupBy(x => x.product_id)
-                .Select(g => new
-                {
-                    ProductId = g.Key,
-                    OnHand = g.Sum(x =>
-                        (x.transaction_type ?? "").ToUpper() == "IN"
-                            ? x.quantity
-                            : -x.quantity)
-                })
-                .ToListAsync();
+            var allProductInventorySummary =
+       await _inventoryDisplayService
+           .GetProductSummaryAsync();
 
-            var reservedData = await _context.DailyOrderAllocations
-                .GroupBy(x => x.product_id)
-                .Select(g => new
-                {
-                    ProductId = g.Key,
-                    ReservedQty = g.Sum(x => x.allocated_qty)
-                })
-                .ToListAsync();
+            dto.LowStockProducts =
+                allProductInventorySummary
+                    .Where(x =>
+                        x.StockStatus == "LOW STOCK" ||
+                        x.StockStatus == "OUT OF STOCK")
+                    .OrderBy(x => x.CategoryName)
+                    .ThenBy(x =>
+                        x.StockStatus == "OUT OF STOCK" ? 0 : 1)
+                    .ThenByDescending(x => x.DeficitQty)
+                    .ThenBy(x => x.ProductName)
+                    .ToList();
 
-            var products = await _context.Products
-                .Where(x => x.stock_level > 0)
-                .ToListAsync();
+            dto.LowStock = dto.LowStockProducts.Count;
 
-            var stockDict = stockData.ToDictionary(x => x.ProductId, x => x.OnHand);
-            var reservedDict = reservedData.ToDictionary(x => x.ProductId, x => x.ReservedQty);
+            var stockDict = allProductInventorySummary
+                .ToDictionary(
+                    x => x.ProductId,
+                    x => x.TotalQty
+                );
 
-            foreach (var p in products)
+            var reservedDict = allProductInventorySummary
+                .ToDictionary(
+                    x => x.ProductId,
+                    x => x.ReservedQty
+                );
+
+            foreach (var item in dto.LowStockProducts)
             {
-                var onHand = stockDict.ContainsKey(p.product_id) ? stockDict[p.product_id] : 0;
-                var reserved = reservedDict.ContainsKey(p.product_id) ? reservedDict[p.product_id] : 0;
-                var available = onHand - reserved;
-
-                if (available <= p.stock_level)
+                alerts.Add(new DashboardInventoryAlertDto
                 {
-                    alerts.Add(new DashboardInventoryAlertDto
-                    {
-                        ProductId = p.product_id,
-                        ProductName = p.product_name,
-                        Quantity = available,
-                        StockLevel = p.stock_level,
-                        Uom = p.uom,
-                        AlertType = available <= 0 ? "OUT OF STOCK" : "LOW STOCK"
-                    });
-                }
+                    ProductId = item.ProductId,
+                    ProductName = item.ProductName,
+
+                    Quantity = item.TotalQty,
+                    StockLevel = item.StockLevel,
+
+                    AvailableQty = item.AvailableQty,
+                    ReservedQty = item.ReservedQty,
+
+                    Uom = item.Uom,
+                    AlertType = item.StockStatus
+                });
             }
 
             // =========================
