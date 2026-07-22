@@ -599,10 +599,11 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
 
 
         public async Task<List<object>> GetChecklistListAsync(
-    DateTime? date,
-    string? status,
-    string? truck,
-    string? search)
+     DateTime? date,
+     string? status,
+     string? truck,
+     string? search,
+     bool activeOnly = false)
         {
             status = string.IsNullOrWhiteSpace(status) ? null : status.Trim();
             truck = string.IsNullOrWhiteSpace(truck) ? null : truck.Trim();
@@ -638,26 +639,71 @@ ORDER BY oh.delivery_date ASC, oh.order_no ASC, ol.order_line_id ASC;";
             ON h.created_by = u.user_id
 
 
-        WHERE IFNULL(h.is_deleted, 0) = 0
-          AND (@date IS NULL OR DATE(h.delivery_date) = @date)
-          AND (@status IS NULL OR UPPER(h.status) = UPPER(@status))
-          AND (@truck IS NULL OR h.truck_name LIKE CONCAT('%', @truck, '%'))
-          AND (
-                @search IS NULL
-                OR h.checklist_no LIKE CONCAT('%', @search, '%')
-                OR h.route_name LIKE CONCAT('%', @search, '%')
-                OR h.truck_name LIKE CONCAT('%', @search, '%')
-                OR h.driver_name LIKE CONCAT('%', @search, '%')
-                OR u.full_name LIKE CONCAT('%', @search, '%')
-OR EXISTS
-(
-    SELECT 1
-    FROM inventory_transactions it
-    WHERE it.checklist_id = h.checklist_id
-      AND IFNULL(it.is_deleted,0)=0
-      AND it.dr_no LIKE CONCAT('%', @search, '%')
-)
-              )
+    WHERE IFNULL(h.is_deleted, 0) = 0
+
+  AND
+  (
+      @active_only = 0
+      OR UPPER(TRIM(h.status)) IN
+      (
+          'READY',
+          'LOADING',
+          'PARTIAL',
+          'PARTIALLY_COMPLETED'
+      )
+  )
+
+  AND
+  (
+      @active_only = 1
+      OR @date IS NULL
+      OR DATE(h.delivery_date) = @date
+  )
+
+  AND
+  (
+      @active_only = 1
+      OR @status IS NULL
+      OR UPPER(TRIM(h.status)) = UPPER(TRIM(@status))
+  )
+
+  AND
+  (
+      @truck IS NULL
+      OR h.truck_name LIKE CONCAT('%', @truck, '%')
+  )
+
+  AND
+  (
+      @search IS NULL
+
+      OR h.checklist_no LIKE CONCAT('%', @search, '%')
+      OR h.route_name LIKE CONCAT('%', @search, '%')
+      OR h.truck_name LIKE CONCAT('%', @search, '%')
+      OR h.driver_name LIKE CONCAT('%', @search, '%')
+      OR u.full_name LIKE CONCAT('%', @search, '%')
+
+      OR EXISTS
+      (
+          SELECT 1
+          FROM delivery_checklist_line dcl_search
+          WHERE dcl_search.checklist_id = h.checklist_id
+            AND IFNULL(dcl_search.is_deleted, 0) = 0
+            AND dcl_search.customer_name
+                LIKE CONCAT('%', @search, '%')
+      )
+
+      OR EXISTS
+      (
+          SELECT 1
+          FROM inventory_transactions it
+          WHERE it.checklist_id = h.checklist_id
+            AND IFNULL(it.is_deleted, 0) = 0
+            AND it.dr_no LIKE CONCAT('%', @search, '%')
+      )
+  )
+
+
         GROUP BY
             h.checklist_id,
             h.checklist_no,
@@ -675,6 +721,10 @@ OR EXISTS
             cmd.Parameters.AddWithValue("@status", (object?)status ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@truck", (object?)truck ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@search", (object?)search ?? DBNull.Value);
+            cmd.Parameters.AddWithValue(
+    "@active_only",
+    activeOnly ? 1 : 0
+);
 
             var list = new List<object>();
 
@@ -1969,21 +2019,67 @@ WHERE checklist_line_id = @checklist_line_id;";
                     await cmd.ExecuteNonQueryAsync();
                 }
 
-                string countSql = @"
-SELECT COUNT(*)
+
+                string statusCountSql = @"
+SELECT
+    COUNT(*) AS total_lines,
+
+    SUM(
+        CASE
+            WHEN UPPER(TRIM(IFNULL(status, ''))) = 'COMPLETED'
+            THEN 1
+            ELSE 0
+        END
+    ) AS completed_lines,
+
+    SUM(
+        CASE
+            WHEN UPPER(TRIM(IFNULL(status, ''))) <> 'COMPLETED'
+            THEN 1
+            ELSE 0
+        END
+    ) AS pending_lines
+
 FROM delivery_checklist_line
 WHERE checklist_id = @checklist_id
   AND IFNULL(is_deleted, 0) = 0;";
 
-                long remainingLines;
+                long totalLines = 0;
+                long completedLines = 0;
+                long pendingLines = 0;
 
-                using (var cmd = new MySqlCommand(countSql, conn, transaction))
+                using (var cmd = new MySqlCommand(
+                    statusCountSql,
+                    conn,
+                    transaction))
                 {
-                    cmd.Parameters.AddWithValue("@checklist_id", checklistId);
-                    remainingLines = Convert.ToInt64(await cmd.ExecuteScalarAsync());
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        checklistId
+                    );
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        totalLines =
+                            reader["total_lines"] == DBNull.Value
+                                ? 0
+                                : Convert.ToInt64(reader["total_lines"]);
+
+                        completedLines =
+                            reader["completed_lines"] == DBNull.Value
+                                ? 0
+                                : Convert.ToInt64(reader["completed_lines"]);
+
+                        pendingLines =
+                            reader["pending_lines"] == DBNull.Value
+                                ? 0
+                                : Convert.ToInt64(reader["pending_lines"]);
+                    }
                 }
 
-                if (remainingLines == 0)
+                if (totalLines == 0)
                 {
                     string deleteHeaderSql = @"
 UPDATE delivery_checklist_header
@@ -1991,11 +2087,79 @@ SET is_deleted = 1,
     updated_at = @updated_at
 WHERE checklist_id = @checklist_id;";
 
-                    using var cmd = new MySqlCommand(deleteHeaderSql, conn, transaction);
-                    cmd.Parameters.AddWithValue("@checklist_id", checklistId);
-                    cmd.Parameters.AddWithValue("@updated_at", DateTime.UtcNow);
+                    using var cmd = new MySqlCommand(
+                        deleteHeaderSql,
+                        conn,
+                        transaction
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        checklistId
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@updated_at",
+                        DateTime.UtcNow
+                    );
+
                     await cmd.ExecuteNonQueryAsync();
                 }
+                else
+                {
+                    string newHeaderStatus;
+
+                    if (pendingLines == 0)
+                    {
+                        newHeaderStatus = "COMPLETED";
+                    }
+                    else if (completedLines > 0)
+                    {
+                        newHeaderStatus = "PARTIALLY_COMPLETED";
+                    }
+                    else
+                    {
+                        newHeaderStatus =
+                            string.Equals(
+                                status,
+                                "LOADING",
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                                ? "LOADING"
+                                : "READY";
+                    }
+
+                    string updateHeaderStatusSql = @"
+UPDATE delivery_checklist_header
+SET status = @status,
+    updated_at = @updated_at
+WHERE checklist_id = @checklist_id
+  AND IFNULL(is_deleted, 0) = 0;";
+
+                    using var cmd = new MySqlCommand(
+                        updateHeaderStatusSql,
+                        conn,
+                        transaction
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@checklist_id",
+                        checklistId
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@status",
+                        newHeaderStatus
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@updated_at",
+                        DateTime.UtcNow
+                    );
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
+
 
                 await transaction.CommitAsync();
 

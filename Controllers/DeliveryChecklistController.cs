@@ -55,22 +55,34 @@ namespace inventory_api.Controllers
 
         [HttpGet("list")]
         public async Task<IActionResult> GetChecklistList(
-    DateTime? date,
-    string? status,
-    string? truck,
-    string? search)
+     DateTime? date,
+     string? status,
+     string? truck,
+     string? search,
+     bool activeOnly = false)
         {
             try
             {
-                var data = await _deliveryChecklistService.GetChecklistListAsync(date, status, truck, search);
+                var data = await _deliveryChecklistService
+                    .GetChecklistListAsync(
+                        date,
+                        status,
+                        truck,
+                        search,
+                        activeOnly
+                    );
+
                 return Ok(data);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
             }
         }
-
         [HttpGet("{id:long}")]
         public async Task<IActionResult> GetChecklistDetails(long id)
         {
