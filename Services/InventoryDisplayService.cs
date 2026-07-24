@@ -383,6 +383,7 @@ namespace inventory_api.Services
     int pageSize = 30,
     string search = "",
     string lotNo = "",
+    string category = "",
     string warehouse = "",
     string status = "",
     int? minimumDays = null,
@@ -441,80 +442,94 @@ namespace inventory_api.Services
                 };
 
             var query =
-                from lot in _context.ProductLotNumbers
+       from lot in _context.ProductLotNumbers
 
-                join product in _context.Products
-                    on lot.product_id equals product.product_id
+       join product in _context.Products
+           on lot.product_id equals product.product_id
 
-                join branch in _context.Branches
-                    on lot.branch_id equals branch.branch_id
-                    into branchJoin
+       join categoryData in _context.Categories
+           on product.catg_id equals categoryData.catg_id
+           into categoryJoin
 
-                from branch in branchJoin.DefaultIfEmpty()
+       from categoryData in categoryJoin.DefaultIfEmpty()
 
-                join movement in movementQuery
-                    on new
-                    {
-                        lot.product_id,
-                        lot.branch_id,
-                        lot.lot_no
-                    }
-                    equals new
-                    {
-                        movement.product_id,
-                        movement.branch_id,
-                        movement.lot_no
-                    }
-                    into movementJoin
+       join branch in _context.Branches
+           on lot.branch_id equals branch.branch_id
+           into branchJoin
 
-                from movement in movementJoin.DefaultIfEmpty()
+       from branch in branchJoin.DefaultIfEmpty()
 
-                where
-                    !lot.is_deleted &&
-                    !product.is_deleted &&
-                    lot.quantity > 0
+       join movement in movementQuery
+           on new
+           {
+               lot.product_id,
+               lot.branch_id,
+               lot.lot_no
+           }
+           equals new
+           {
+               movement.product_id,
+               movement.branch_id,
+               movement.lot_no
+           }
+           into movementJoin
 
-                select new
-                {
-                    lot.product_id,
-                    lot.branch_id,
+       from movement in movementJoin.DefaultIfEmpty()
 
-                    product_name =
-                        product.product_name ?? "",
+       where
+           !lot.is_deleted &&
+           !product.is_deleted &&
+           lot.quantity > 0
 
-                    product_description =
-                        product.product_description ?? "",
+       select new
+       {
+           lot.product_id,
+           lot.branch_id,
 
-                    lot_no =
-                        lot.lot_no ?? "",
+           category_id =
+               product.catg_id ?? "",
 
-                    warehouse =
-                        branch != null
-                            ? branch.branch_name ?? lot.branch_id
-                            : lot.branch_id,
+           category_name =
+               categoryData != null
+                   ? categoryData.catg_name ?? ""
+                   : "",
 
-                    qty =
-                        (decimal)lot.quantity,
+           product_name =
+               product.product_name ?? "",
 
-                    uom =
-                        product.uom ?? "",
+           product_description =
+               product.product_description ?? "",
 
-                    date_in =
-                        movement != null
-                            ? movement.date_in
-                            : null,
+           lot_no =
+               lot.lot_no ?? "",
 
-                    last_out_date =
-                        movement != null
-                            ? movement.last_out_date
-                            : null,
+           warehouse =
+               branch != null
+                   ? branch.branch_name ?? lot.branch_id
+                   : lot.branch_id,
 
-                    manufacturing_date =
-                        lot.manufacturing_date,
+           qty =
+               (decimal)lot.quantity,
 
-                    expiration_date =
-                        lot.expiration_date
-                };
+           uom =
+               product.uom ?? "",
+
+           date_in =
+               movement != null
+                   ? movement.date_in
+                   : null,
+
+           last_out_date =
+               movement != null
+                   ? movement.last_out_date
+                   : null,
+
+           manufacturing_date =
+               lot.manufacturing_date,
+
+           expiration_date =
+               lot.expiration_date
+       };
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -535,6 +550,15 @@ namespace inventory_api.Services
                     x.lot_no.Contains(lotKeyword)
                 );
             }
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                var selectedCategory = category.Trim();
+
+                query = query.Where(x =>
+                    x.category_id == selectedCategory
+                );
+            }
+
 
             if (!string.IsNullOrWhiteSpace(warehouse))
             {
