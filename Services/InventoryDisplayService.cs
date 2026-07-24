@@ -216,6 +216,8 @@ namespace inventory_api.Services
                     x.expiration_date.HasValue &&
                     x.expiration_date.Value.Date > todayPh.AddMonths(2));
             }
+
+
             else if (expiryStatus == "noexp")
             {
                 query = query.Where(x => !x.expiration_date.HasValue);
@@ -372,6 +374,390 @@ namespace inventory_api.Services
                 { "page", page },
                 { "pageSize", pageSize }
             };
+        }
+
+
+
+        public async Task<Dictionary<string, object>> GetInventoryAgingAsync(
+    int page = 1,
+    int pageSize = 30,
+    string search = "",
+    string lotNo = "",
+    string warehouse = "",
+    string status = "",
+    int? minimumDays = null,
+    int? maximumDays = null,
+    string order = "desc")
+        {
+            page = Math.Max(page, 1);
+            pageSize = Math.Clamp(pageSize, 10, 100);
+
+            TimeZoneInfo phTimeZone;
+
+            try
+            {
+                phTimeZone =
+                    TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+            }
+            catch
+            {
+                phTimeZone =
+                    TimeZoneInfo.FindSystemTimeZoneById(
+                        "Singapore Standard Time"
+                    );
+            }
+
+            var todayPh =
+                TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.UtcNow,
+                    phTimeZone
+                ).Date;
+
+            var movementQuery =
+                from transaction in _context.InventoryTransactions
+                where !transaction.is_deleted
+                group transaction by new
+                {
+                    transaction.product_id,
+                    transaction.branch_id,
+                    transaction.lot_no
+                }
+                into movement
+                select new
+                {
+                    movement.Key.product_id,
+                    movement.Key.branch_id,
+                    movement.Key.lot_no,
+
+                    date_in = movement
+                        .Where(x =>
+                            x.transaction_type == "IN")
+                        .Min(x => (DateTime?)x.created_at),
+
+                    last_out_date = movement
+                        .Where(x =>
+                            x.transaction_type == "OUT")
+                        .Max(x => (DateTime?)x.created_at)
+                };
+
+            var query =
+                from lot in _context.ProductLotNumbers
+
+                join product in _context.Products
+                    on lot.product_id equals product.product_id
+
+                join branch in _context.Branches
+                    on lot.branch_id equals branch.branch_id
+                    into branchJoin
+
+                from branch in branchJoin.DefaultIfEmpty()
+
+                join movement in movementQuery
+                    on new
+                    {
+                        lot.product_id,
+                        lot.branch_id,
+                        lot.lot_no
+                    }
+                    equals new
+                    {
+                        movement.product_id,
+                        movement.branch_id,
+                        movement.lot_no
+                    }
+                    into movementJoin
+
+                from movement in movementJoin.DefaultIfEmpty()
+
+                where
+                    !lot.is_deleted &&
+                    !product.is_deleted &&
+                    lot.quantity > 0
+
+                select new
+                {
+                    lot.product_id,
+                    lot.branch_id,
+
+                    product_name =
+                        product.product_name ?? "",
+
+                    product_description =
+                        product.product_description ?? "",
+
+                    lot_no =
+                        lot.lot_no ?? "",
+
+                    warehouse =
+                        branch != null
+                            ? branch.branch_name ?? lot.branch_id
+                            : lot.branch_id,
+
+                    qty =
+                        (decimal)lot.quantity,
+
+                    uom =
+                        product.uom ?? "",
+
+                    date_in =
+                        movement != null
+                            ? movement.date_in
+                            : null,
+
+                    last_out_date =
+                        movement != null
+                            ? movement.last_out_date
+                            : null,
+
+                    manufacturing_date =
+                        lot.manufacturing_date,
+
+                    expiration_date =
+                        lot.expiration_date
+                };
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.Trim();
+
+                query = query.Where(x =>
+                    x.product_name.Contains(keyword) ||
+                    x.product_description.Contains(keyword) ||
+                    x.lot_no.Contains(keyword)
+                );
+            }
+
+            if (!string.IsNullOrWhiteSpace(lotNo))
+            {
+                var lotKeyword = lotNo.Trim();
+
+                query = query.Where(x =>
+                    x.lot_no.Contains(lotKeyword)
+                );
+            }
+
+            if (!string.IsNullOrWhiteSpace(warehouse))
+            {
+                query = query.Where(x =>
+                    x.branch_id == warehouse
+                );
+            }
+
+            var rawRows = await query.ToListAsync();
+
+            var rows = rawRows
+                .Select(x =>
+                {
+                    DateTime? dateInPh = x.date_in.HasValue
+                        ? ConvertToPhilippineTime(
+                            x.date_in.Value,
+                            phTimeZone
+                        )
+                        : null;
+
+                    DateTime? lastOutPh = x.last_out_date.HasValue
+                        ? ConvertToPhilippineTime(
+                            x.last_out_date.Value,
+                            phTimeZone
+                        )
+                        : null;
+
+                    DateTime? expirationDate =
+                        x.expiration_date?.Date;
+
+                    int daysInInventory = dateInPh.HasValue
+                        ? Math.Max(
+                            0,
+                            (todayPh - dateInPh.Value.Date).Days
+                        )
+                        : 0;
+
+                    int? daysSinceLastOut = lastOutPh.HasValue
+                        ? Math.Max(
+                            0,
+                            (todayPh - lastOutPh.Value.Date).Days
+                        )
+                        : null;
+
+                    int? daysToExpiry = expirationDate.HasValue
+                        ? (expirationDate.Value - todayPh).Days
+                        : null;
+
+                    string agingStatus;
+
+                    if (daysToExpiry.HasValue &&
+                        daysToExpiry.Value < 0)
+                    {
+                        agingStatus = "EXPIRED";
+                    }
+                    else if (daysToExpiry.HasValue &&
+                             daysToExpiry.Value <= 60)
+                    {
+                        agingStatus = "NEAR_EXPIRY";
+                    }
+                    else if (!dateInPh.HasValue)
+                    {
+                        agingStatus = "TRANSACTION_ISSUE";
+                    }
+                    else if (daysInInventory > 14)
+                    {
+                        agingStatus = "CLEANUP_NEEDED";
+                    }
+                    else if (daysInInventory > 7)
+                    {
+                        agingStatus = "AGING";
+                    }
+                    else
+                    {
+                        agingStatus = "HEALTHY";
+                    }
+
+                    bool needsVerification =
+                        agingStatus == "CLEANUP_NEEDED" ||
+                        agingStatus == "EXPIRED" ||
+                        agingStatus == "TRANSACTION_ISSUE";
+
+                    return new InventoryAgingDto
+                    {
+                        product_id = x.product_id,
+                        branch_id = x.branch_id,
+
+                        product_name = x.product_name,
+                        product_description =
+                            x.product_description,
+
+                        lot_no = x.lot_no,
+                        warehouse = x.warehouse,
+
+                        qty = x.qty,
+                        uom = x.uom,
+
+                        date_in = dateInPh,
+                        last_out_date = lastOutPh,
+
+                        manufacturing_date =
+                            x.manufacturing_date,
+
+                        expiration_date =
+                            x.expiration_date,
+
+                        days_in_inventory =
+                            daysInInventory,
+
+                        days_since_last_out =
+                            daysSinceLastOut,
+
+                        days_to_expiry =
+                            daysToExpiry,
+
+                        aging_status =
+                            agingStatus,
+
+                        needs_verification =
+                            needsVerification
+                    };
+                })
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var normalizedStatus =
+                    status.Trim().ToUpper();
+
+                rows = rows
+                    .Where(x =>
+                        x.aging_status == normalizedStatus)
+                    .ToList();
+            }
+
+            if (minimumDays.HasValue)
+            {
+                rows = rows
+                    .Where(x =>
+                        x.days_in_inventory >= minimumDays.Value)
+                    .ToList();
+            }
+
+            if (maximumDays.HasValue)
+            {
+                rows = rows
+                    .Where(x =>
+                        x.days_in_inventory <= maximumDays.Value)
+                    .ToList();
+            }
+
+            rows = string.Equals(
+                order,
+                "asc",
+                StringComparison.OrdinalIgnoreCase)
+                ? rows
+                    .OrderBy(x => x.days_in_inventory)
+                    .ThenBy(x => x.product_name)
+                    .ThenBy(x => x.lot_no)
+                    .ToList()
+                : rows
+                    .OrderByDescending(x =>
+                        x.needs_verification)
+                    .ThenByDescending(x =>
+                        x.days_in_inventory)
+                    .ThenBy(x =>
+                        x.product_name)
+                    .ThenBy(x =>
+                        x.lot_no)
+                    .ToList();
+
+            var total = rows.Count;
+
+            var pagedRows = rows
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return new Dictionary<string, object>
+    {
+        { "data", pagedRows },
+        { "total", total },
+        { "page", page },
+        { "pageSize", pageSize },
+        {
+            "totalPages",
+            (int)Math.Ceiling(
+                total / (double)pageSize
+            )
+        },
+
+        {
+            "summary",
+            new
+            {
+                total_lots = rows.Count,
+
+                needs_verification =
+                    rows.Count(x =>
+                        x.needs_verification),
+
+                near_expiry =
+                    rows.Count(x =>
+                        x.aging_status ==
+                        "NEAR_EXPIRY"),
+
+                expired =
+                    rows.Count(x =>
+                        x.aging_status ==
+                        "EXPIRED"),
+
+                cleanup_needed =
+                    rows.Count(x =>
+                        x.aging_status ==
+                        "CLEANUP_NEEDED"),
+
+                transaction_issue =
+                    rows.Count(x =>
+                        x.aging_status ==
+                        "TRANSACTION_ISSUE")
+            }
+        }
+    };
         }
 
 

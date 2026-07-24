@@ -166,5 +166,48 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
+
+        [HttpGet("aging")]
+        public async Task<IActionResult> GetInventoryAging(
+    int page = 1,
+    int pageSize = 30,
+    string search = "",
+    string lotNo = "",
+    string warehouse = "",
+    string status = "",
+    int? minimumDays = null,
+    int? maximumDays = null,
+    string order = "desc")
+        {
+            try
+            {
+                var result =
+                    await _inventoryDisplayService
+                        .GetInventoryAgingAsync(
+                            page,
+                            pageSize,
+                            search,
+                            lotNo,
+                            warehouse,
+                            status,
+                            minimumDays,
+                            maximumDays,
+                            order
+                        );
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message =
+                        "Failed to load inventory aging.",
+                    error = ex.Message
+                });
+            }
+        }
     }
 }
