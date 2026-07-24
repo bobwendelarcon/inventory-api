@@ -24,6 +24,7 @@
         public int? days_since_last_out { get; set; }
 
         public int? days_to_expiry { get; set; }
+        public DateTime? last_verified_at { get; set; }
 
         public string aging_status { get; set; } = "";
         public bool needs_verification { get; set; }

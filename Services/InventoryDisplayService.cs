@@ -441,6 +441,33 @@ namespace inventory_api.Services
                         .Max(x => (DateTime?)x.created_at)
                 };
 
+
+            var verificationQuery =
+    from transaction in _context.InventoryTransactions
+
+    where
+        !transaction.is_deleted &&
+        transaction.reference_type == "INVENTORY_CLEANUP"
+
+    group transaction by new
+    {
+        transaction.product_id,
+        transaction.branch_id,
+        transaction.lot_no
+    }
+    into verification
+
+    select new
+    {
+        verification.Key.product_id,
+        verification.Key.branch_id,
+        verification.Key.lot_no,
+
+        last_verified_at =
+            verification.Max(x =>
+                (DateTime?)x.created_at)
+    };
+
             var query =
        from lot in _context.ProductLotNumbers
 
@@ -475,6 +502,23 @@ namespace inventory_api.Services
            into movementJoin
 
        from movement in movementJoin.DefaultIfEmpty()
+
+       join verification in verificationQuery
+    on new
+    {
+        lot.product_id,
+        lot.branch_id,
+        lot.lot_no
+    }
+    equals new
+    {
+        verification.product_id,
+        verification.branch_id,
+        verification.lot_no
+    }
+    into verificationJoin
+
+       from verification in verificationJoin.DefaultIfEmpty()
 
        where
            !lot.is_deleted &&
@@ -523,6 +567,11 @@ namespace inventory_api.Services
                movement != null
                    ? movement.last_out_date
                    : null,
+
+           last_verified_at =
+    verification != null
+        ? verification.last_verified_at
+        : null,
 
            manufacturing_date =
                lot.manufacturing_date,
@@ -586,6 +635,14 @@ namespace inventory_api.Services
                         )
                         : null;
 
+                    DateTime? lastVerifiedPh =
+    x.last_verified_at.HasValue
+        ? ConvertToPhilippineTime(
+            x.last_verified_at.Value,
+            phTimeZone
+        )
+        : null;
+
                     DateTime? expirationDate =
                         x.expiration_date?.Date;
 
@@ -636,10 +693,16 @@ namespace inventory_api.Services
                         agingStatus = "HEALTHY";
                     }
 
+                    bool wasVerified =
+                        lastVerifiedPh.HasValue;
+
                     bool needsVerification =
-                        agingStatus == "CLEANUP_NEEDED" ||
-                        agingStatus == "EXPIRED" ||
-                        agingStatus == "TRANSACTION_ISSUE";
+                        !wasVerified &&
+                        (
+                            agingStatus == "CLEANUP_NEEDED" ||
+                            agingStatus == "EXPIRED" ||
+                            agingStatus == "TRANSACTION_ISSUE"
+                        );
 
                     return new InventoryAgingDto
                     {
@@ -658,6 +721,8 @@ namespace inventory_api.Services
 
                         date_in = dateInPh,
                         last_out_date = lastOutPh,
+
+                        last_verified_at = lastVerifiedPh,
 
                         manufacturing_date =
                             x.manufacturing_date,
@@ -778,7 +843,14 @@ namespace inventory_api.Services
                 transaction_issue =
                     rows.Count(x =>
                         x.aging_status ==
-                        "TRANSACTION_ISSUE")
+                        "TRANSACTION_ISSUE"),
+
+                        verified_today =
+    rows.Count(x =>
+        x.last_verified_at.HasValue &&
+        x.last_verified_at.Value.Date == todayPh)
+
+
             }
         }
     };
