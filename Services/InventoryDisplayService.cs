@@ -618,9 +618,66 @@ namespace inventory_api.Services
 
             var rawRows = await query.ToListAsync();
 
+            var allocations = await (
+    from allocation in _context.DailyOrderAllocations
+
+    join line in _context.DailyOrderLines
+        on allocation.order_line_id equals line.order_line_id
+
+    join header in _context.DailyOrderHeaders
+        on line.order_id equals header.order_id
+
+    where
+        !header.is_deleted &&
+        allocation.allocated_qty > 0
+
+    select new
+    {
+        allocation.product_id,
+        allocation.branch_id,
+        lot_no = allocation.lot_no ?? "",
+        allocation.allocated_qty,
+        header.order_no,
+        header.customer_name
+    }
+).ToListAsync();
+
             var rows = rawRows
                 .Select(x =>
                 {
+
+
+
+
+
+                    var reservedAllocations = allocations
+    .Where(a =>
+        (a.product_id ?? "").Trim() ==
+        (x.product_id ?? "").Trim() &&
+
+        (a.branch_id ?? "").Trim() ==
+        (x.branch_id ?? "").Trim() &&
+
+        (a.lot_no ?? "").Trim() ==
+        (x.lot_no ?? "").Trim()
+    )
+    .ToList();
+
+                    decimal reservedQty =
+                        reservedAllocations.Sum(x => x.allocated_qty);
+
+                    decimal availableQty =
+                        Math.Max(0, x.qty - reservedQty);
+
+                    int reservationCount =
+                        reservedAllocations
+                            .GroupBy(x => x.order_no)
+                            .Count();
+
+                    bool hasReservation =
+                        reservedQty > 0;
+
+
                     DateTime? dateInPh = x.date_in.HasValue
                         ? ConvertToPhilippineTime(
                             x.date_in.Value,
@@ -710,40 +767,33 @@ namespace inventory_api.Services
                         branch_id = x.branch_id,
 
                         product_name = x.product_name,
-                        product_description =
-                            x.product_description,
+                        product_description = x.product_description,
 
                         lot_no = x.lot_no,
                         warehouse = x.warehouse,
 
                         qty = x.qty,
+
+                        reserved_qty = reservedQty,
+                        available_qty = availableQty,
+                        has_reservation = hasReservation,
+                        reservation_count = reservationCount,
+
                         uom = x.uom,
 
                         date_in = dateInPh,
                         last_out_date = lastOutPh,
-
                         last_verified_at = lastVerifiedPh,
 
-                        manufacturing_date =
-                            x.manufacturing_date,
+                        manufacturing_date = x.manufacturing_date,
+                        expiration_date = x.expiration_date,
 
-                        expiration_date =
-                            x.expiration_date,
+                        days_in_inventory = daysInInventory,
+                        days_since_last_out = daysSinceLastOut,
+                        days_to_expiry = daysToExpiry,
 
-                        days_in_inventory =
-                            daysInInventory,
-
-                        days_since_last_out =
-                            daysSinceLastOut,
-
-                        days_to_expiry =
-                            daysToExpiry,
-
-                        aging_status =
-                            agingStatus,
-
-                        needs_verification =
-                            needsVerification
+                        aging_status = agingStatus,
+                        needs_verification = needsVerification
                     };
                 })
                 .ToList();

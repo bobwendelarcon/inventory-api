@@ -12,6 +12,13 @@
         public string warehouse { get; set; } = "";
 
         public decimal qty { get; set; }
+
+        // Reservation safety fields
+        public decimal reserved_qty { get; set; }
+        public decimal available_qty { get; set; }
+        public bool has_reservation { get; set; }
+        public int reservation_count { get; set; }
+
         public string uom { get; set; } = "";
 
         public DateTime? date_in { get; set; }

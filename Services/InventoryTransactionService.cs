@@ -716,6 +716,43 @@ namespace inventory_api.Services
                     throw new Exception("adjustment_type must be ADD, DEDUCT, or SET.");
             }
 
+            // ============================================================
+            // SAFETY CHECK: Do not reduce inventory below reserved quantity
+            // ============================================================
+            var reservedQty = await (
+                from allocation in _context.DailyOrderAllocations
+
+                join line in _context.DailyOrderLines
+                    on allocation.order_line_id equals line.order_line_id
+
+                join header in _context.DailyOrderHeaders
+                    on line.order_id equals header.order_id
+
+                where
+                    !header.is_deleted &&
+                    allocation.allocated_qty > 0 &&
+
+                    (allocation.product_id ?? "").Trim()
+                        == (dto.product_id ?? "").Trim() &&
+
+                    (allocation.branch_id ?? "").Trim()
+                        == (dto.branch_id ?? "").Trim() &&
+
+                    (allocation.lot_no ?? "").Trim()
+                        == (dto.lot_no ?? "").Trim()
+
+                select allocation.allocated_qty
+            ).SumAsync();
+
+            if (newQty < reservedQty)
+            {
+                throw new Exception(
+                    $"Adjustment blocked. This lot has {reservedQty:0.##} " +
+                    $"reserved quantity. The inventory quantity cannot be set " +
+                    $"below {reservedQty:0.##}."
+                );
+            }
+
             lot.quantity = newQty;
             lot.updated_at = DateTime.UtcNow;
 
@@ -761,6 +798,8 @@ namespace inventory_api.Services
                 branch_id = dto.branch_id,
                 old_qty = oldQty,
                 new_qty = newQty,
+                reserved_qty = reservedQty,
+                available_qty = Math.Max(0, newQty - reservedQty),
                 adjustment_type = adjustmentType
             };
         }
