@@ -10,6 +10,7 @@
         public DateTime? DeliveryDate { get; set; }
         public string Status { get; set; } = string.Empty;
 
+
         public string? ClassName { get; set; }
         public string? RouteName { get; set; }
         public string? SpecialInstructions { get; set; }
@@ -32,6 +33,10 @@
         public string? PackUom { get; set; }
 
         public string AllocationResult { get; set; } = string.Empty;
+
+        public decimal TotalOnHandStock { get; set; }
+        public decimal TotalReservedStock { get; set; }
+
         public decimal TotalAvailableStock { get; set; }
         public List<WarehouseAvailableDto> WarehouseAvailableStocks { get; set; } = new();
         public List<DailyOrderAllocationDto> Allocations { get; set; } = new();

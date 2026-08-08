@@ -13,8 +13,10 @@ namespace inventory_api.Models.Manufacturing.Materials
         [Column("material_id")]
         public int material_id { get; set; }
 
+        [Required]
+        [MaxLength(50)]
         [Column("branch_id")]
-        public int branch_id { get; set; }
+        public string branch_id { get; set; } = string.Empty;
 
         [Required]
         [Column("lot_no")]

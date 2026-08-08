@@ -9,6 +9,8 @@
         public string PoNo { get; set; } = string.Empty;
 
         public int SupplierId { get; set; }
+
+        public string BranchId { get; set; } = string.Empty;
         public string SupplierName { get; set; } = string.Empty;
 
         public string? SiDrNo { get; set; }

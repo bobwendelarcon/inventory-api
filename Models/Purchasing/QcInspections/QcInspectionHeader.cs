@@ -13,6 +13,7 @@
 
         public int SupplierId { get; set; }
 
+
         public DateTime? InspectionDate { get; set; }
         public string? InspectorId { get; set; }
 

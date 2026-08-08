@@ -13,6 +13,7 @@ namespace inventory_api.Models.Purchasing.ReceivingReports
       
         public string PoNo { get; set; } = string.Empty;
         public int SupplierId { get; set; }
+        public string BranchId { get; set; } = string.Empty;
 
         public string? SiDrNo { get; set; }
         public DateTime DeliveryDate { get; set; }
