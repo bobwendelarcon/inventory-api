@@ -49,47 +49,6 @@ namespace inventory_api.Services
             var products = await _context.Products.ToListAsync();
             var productDict = products.ToDictionary(x => x.product_id, x => x);
 
-            // =========================================
-            // STOCK TOTALS FOR DAILY ORDER LIST
-            // =========================================
-
-            // all active lot stock
-            var lotStocks = await _context.ProductLotNumbers
-                .Where(x => !x.is_deleted)
-                .AsNoTracking()
-                .ToListAsync();
-
-            // all active reservations from non-deleted orders
-            var reservationList = await _context.DailyOrderAllocations
-                .Where(a => a.allocated_qty > 0)
-                .Join(
-                    _context.DailyOrderLines,
-                    a => a.order_line_id,
-                    dl => dl.order_line_id,
-                    (a, dl) => new
-                    {
-                        Allocation = a,
-                        Line = dl
-                    })
-                .Join(
-                    _context.DailyOrderHeaders,
-                    x => x.Line.order_id,
-                    h => h.order_id,
-                    (x, h) => new
-                    {
-                        x.Allocation.product_id,
-                        x.Allocation.branch_id,
-                        x.Allocation.lot_no,
-                        x.Allocation.allocated_qty,
-                        HeaderDeleted = h.is_deleted
-                    })
-                .Where(x => !x.HeaderDeleted)
-                .AsNoTracking()
-                .ToListAsync();
-
-
-
-
             var users = await _context.Users
     .AsNoTracking()
     .ToListAsync();
@@ -109,34 +68,12 @@ namespace inventory_api.Services
      );
 
             var result = headers
-      .SelectMany(h => h.Lines.Select(l =>
-      {
-          productDict.TryGetValue(l.product_id, out var p);
+    .SelectMany(h => h.Lines.Select(l =>
+    {
+        productDict.TryGetValue(l.product_id, out var p);
 
-          // =========================================
-          // TOTAL STOCK ACROSS ALL LOTS / WAREHOUSES
-          // =========================================
-
-          var productLots = lotStocks
-              .Where(x => x.product_id == l.product_id)
-              .ToList();
-
-          var totalOnHandStock =
-              productLots.Sum(x => x.quantity);
-
-          var totalReservedStock =
-              reservationList
-                  .Where(x => x.product_id == l.product_id)
-                  .Sum(x => x.allocated_qty);
-
-          var totalAvailableStock =
-              Math.Max(
-                  0,
-                  totalOnHandStock - totalReservedStock
-              );
-
-          return new DailyOrderListDto
-          {
+        return new DailyOrderListDto
+        {
             OrderId = h.order_id,
             OrderLineId = l.order_line_id,
             ClassName = h.class_name ?? "",
@@ -150,10 +87,7 @@ namespace inventory_api.Services
             AllocatedQty = l.allocated_qty,
             RemainingQty = Math.Max(0, l.required_qty - l.dispatched_qty),
             DispatchedQty = l.dispatched_qty,
-              TotalOnHandStock = totalOnHandStock,
-              TotalReservedStock = totalReservedStock,
-              TotalAvailableStock = totalAvailableStock,
-              CreatedBy = userDict.TryGetValue(
+            CreatedBy = userDict.TryGetValue(
         (h.created_by ?? "").Trim().ToLower(),
         out var fullName)
     ? fullName
@@ -398,15 +332,8 @@ namespace inventory_api.Services
                 {
                     productDict.TryGetValue(l.product_id, out var p);
 
-
-                    var productLots = lotStocks
-    .Where(x => x.product_id == l.product_id)
-    .ToList();
-
-                    var totalOnHandStock = productLots.Sum(x => x.quantity);
-
-                    var warehouseAvailableStocks = productLots
-                         .Where(x => x.product_id == l.product_id)
+                    var warehouseAvailableStocks = lotStocks
+                        .Where(x => x.product_id == l.product_id)
                         .GroupBy(x => x.branch_id)
                         .Select(g =>
                         {
@@ -452,8 +379,7 @@ namespace inventory_api.Services
                         .ToList();
 
                     var totalAvailableStock = warehouseAvailableStocks.Sum(x => x.AvailableQty);
-                    var totalReservedStock =
-    Math.Max(0, totalOnHandStock - totalAvailableStock);
+
                     return new DailyOrderLineDto
                     {
                         OrderLineId = l.order_line_id,

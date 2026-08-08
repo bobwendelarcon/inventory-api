@@ -1,8 +1,6 @@
 ﻿using inventory_api.Data;
 using inventory_api.DTOs.Purchasing.QcInspections;
-using inventory_api.Models.Manufacturing.Materials;
 using inventory_api.Models.Purchasing.QcInspections;
-using inventory_api.Models.Purchasing.ReceivingReports;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Purchasing.QcInspections
@@ -128,16 +126,16 @@ namespace inventory_api.Services.Purchasing.QcInspections
      SaveQcInspectionDto dto,
      string userId)
         {
-            var strategy = _context.Database.CreateExecutionStrategy();
 
-            await strategy.ExecuteAsync(async () =>
+
+
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
             {
-                await using var transaction =
-                    await _context.Database.BeginTransactionAsync();
-
-                try
-                {
-                    var qc = await _context.QcInspectionHeaders
+                var qc = await _context.QcInspectionHeaders
      .Include(x => x.Lines)
          .ThenInclude(x => x.Lots)
      .FirstOrDefaultAsync(x => x.QcId == qcId);
@@ -307,13 +305,14 @@ namespace inventory_api.Services.Purchasing.QcInspections
                     // Accepted quantity will be posted to inventory next.
                     if (qcLine.AcceptedQty > 0)
                     {
-                        await AddAcceptedQtyToInventoryAsync(
-                            qc,
-                            rr,
-                            qcLine,
-                            rrLine,
-                            inspectorId,
-                            now);
+                        // await AddAcceptedQtyToInventoryAsync(
+                        //     qc,
+                        //     rr,
+                        //     qcLine,
+                        //     lineDto.AcceptedQty,
+                        //     inspectorId,
+                        //     now
+                        // );
                     }
                 }
 
@@ -327,22 +326,20 @@ namespace inventory_api.Services.Purchasing.QcInspections
                     totalRejected
                 );
 
-                qc.Status = "COMMITTED";
-                qc.CommittedBy = inspectorId;
-                qc.CommittedAt = now;
+                qc.Status = "INSPECTED";
                 qc.InspectionDate = dto.InspectionDate ?? now;
                 qc.InspectorId = inspectorId;
                 qc.Remarks = dto.Remarks;
                
                 qc.UpdatedAt = now;
-               
+                //qc.CommittedBy = inspectorId;
+                //qc.CommittedAt = now;
 
-                rr.Status = "COMMITTED";
-                rr.CommittedBy = inspectorId;
-                rr.CommittedAt = now;
+                rr.Status = "QA_COMPLETED";
                 rr.QcBy = inspectorId;
                 rr.QcAt = now;
-              
+                //rr.CommittedBy = inspectorId;
+                //rr.CommittedAt = now;
                 rr.UpdatedAt = now;
 
                 var allPoLinesClosed = po.Lines.All(x => x.BalanceQty <= 0);
@@ -355,15 +352,15 @@ namespace inventory_api.Services.Purchasing.QcInspections
                         : "APPROVED";
 
                 po.UpdatedAt = now;
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            });
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
 
@@ -521,11 +518,9 @@ namespace inventory_api.Services.Purchasing.QcInspections
                 }
 
                 lot.LotNo =
-     string.IsNullOrWhiteSpace(lotDto.LotNo)
-         ? $"NOLOT-MAT-{qcLine.MaterialId}-QCL-{qcLine.QcLineId}"
-         : lotDto.LotNo.Trim().ToUpperInvariant();
-
-
+    string.IsNullOrWhiteSpace(lotDto.LotNo)
+        ? $"NON-LOT-QCL-{qcLine.QcLineId}"
+        : lotDto.LotNo.Trim();
                 lot.ManufacturingDate = lotDto.ManufacturingDate?.Date;
                 lot.ExpirationDate = lotDto.ExpirationDate?.Date;
 
@@ -548,159 +543,6 @@ namespace inventory_api.Services.Purchasing.QcInspections
                     lotDto.AcceptedQty,
                     lotDto.RejectedQty
                 );
-            }
-        }
-
-
-        private async Task AddAcceptedQtyToInventoryAsync(
-    QcInspectionHeader qc,
-    ReceivingReportHeader rr,
-    QcInspectionLine qcLine,
-    ReceivingReportLine rrLine,
-    string userId,
-    DateTime now)
-        {
-            if (string.IsNullOrWhiteSpace(rr.BranchId))
-            {
-                throw new InvalidOperationException(
-                    $"Receiving Report {rr.RrNo} does not have a branch.");
-            }
-
-            var branchId = rr.BranchId.Trim();
-
-            if (string.IsNullOrWhiteSpace(rrLine.Uom))
-            {
-                throw new InvalidOperationException(
-                    $"UOM is missing for material ID {qcLine.MaterialId}.");
-            }
-
-            if (qcLine.Lots == null || qcLine.Lots.Count == 0)
-            {
-                throw new InvalidOperationException(
-                    $"No QC lot information was found for material ID {qcLine.MaterialId}.");
-            }
-
-            foreach (var qcLot in qcLine.Lots.Where(x => x.AcceptedQty > 0))
-            {
-                var lotNo = qcLot.LotNo?.Trim();
-
-                if (string.IsNullOrWhiteSpace(lotNo))
-                {
-                    throw new InvalidOperationException(
-                        $"Lot reference is missing for material ID {qcLine.MaterialId}.");
-                }
-
-                /*
-                 * Idempotency protection:
-                 * Do not post the same QC material lot transaction twice.
-                 */
-                var transactionExistsLocally =
-      _context.MaterialInventoryTransactions.Local.Any(x =>
-          x.material_id == qcLine.MaterialId &&
-          x.branch_id == branchId &&
-          x.lot_no == lotNo &&
-          x.transaction_type == "PURCHASE_RECEIPT" &&
-          x.reference_type == "QC" &&
-          x.reference_id == qc.QcId);
-
-                var transactionExistsInDatabase =
-                    await _context.MaterialInventoryTransactions.AnyAsync(x =>
-                        x.material_id == qcLine.MaterialId &&
-                        x.branch_id == branchId &&
-                        x.lot_no == lotNo &&
-                        x.transaction_type == "PURCHASE_RECEIPT" &&
-                        x.reference_type == "QC" &&
-                        x.reference_id == qc.QcId);
-
-                if (transactionExistsLocally || transactionExistsInDatabase)
-                {
-                    throw new InvalidOperationException(
-                        $"QC {qc.QcNo}, material ID {qcLine.MaterialId}, " +
-                        $"lot {lotNo} has already been committed to inventory.");
-                }
-
-
-
-                var inventoryLot =
-     _context.MaterialLotNumbers.Local.FirstOrDefault(x =>
-         x.material_id == qcLine.MaterialId &&
-         x.branch_id == branchId &&
-         x.lot_no == lotNo);
-
-                inventoryLot ??=
-                    await _context.MaterialLotNumbers.FirstOrDefaultAsync(x =>
-                        x.material_id == qcLine.MaterialId &&
-                        x.branch_id == branchId &&
-                        x.lot_no == lotNo);
-
-                if (inventoryLot == null)
-                {
-                    inventoryLot = new MaterialLotNumber
-                    {
-                        material_id = qcLine.MaterialId,
-                        branch_id = branchId,
-                        lot_no = lotNo,
-
-                        manufacturing_date = qcLot.ManufacturingDate,
-                        expiration_date = qcLot.ExpirationDate,
-
-                        quantity = qcLot.AcceptedQty,
-                        uom = rrLine.Uom,
-
-                        supplier_id = qc.SupplierId,
-
-                        remarks = $"Accepted through QC {qc.QcNo}; RR {rr.RrNo}.",
-                        is_active = true,
-
-                        created_at = now,
-                        updated_at = null
-                    };
-
-                    await _context.MaterialLotNumbers.AddAsync(inventoryLot);
-                }
-                else
-                {
-                    inventoryLot.quantity += qcLot.AcceptedQty;
-                    inventoryLot.is_active = true;
-                    inventoryLot.updated_at = now;
-
-                    /*
-                     * Preserve existing dates unless they are currently empty.
-                     */
-                    inventoryLot.manufacturing_date ??= qcLot.ManufacturingDate;
-                    inventoryLot.expiration_date ??= qcLot.ExpirationDate;
-                    inventoryLot.supplier_id ??= qc.SupplierId;
-                    if (string.IsNullOrWhiteSpace(inventoryLot.uom))
-                    {
-                        inventoryLot.uom = rrLine.Uom.Trim();
-                    }
-                }
-
-                var inventoryTransaction = new MaterialInventoryTransaction
-                {
-                    material_id = qcLine.MaterialId,
-                    branch_id = branchId,
-                    lot_no = lotNo,
-
-                    transaction_type = "PURCHASE_RECEIPT",
-                    quantity = qcLot.AcceptedQty,
-                    uom = rrLine.Uom,
-
-                    reference_type = "QC",
-                    reference_id = qc.QcId,
-                    reference_no = qc.QcNo,
-
-                    remarks =
-                        $"Accepted inventory from RR {rr.RrNo}, PO {qc.PoNo}, " +
-                        $"lot {lotNo}.",
-
-                    encoded_by = userId,
-                    transaction_date = now,
-                    created_at = now
-                };
-
-                await _context.MaterialInventoryTransactions.AddAsync(
-                    inventoryTransaction);
             }
         }
 

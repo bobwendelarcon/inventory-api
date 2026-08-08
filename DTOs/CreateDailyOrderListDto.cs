@@ -19,10 +19,6 @@
 
         public string CreatedBy { get; set; } = "";
 
-        public decimal TotalOnHandStock { get; set; }
-        public decimal TotalReservedStock { get; set; }
-        public decimal TotalAvailableStock { get; set; }
-
         public string? Uom { get; set; }
         public decimal? PackQty { get; set; }
         public string? PackUom { get; set; }
@@ -37,7 +33,5 @@
         public DateTime? DateDelivered { get; set; }
         public string Status { get; set; } = string.Empty;
         public string? SpecialInstructions { get; set; }
-
-
     }
 }

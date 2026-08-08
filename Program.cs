@@ -1,17 +1,14 @@
 using inventory_api.Data;
 using inventory_api.Services;
-using inventory_api.Services.Inventory;
 using inventory_api.Services.Manufacturing.Materials;
 using inventory_api.Services.Purchasing;
 using inventory_api.Services.Purchasing.Canvassing;
 using inventory_api.Services.Purchasing.PurchaseOrders;
 using inventory_api.Services.Purchasing.QcInspections;
 using inventory_api.Services.Purchasing.ReceivingReports;
-using inventory_api.Services.Purchasing.SupplierEvaluations;
 using inventory_api.Services.Purchasing.Suppliers;
 
 using Microsoft.EntityFrameworkCore;
-using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,27 +16,15 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var connectionString =
-    builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException(
-        "Connection string 'DefaultConnection' was not found.");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-// Register AppDbContext only once
 builder.Services.AddDbContext<AppDbContext>(options =>
-{
     options.UseMySql(
         connectionString,
-        ServerVersion.AutoDetect(connectionString),
-        mysqlOptions =>
-        {
-            mysqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(10),
-                errorNumbersToAdd: null);
-        });
-});
+        ServerVersion.AutoDetect(connectionString)
+    ));
 
-// Core services
+// Register only converted services
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<InventoryTransactionService>();
@@ -55,50 +40,41 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ProductToProduceService>();
 builder.Services.AddScoped<ReturnService>();
 builder.Services.AddScoped<ReportService>();
-builder.Services.AddScoped<RawMaterialInventoryService>();
+builder.Services.AddScoped<ProductToProduceService>();
 
-// Manufacturing
+
+//manufacturing
 builder.Services.AddScoped<MaterialCategoryService>();
 builder.Services.AddScoped<MaterialService>();
 builder.Services.AddScoped<MaterialSubCategoryService>();
 
-// Purchasing
+//purchasing
 builder.Services.AddScoped<MprfService>();
-
-// Suppliers
+//purchasing-supplier
 builder.Services.AddScoped<SupplierService>();
+//purchasing-manufacturer
 builder.Services.AddScoped<ManufacturerService>();
+//purchasing - supplier - supplier material service
 builder.Services.AddScoped<SupplierMaterialService>();
+// msupplier manufacturer
 builder.Services.AddScoped<SupplierManufacturerService>();
-
-// Canvassing
+//canvassing
 builder.Services.AddScoped<CanvassingService>();
-
-// Purchase orders
+//PO
 builder.Services.AddScoped<PurchaseOrderService>();
-
-// Receiving
+//receiving
 builder.Services.AddScoped<ReceivingReportService>();
-
-// QA/QC
+//qaqc
 builder.Services.AddScoped<QcInspectionService>();
-
-
-// Supplier performance evaluation
-builder.Services.AddScoped<SupplierEvaluationScoringService>();
-builder.Services.AddScoped<SupplierEvaluationGenerationService>();
-builder.Services.AddScoped<SupplierEvaluationService>();
 
 var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// app.UseHttpsRedirection();
-
+//app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

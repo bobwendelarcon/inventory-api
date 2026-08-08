@@ -13,10 +13,8 @@ namespace inventory_api.Models.Manufacturing.Materials
         [Column("material_id")]
         public int material_id { get; set; }
 
-        [Required]
-        [MaxLength(50)]
         [Column("branch_id")]
-        public string branch_id { get; set; } = string.Empty;
+        public int branch_id { get; set; }
 
         [Column("lot_no")]
         public string? lot_no { get; set; }
@@ -44,9 +42,8 @@ namespace inventory_api.Models.Manufacturing.Materials
         [Column("remarks")]
         public string? remarks { get; set; }
 
-        [MaxLength(50)]
         [Column("encoded_by")]
-        public string? encoded_by { get; set; }
+        public int? encoded_by { get; set; }
 
         [Column("transaction_date")]
         public DateTime transaction_date { get; set; }

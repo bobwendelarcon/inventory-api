@@ -43,20 +43,16 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
 
         public async Task<int> CreateAsync(CreatePurchaseOrderDto dto, string userId)
         {
-            var strategy = _context.Database.CreateExecutionStrategy();
 
-            return await strategy.ExecuteAsync(async () =>
+
+            await using var transaction =
+    await _context.Database.BeginTransactionAsync();
+
+            try
             {
-                await using var transaction =
-                    await _context.Database.BeginTransactionAsync();
-
-                try
-                {
-                    // existing code
 
 
-
-                    var canvass = await _context.PurchasingCanvassHeaders
+                var canvass = await _context.PurchasingCanvassHeaders
                 .FirstOrDefaultAsync(x => x.CanvassId == dto.CanvassId);
 
             if (canvass == null)
@@ -368,16 +364,17 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
                 await _context.SaveChangesAsync();
                 await UpdateMprfPoStatusAsync(dto.CanvassId);
 
-                    await transaction.CommitAsync();
+                await transaction.CommitAsync();
 
-                    return header.PoId;
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            });
+                return header.PoId;
+
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+
         }
 
 

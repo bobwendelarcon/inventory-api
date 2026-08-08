@@ -197,354 +197,342 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
         }
 
         public async Task<int> CreateAsync(
-     CreateReceivingReportDto dto,
-     string userId)
+    CreateReceivingReportDto dto,
+    string userId)
         {
-            var strategy = _context.Database.CreateExecutionStrategy();
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
 
-            return await strategy.ExecuteAsync(async () =>
+            try
             {
-                await using var transaction =
-                    await _context.Database.BeginTransactionAsync();
+                if (dto.ScheduleId <= 0)
+                    throw new Exception("Delivery schedule is required.");
 
-                try
+                if (dto.DeliveryDate == default)
+                    throw new Exception("Actual delivery date is required.");
+
+                if (dto.Lines == null || !dto.Lines.Any())
+                    throw new Exception("RR must have at least one line.");
+
+                var validLines = dto.Lines
+                    .Where(x => x.ReceiveQty > 0)
+                    .ToList();
+
+                if (!validLines.Any())
+                    throw new Exception("Receive quantity is required.");
+
+                var schedule = await _context.PurchaseOrderDeliverySchedules
+                    .Include(x => x.PurchaseOrder)
+                        .ThenInclude(x => x!.Lines)
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x =>
+                        x.ScheduleId == dto.ScheduleId);
+
+                if (schedule == null)
+                    throw new Exception("Delivery schedule not found.");
+
+                var po = schedule.PurchaseOrder;
+
+                if (po == null)
+                    throw new Exception("Purchase Order not found.");
+
+                if (po.Status != "APPROVED" &&
+                    po.Status != "PARTIALLY_RECEIVED")
                 {
-                    if (dto.ScheduleId <= 0)
-                        throw new Exception("Delivery schedule is required.");
+                    throw new Exception(
+                        "Only approved or partially received PO can create RR."
+                    );
+                }
 
-                    if (dto.DeliveryDate == default)
-                        throw new Exception("Actual delivery date is required.");
+                if (schedule.Status != "OPEN")
+                {
+                    throw new Exception(
+                        "Only an open delivery schedule can create a Receiving Report."
+                    );
+                }
 
-                    if (string.IsNullOrWhiteSpace(dto.BranchId))
-                    {
-                        throw new InvalidOperationException(
-                            "Receiving branch is required.");
-                    }
+                /*
+                 * One actual truck arrival creates only one RR
+                 * for the selected schedule.
+                 */
+                var hasScheduleRr = await _context.ReceivingReportHeaders
+                    .AnyAsync(x => x.ScheduleId == dto.ScheduleId);
 
-                    if (dto.Lines == null || !dto.Lines.Any())
-                        throw new Exception("RR must have at least one line.");
+                if (hasScheduleRr)
+                {
+                    throw new Exception(
+                        "A Receiving Report already exists for this delivery schedule."
+                    );
+                }
 
-                    var validLines = dto.Lines
-                        .Where(x => x.ReceiveQty > 0)
-                        .ToList();
+                /*
+                 * Temporary business rule:
+                 * only one DRAFT or FOR_QC RR for the whole PO.
+                 */
+                var hasActivePoRr = await _context.ReceivingReportHeaders
+                    .AnyAsync(x =>
+                        x.PoId == po.PoId &&
+                        (
+                           x.Status == "FOR_QC"
+                        ));
 
-                    if (!validLines.Any())
-                        throw new Exception("Receive quantity is required.");
+                if (hasActivePoRr)
+                {
+                    throw new Exception(
+                        "This Purchase Order already has an active Receiving Report."
+                    );
+                }
 
-                    var schedule = await _context.PurchaseOrderDeliverySchedules
-                        .Include(x => x.PurchaseOrder)
-                            .ThenInclude(x => x!.Lines)
-                        .Include(x => x.Lines)
-                        .FirstOrDefaultAsync(x =>
-                            x.ScheduleId == dto.ScheduleId);
+                var duplicatePoLineIds = validLines
+                    .GroupBy(x => x.PoLineId)
+                    .Where(x => x.Count() > 1)
+                    .Select(x => x.Key)
+                    .ToList();
 
-                    if (schedule == null)
-                        throw new Exception("Delivery schedule not found.");
+                if (duplicatePoLineIds.Any())
+                {
+                    throw new Exception(
+                        "Duplicate receiving lines were submitted."
+                    );
+                }
 
-                    var po = schedule.PurchaseOrder;
+                var rrNo = await GenerateRrNoAsync();
+                var now = DateTime.Now;
 
-                    if (po == null)
-                        throw new Exception("Purchase Order not found.");
+                var rr = new ReceivingReportHeader
+                {
+                    RrNo = rrNo,
 
-                    if (po.Status != "APPROVED" &&
-                        po.Status != "PARTIALLY_RECEIVED")
+                    PoId = po.PoId,
+                    ScheduleId = schedule.ScheduleId,
+
+                    PoNo = po.PoNo,
+                    SupplierId = po.SupplierId,
+
+                    SiDrNo = dto.SiDrNo,
+                    DeliveryDate = dto.DeliveryDate.Date,
+
+                    Remarks = dto.Remarks,
+
+                    Status = "FOR_QC",
+
+                    CreatedBy = userId,
+                    CreatedAt = now
+                };
+
+                foreach (var lineDto in validLines)
+                {
+                    var scheduleLine = schedule.Lines
+                        .FirstOrDefault(x =>
+                            x.PoLineId == lineDto.PoLineId);
+
+                    if (scheduleLine == null)
                     {
                         throw new Exception(
-                            "Only approved or partially received PO can create RR."
+                            "One or more selected materials do not belong to this delivery schedule."
                         );
                     }
 
-                    if (schedule.Status != "OPEN")
+                    var poLine = po.Lines
+                        .FirstOrDefault(x =>
+                            x.PoLineId == lineDto.PoLineId);
+
+                    if (poLine == null)
+                        throw new Exception("Invalid PO line selected.");
+
+                    if (scheduleLine.BalanceQty <= 0)
                     {
                         throw new Exception(
-                            "Only an open delivery schedule can create a Receiving Report."
+                            $"Schedule line for material ID {poLine.MaterialId} has no remaining balance."
                         );
                     }
 
-                    /*
-                     * One actual truck arrival creates only one RR
-                     * for the selected schedule.
-                     */
-                    var hasScheduleRr = await _context.ReceivingReportHeaders
-                        .AnyAsync(x => x.ScheduleId == dto.ScheduleId);
-
-                    if (hasScheduleRr)
+                    if (poLine.BalanceQty <= 0)
                     {
                         throw new Exception(
-                            "A Receiving Report already exists for this delivery schedule."
+                            $"PO line for material ID {poLine.MaterialId} has no remaining balance."
                         );
                     }
 
-                    /*
-                     * Temporary business rule:
-                     * only one DRAFT or FOR_QC RR for the whole PO.
-                     */
-                    var hasActivePoRr = await _context.ReceivingReportHeaders
-                        .AnyAsync(x =>
-                            x.PoId == po.PoId &&
-                            (
-                               x.Status == "FOR_QC"
-                            ));
+                    var exceedsSchedule =
+                        lineDto.ReceiveQty > scheduleLine.BalanceQty;
 
-                    if (hasActivePoRr)
+                    var exceedsPo =
+                        lineDto.ReceiveQty > poLine.BalanceQty;
+
+                    if ((exceedsSchedule || exceedsPo) &&
+                        string.IsNullOrWhiteSpace(lineDto.Remarks))
                     {
                         throw new Exception(
-                            "This Purchase Order already has an active Receiving Report."
+                            $"Remarks are required for over-receiving material ID {poLine.MaterialId}."
                         );
                     }
 
-                    var duplicatePoLineIds = validLines
-                        .GroupBy(x => x.PoLineId)
-                        .Where(x => x.Count() > 1)
-                        .Select(x => x.Key)
-                        .ToList();
+                    var previousPoReceivedQty = poLine.ReceivedQty;
+                    var previousPoBalanceQty = poLine.BalanceQty;
 
-                    if (duplicatePoLineIds.Any())
+                    rr.Lines.Add(new ReceivingReportLine
                     {
-                        throw new Exception(
-                            "Duplicate receiving lines were submitted."
-                        );
-                    }
+                        PoLineId = poLine.PoLineId,
+                        MaterialId = poLine.MaterialId,
 
-                    var rrNo = await GenerateRrNoAsync();
-                    var now = DateTime.Now;
+                        PoQty = poLine.PoQty,
 
-                    var rr = new ReceivingReportHeader
-                    {
-                        RrNo = rrNo,
+                        PreviouslyReceivedQty =
+                            previousPoReceivedQty,
 
-                        PoId = po.PoId,
-                        ScheduleId = schedule.ScheduleId,
+                        BalanceQty =
+                            previousPoBalanceQty,
 
-                        PoNo = po.PoNo,
-                        SupplierId = po.SupplierId,
+                        ReceiveQty =
+                            lineDto.ReceiveQty,
 
-                        BranchId = dto.BranchId.Trim(),
+                        AcceptedQty = 0,
+                        RejectedQty = 0,
 
-                        SiDrNo = dto.SiDrNo,
-                        DeliveryDate = dto.DeliveryDate.Date,
+                        Uom = poLine.Uom,
 
-                        Remarks = dto.Remarks,
+                        Remarks = lineDto.Remarks,
 
-                        Status = "FOR_QC",
+                        Status = "PENDING",
 
-                        CreatedBy = userId,
                         CreatedAt = now
-                    };
-
-                    foreach (var lineDto in validLines)
-                    {
-                        var scheduleLine = schedule.Lines
-                            .FirstOrDefault(x =>
-                                x.PoLineId == lineDto.PoLineId);
-
-                        if (scheduleLine == null)
-                        {
-                            throw new Exception(
-                                "One or more selected materials do not belong to this delivery schedule."
-                            );
-                        }
-
-                        var poLine = po.Lines
-                            .FirstOrDefault(x =>
-                                x.PoLineId == lineDto.PoLineId);
-
-                        if (poLine == null)
-                            throw new Exception("Invalid PO line selected.");
-
-                        if (scheduleLine.BalanceQty <= 0)
-                        {
-                            throw new Exception(
-                                $"Schedule line for material ID {poLine.MaterialId} has no remaining balance."
-                            );
-                        }
-
-                        if (poLine.BalanceQty <= 0)
-                        {
-                            throw new Exception(
-                                $"PO line for material ID {poLine.MaterialId} has no remaining balance."
-                            );
-                        }
-
-                        var exceedsSchedule =
-                            lineDto.ReceiveQty > scheduleLine.BalanceQty;
-
-                        var exceedsPo =
-                            lineDto.ReceiveQty > poLine.BalanceQty;
-
-                        if ((exceedsSchedule || exceedsPo) &&
-                            string.IsNullOrWhiteSpace(lineDto.Remarks))
-                        {
-                            throw new Exception(
-                                $"Remarks are required for over-receiving material ID {poLine.MaterialId}."
-                            );
-                        }
-
-                        var previousPoReceivedQty = poLine.ReceivedQty;
-                        var previousPoBalanceQty = poLine.BalanceQty;
-
-                        rr.Lines.Add(new ReceivingReportLine
-                        {
-                            PoLineId = poLine.PoLineId,
-                            MaterialId = poLine.MaterialId,
-
-                            PoQty = poLine.PoQty,
-
-                            PreviouslyReceivedQty =
-                                previousPoReceivedQty,
-
-                            BalanceQty =
-                                previousPoBalanceQty,
-
-                            ReceiveQty =
-                                lineDto.ReceiveQty,
-
-                            AcceptedQty = 0,
-                            RejectedQty = 0,
-
-                            Uom = poLine.Uom,
-
-                            Remarks = lineDto.Remarks,
-
-                            Status = "PENDING",
-
-                            CreatedAt = now
-                        });
-
-                        /*
-                         * Update physical receiving totals for the PO line.
-                         */
-                        poLine.ReceivedQty += lineDto.ReceiveQty;
-
-                        poLine.BalanceQty = Math.Max(
-                            0m,
-                            poLine.PoQty - poLine.ReceivedQty
-                        );
-
-                        poLine.Status =
-                            poLine.BalanceQty <= 0
-                                ? "CLOSED"
-                                : "PARTIAL";
-
-                        poLine.UpdatedAt = now;
-
-                        /*
-                         * Update the selected delivery schedule line.
-                         */
-                        scheduleLine.ReceivedQty += lineDto.ReceiveQty;
-
-                        scheduleLine.BalanceQty = Math.Max(
-                            0m,
-                            scheduleLine.ScheduledQty -
-                            scheduleLine.ReceivedQty
-                        );
-
-                        scheduleLine.Status =
-                            scheduleLine.BalanceQty <= 0
-                                ? "RECEIVED"
-                                : "PARTIAL";
-
-                        scheduleLine.UpdatedAt = now;
-                    }
+                    });
 
                     /*
-                     * Lines that were scheduled but received as zero
-                     * remain OPEN with their full balance.
-                     *
-                     * Since one truck arrival creates one RR,
-                     * those remaining quantities will later be
-                     * rescheduled by Purchasing.
+                     * Update physical receiving totals for the PO line.
                      */
-                    var scheduleHasRemaining =
-                        schedule.Lines.Any(x => x.BalanceQty > 0);
+                    poLine.ReceivedQty += lineDto.ReceiveQty;
 
-                    var scheduleHasReceived =
-                        schedule.Lines.Any(x => x.ReceivedQty > 0);
+                    poLine.BalanceQty = Math.Max(
+                        0m,
+                        poLine.PoQty - poLine.ReceivedQty
+                    );
 
-                    schedule.Status =
-                        !scheduleHasRemaining
+                    poLine.Status =
+                        poLine.BalanceQty <= 0
+                            ? "CLOSED"
+                            : "PARTIAL";
+
+                    poLine.UpdatedAt = now;
+
+                    /*
+                     * Update the selected delivery schedule line.
+                     */
+                    scheduleLine.ReceivedQty += lineDto.ReceiveQty;
+
+                    scheduleLine.BalanceQty = Math.Max(
+                        0m,
+                        scheduleLine.ScheduledQty -
+                        scheduleLine.ReceivedQty
+                    );
+
+                    scheduleLine.Status =
+                        scheduleLine.BalanceQty <= 0
                             ? "RECEIVED"
-                            : scheduleHasReceived
-                                ? "PARTIALLY_RECEIVED"
-                                : "OPEN";
+                            : "PARTIAL";
 
-                    schedule.UpdatedBy = userId;
-                    schedule.UpdatedAt = now;
-
-                    var allPoLinesClosed =
-                        po.Lines.All(x => x.BalanceQty <= 0);
-
-                    var anyPoQuantityReceived =
-                        po.Lines.Any(x => x.ReceivedQty > 0);
-
-                    po.Status =
-                        allPoLinesClosed
-                            ? "FULLY_RECEIVED"
-                            : anyPoQuantityReceived
-                                ? "PARTIALLY_RECEIVED"
-                                : "APPROVED";
-
-                    po.UpdatedAt = now;
-
-                    _context.ReceivingReportHeaders.Add(rr);
-
-                    await _context.SaveChangesAsync();
-
-
-                    var qcNo = await GenerateQcNoAsync();
-
-                    var qc = new QcInspectionHeader
-                    {
-                        QcNo = qcNo,
-
-                        RrId = rr.RrId,
-                        RrNo = rr.RrNo,
-
-                        PoId = rr.PoId,
-                        PoNo = rr.PoNo,
-
-                        SupplierId = rr.SupplierId,
-
-                        Status = "FOR_INSPECTION",
-
-                        CreatedBy = userId,
-                        CreatedAt = now
-                    };
-
-                    foreach (var rrLine in rr.Lines)
-                    {
-                        qc.Lines.Add(new QcInspectionLine
-                        {
-                            RrLineId = rrLine.RrLineId,
-                            PoLineId = rrLine.PoLineId,
-                            MaterialId = rrLine.MaterialId,
-
-                            ReceivedQty = rrLine.ReceiveQty,
-
-                            AcceptedQty = 0,
-                            RejectedQty = 0,
-
-                            Status = "PENDING",
-
-                            CreatedAt = now
-                        });
-                    }
-
-                    _context.QcInspectionHeaders.Add(qc);
-
-                    await _context.SaveChangesAsync();
-
-                    await transaction.CommitAsync();
-
-                    return rr.RrId;
+                    scheduleLine.UpdatedAt = now;
                 }
-                catch
+
+                /*
+                 * Lines that were scheduled but received as zero
+                 * remain OPEN with their full balance.
+                 *
+                 * Since one truck arrival creates one RR,
+                 * those remaining quantities will later be
+                 * rescheduled by Purchasing.
+                 */
+                var scheduleHasRemaining =
+                    schedule.Lines.Any(x => x.BalanceQty > 0);
+
+                var scheduleHasReceived =
+                    schedule.Lines.Any(x => x.ReceivedQty > 0);
+
+                schedule.Status =
+                    !scheduleHasRemaining
+                        ? "RECEIVED"
+                        : scheduleHasReceived
+                            ? "PARTIALLY_RECEIVED"
+                            : "OPEN";
+
+                schedule.UpdatedBy = userId;
+                schedule.UpdatedAt = now;
+
+                var allPoLinesClosed =
+                    po.Lines.All(x => x.BalanceQty <= 0);
+
+                var anyPoQuantityReceived =
+                    po.Lines.Any(x => x.ReceivedQty > 0);
+
+                po.Status =
+                    allPoLinesClosed
+                        ? "FULLY_RECEIVED"
+                        : anyPoQuantityReceived
+                            ? "PARTIALLY_RECEIVED"
+                            : "APPROVED";
+
+                po.UpdatedAt = now;
+
+                _context.ReceivingReportHeaders.Add(rr);
+
+                await _context.SaveChangesAsync();
+
+
+                var qcNo = await GenerateQcNoAsync();
+
+                var qc = new QcInspectionHeader
                 {
-                    await transaction.RollbackAsync();
-                    throw;
+                    QcNo = qcNo,
+
+                    RrId = rr.RrId,
+                    RrNo = rr.RrNo,
+
+                    PoId = rr.PoId,
+                    PoNo = rr.PoNo,
+
+                    SupplierId = rr.SupplierId,
+
+                    Status = "FOR_INSPECTION",
+
+                    CreatedBy = userId,
+                    CreatedAt = now
+                };
+
+                foreach (var rrLine in rr.Lines)
+                {
+                    qc.Lines.Add(new QcInspectionLine
+                    {
+                        RrLineId = rrLine.RrLineId,
+                        PoLineId = rrLine.PoLineId,
+                        MaterialId = rrLine.MaterialId,
+
+                        ReceivedQty = rrLine.ReceiveQty,
+
+                        AcceptedQty = 0,
+                        RejectedQty = 0,
+
+                        Status = "PENDING",
+
+                        CreatedAt = now
+                    });
                 }
-            });
+
+                _context.QcInspectionHeaders.Add(qc);
+
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                return rr.RrId;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
+
         public async Task SubmitForQcAsync(int rrId)
         {
             var rr = await _context.ReceivingReportHeaders
@@ -636,7 +624,7 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                     PoId = x.PoId,
                     PoNo = x.PoNo,
                     SupplierId = x.SupplierId,
-                    BranchId = x.BranchId,
+
                     SupplierName = _context.Suppliers
                         .Where(s => s.SupplierId == x.SupplierId)
                         .Select(s => s.SupplierName)
@@ -969,20 +957,16 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
         }
 
         public async Task<List<int>> RescheduleRemainingAsync(
-       int sourceScheduleId,
-       RescheduleRemainingDeliveryDto dto,
-       string userId)
+      int sourceScheduleId,
+      RescheduleRemainingDeliveryDto dto,
+      string userId)
         {
-            var strategy = _context.Database.CreateExecutionStrategy();
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
 
-            return await strategy.ExecuteAsync(async () =>
+            try
             {
-                await using var transaction =
-                    await _context.Database.BeginTransactionAsync();
-
-                try
-                {
-                    if (dto.Schedules == null || !dto.Schedules.Any())
+                if (dto.Schedules == null || !dto.Schedules.Any())
                 {
                     throw new Exception(
                         "At least one new delivery schedule is required."
@@ -1209,19 +1193,19 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
 
                 await _context.SaveChangesAsync();
 
-                    await transaction.CommitAsync();
+                await transaction.CommitAsync();
 
-                    return newSchedules
-                        .Select(x => x.ScheduleId)
-                        .ToList();
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            });
+                return newSchedules
+                    .Select(x => x.ScheduleId)
+                    .ToList();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
+
 
     }
 }
