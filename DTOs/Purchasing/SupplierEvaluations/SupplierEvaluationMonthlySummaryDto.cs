@@ -6,13 +6,17 @@ public class SupplierEvaluationMonthlySummaryDto
 
     public int EvaluationMonth { get; set; }
 
-    public string EvaluationMonthName { get; set; } =
-        string.Empty;
+    public string EvaluationMonthName { get; set; }
+        = string.Empty;
 
     public int TotalSuppliers { get; set; }
 
     public int TotalEvaluations { get; set; }
 
+    /// <summary>
+    /// Currently means PENDING_PURCHASING.
+    /// Kept with this name temporarily for frontend compatibility.
+    /// </summary>
     public int GeneratedCount { get; set; }
 
     public int FinalizedCount { get; set; }
@@ -37,6 +41,6 @@ public class SupplierEvaluationMonthlySummaryDto
 
     public int PoorCount { get; set; }
 
-    public List<SupplierEvaluationListDto> Evaluations { get; set; } =
-        new();
+    public List<SupplierEvaluationListDto> Evaluations { get; set; }
+        = new();
 }

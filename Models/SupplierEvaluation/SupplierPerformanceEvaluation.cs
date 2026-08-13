@@ -19,73 +19,75 @@ namespace inventory_api.Models.SupplierEvaluation
         [Column("supplier_id")]
         public int SupplierId { get; set; }
 
-        [Required]
+        [Column("po_id")]
+        public int? PoId { get; set; }
+
+        [Column("schedule_id")]
+        public int? ScheduleId { get; set; }
+
+        [Column("rr_id")]
+        public int? RrId { get; set; }
+
+        [Column("qc_id")]
+        public int? QcId { get; set; }
+
+        [Column("evaluation_date")]
+        public DateTime? EvaluationDate { get; set; }
+
+        [Column("delivery_date")]
+        public DateTime? DeliveryDate { get; set; }
+
+        // Legacy monthly fields.
+        // Kept nullable for compatibility with old records.
         [Column("evaluation_year")]
-        public int EvaluationYear { get; set; }
+        public int? EvaluationYear { get; set; }
 
-        [Required]
         [Column("evaluation_month")]
-        public int EvaluationMonth { get; set; }
+        public int? EvaluationMonth { get; set; }
 
-        /// <summary>
-        /// First day of the evaluated month.
-        /// Example: 2026-07-01.
-        /// </summary>
-        [Required]
         [Column("period_start")]
-        public DateTime PeriodStart { get; set; }
+        public DateTime? PeriodStart { get; set; }
 
-        /// <summary>
-        /// Last day of the evaluated month.
-        /// Example: 2026-07-31.
-        /// </summary>
-        [Required]
         [Column("period_end")]
-        public DateTime PeriodEnd { get; set; }
+        public DateTime? PeriodEnd { get; set; }
 
-        // Raw scores are from 0 to 100.
+        // Header summary scores.
 
-        [Column("quality_score", TypeName = "decimal(6,2)")]
+        [Column("quality_score", TypeName = "decimal(10,2)")]
         public decimal QualityScore { get; set; }
 
-        [Column("on_time_delivery_score", TypeName = "decimal(6,2)")]
-        public decimal OnTimeDeliveryScore { get; set; }
-
-        [Column("cost_competitiveness_score", TypeName = "decimal(6,2)")]
-        public decimal CostCompetitivenessScore { get; set; }
-
-        [Column("reliability_score", TypeName = "decimal(6,2)")]
-        public decimal ReliabilityScore { get; set; }
-
-        // Weighted score contributions.
-
-        [Column("quality_weighted_score", TypeName = "decimal(6,2)")]
+        [Column("quality_weighted_score", TypeName = "decimal(10,2)")]
         public decimal QualityWeightedScore { get; set; }
 
-        [Column("delivery_weighted_score", TypeName = "decimal(6,2)")]
+        [Column("on_time_delivery_score", TypeName = "decimal(10,2)")]
+        public decimal OnTimeDeliveryScore { get; set; }
+
+        [Column("delivery_weighted_score", TypeName = "decimal(10,2)")]
         public decimal DeliveryWeightedScore { get; set; }
 
-        [Column("cost_weighted_score", TypeName = "decimal(6,2)")]
+        [Column("cost_competitiveness_score", TypeName = "decimal(10,2)")]
+        public decimal CostCompetitivenessScore { get; set; }
+
+        [Column("cost_weighted_score", TypeName = "decimal(10,2)")]
         public decimal CostWeightedScore { get; set; }
 
-        [Column("reliability_weighted_score", TypeName = "decimal(6,2)")]
+        [Column("reliability_score", TypeName = "decimal(10,2)")]
+        public decimal ReliabilityScore { get; set; }
+
+        [Column("reliability_weighted_score", TypeName = "decimal(10,2)")]
         public decimal ReliabilityWeightedScore { get; set; }
 
-        [Column("total_score", TypeName = "decimal(6,2)")]
+        [Column("total_score", TypeName = "decimal(10,2)")]
         public decimal TotalScore { get; set; }
 
-        /// <summary>
-        /// Suggested values:
-        /// EXCELLENT, VERY_GOOD, GOOD, NEEDS_IMPROVEMENT, POOR.
-        /// </summary>
-        [MaxLength(50)]
+        [MaxLength(40)]
         [Column("performance_rating")]
         public string? PerformanceRating { get; set; }
 
         [Required]
-        [MaxLength(30)]
+        [MaxLength(40)]
         [Column("status")]
-        public string Status { get; set; } = "DRAFT";
+        public string Status { get; set; } = "PENDING_PURCHASING";
 
         [MaxLength(1000)]
         [Column("remarks")]
@@ -126,10 +128,9 @@ namespace inventory_api.Models.SupplierEvaluation
         [Column("finalized_at")]
         public DateTime? FinalizedAt { get; set; }
 
-        [Required]
         [MaxLength(50)]
         [Column("created_by")]
-        public string CreatedBy { get; set; } = string.Empty;
+        public string? CreatedBy { get; set; }
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
@@ -141,21 +142,10 @@ namespace inventory_api.Models.SupplierEvaluation
         [Column("updated_at")]
         public DateTime? UpdatedAt { get; set; }
 
-        public SupplierEvaluationQualityMetric? QualityMetric { get; set; }
-
-        public SupplierEvaluationDeliveryMetric? DeliveryMetric { get; set; }
-
-        public SupplierEvaluationCostMetric? CostMetric { get; set; }
-
-        public SupplierEvaluationReliabilityScore? ReliabilityAssessment { get; set; }
+        public ICollection<SupplierPerformanceEvaluationLine> Lines { get; set; }
+            = new List<SupplierPerformanceEvaluationLine>();
 
         public ICollection<SupplierEvaluationWorkflowHistory> WorkflowHistory { get; set; }
             = new List<SupplierEvaluationWorkflowHistory>();
-
-        /*
-         * Add this navigation after confirming your existing supplier model:
-         *
-         * public Supplier Supplier { get; set; } = null!;
-         */
     }
 }

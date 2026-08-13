@@ -15,7 +15,10 @@
         public string SupplierName { get; set; } = string.Empty;
 
         public DateTime? InspectionDate { get; set; }
+
         public string? InspectorId { get; set; }
+
+        public string? InspectorName { get; set; }
 
         public string Status { get; set; } = string.Empty;
         public string? Decision { get; set; }

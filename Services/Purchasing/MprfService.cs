@@ -499,6 +499,32 @@ namespace inventory_api.Services.Purchasing
             return true;
         }
 
+        //get next number in MPRF create
+        public async Task<string> GetNextMprfNoAsync()
+        {
+            return await GenerateMprfNoAsync();
+        }
+
+        public async Task<decimal> GetMaterialQtyOnHandAsync(
+            int materialId)
+        {
+            if (materialId <= 0)
+                return 0m;
+
+            /*
+             * Current raw material inventory is stored per lot.
+             * Qty On Hand = sum of all active lots for the material.
+             */
+            var qty = await _context.MaterialLotNumbers
+                .AsNoTracking()
+                .Where(x =>
+                    x.material_id == materialId &&
+                    x.is_active)
+                .SumAsync(x => (decimal?)x.quantity);
+
+            return qty ?? 0m;
+        }
+
 
     }
 }

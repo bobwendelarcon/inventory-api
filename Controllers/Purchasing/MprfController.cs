@@ -122,5 +122,35 @@ namespace inventory_api.Controllers.Purchasing
                 return BadRequest(ex.Message);
             }
         }
+
+
+        //MPRF NO
+
+        [HttpGet("next-no")]
+        public async Task<IActionResult> GetNextMprfNo()
+        {
+            var nextNo =
+                await _service.GetNextMprfNoAsync();
+
+            return Ok(new
+            {
+                mprf_no = nextNo
+            });
+        }
+
+        [HttpGet("materials/{materialId:int}/qty-on-hand")]
+        public async Task<IActionResult> GetMaterialQtyOnHand(
+            int materialId)
+        {
+            var qty =
+                await _service.GetMaterialQtyOnHandAsync(
+                    materialId);
+
+            return Ok(new
+            {
+                material_id = materialId,
+                qty_on_hand = qty
+            });
+        }
     }
 }

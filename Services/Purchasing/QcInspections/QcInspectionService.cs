@@ -3,6 +3,7 @@ using inventory_api.DTOs.Purchasing.QcInspections;
 using inventory_api.Models.Manufacturing.Materials;
 using inventory_api.Models.Purchasing.QcInspections;
 using inventory_api.Models.Purchasing.ReceivingReports;
+using inventory_api.Services.Purchasing.SupplierEvaluations;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Purchasing.QcInspections
@@ -10,10 +11,15 @@ namespace inventory_api.Services.Purchasing.QcInspections
     public class QcInspectionService
     {
         private readonly AppDbContext _context;
+        private readonly SupplierEvaluationGenerationService _supplierEvaluationGenerationService;
 
-        public QcInspectionService(AppDbContext context)
+        public QcInspectionService(
+            AppDbContext context,
+            SupplierEvaluationGenerationService supplierEvaluationGenerationService)
         {
             _context = context;
+            _supplierEvaluationGenerationService =
+                supplierEvaluationGenerationService;
         }
 
         public async Task<List<QcInspectionListDto>> GetAllAsync()
@@ -34,7 +40,17 @@ namespace inventory_api.Services.Purchasing.QcInspections
                         .FirstOrDefault() ?? "",
 
                     InspectionDate = x.InspectionDate,
+
                     InspectorId = x.InspectorId,
+
+                    InspectorName =
+    _context.Users
+        .Where(u =>
+            u.user_id == x.InspectorId)
+        .Select(u => u.full_name)
+        .FirstOrDefault()
+    ?? x.InspectorId,
+
                     Status = x.Status,
                     Decision = x.Decision,
                     CreatedAt = x.CreatedAt
@@ -62,7 +78,17 @@ namespace inventory_api.Services.Purchasing.QcInspections
                         .FirstOrDefault() ?? "",
 
                     InspectionDate = x.InspectionDate,
+
                     InspectorId = x.InspectorId,
+
+                    InspectorName =
+    _context.Users
+        .Where(u =>
+            u.user_id == x.InspectorId)
+        .Select(u => u.full_name)
+        .FirstOrDefault()
+    ?? x.InspectorId,
+
                     Status = x.Status,
                     Decision = x.Decision,
                     Remarks = x.Remarks,
@@ -348,14 +374,41 @@ namespace inventory_api.Services.Purchasing.QcInspections
                 var allPoLinesClosed = po.Lines.All(x => x.BalanceQty <= 0);
                 var hasReceivedQty = po.Lines.Any(x => x.ReceivedQty > 0);
 
-                po.Status = allPoLinesClosed
-                    ? "FULLY_RECEIVED"
-                    : hasReceivedQty
-                        ? "PARTIALLY_RECEIVED"
-                        : "APPROVED";
+                    po.Status = allPoLinesClosed
+         ? "FULLY_RECEIVED"
+         : hasReceivedQty
+             ? "PARTIALLY_RECEIVED"
+             : "APPROVED";
 
-                po.UpdatedAt = now;
+                    po.UpdatedAt = now;
+
+
+                    // ---------------------------------------------------------
+                    // AUTO CREATE SUPPLIER PERFORMANCE EVALUATION
+                    // ---------------------------------------------------------
+                    // QC, RR, inventory posting and supplier evaluation are
+                    // saved inside the SAME database transaction.
+                    //
+                    // If evaluation creation fails, the whole QC commit rolls
+                    // back so the records cannot become inconsistent.
+                    // ---------------------------------------------------------
+
+                    await _supplierEvaluationGenerationService
+                        .CreateFromCommittedQcAsync(
+                            qc,
+                            rr,
+                            po,
+                            inspectorId,
+                            now);
+
+
+                    // Save everything together:
+                    // QC
+                    // RR
+                    // Inventory
+                    // Supplier Evaluation
                     await _context.SaveChangesAsync();
+
                     await transaction.CommitAsync();
                 }
                 catch
@@ -553,12 +606,12 @@ namespace inventory_api.Services.Purchasing.QcInspections
 
 
         private async Task AddAcceptedQtyToInventoryAsync(
-    QcInspectionHeader qc,
-    ReceivingReportHeader rr,
-    QcInspectionLine qcLine,
-    ReceivingReportLine rrLine,
-    string userId,
-    DateTime now)
+       QcInspectionHeader qc,
+       ReceivingReportHeader rr,
+       QcInspectionLine qcLine,
+       ReceivingReportLine rrLine,
+       string userId,
+       DateTime now)
         {
             if (string.IsNullOrWhiteSpace(rr.BranchId))
             {
@@ -574,133 +627,287 @@ namespace inventory_api.Services.Purchasing.QcInspections
                     $"UOM is missing for material ID {qcLine.MaterialId}.");
             }
 
-            if (qcLine.Lots == null || qcLine.Lots.Count == 0)
+            if (qcLine.Lots == null ||
+                qcLine.Lots.Count == 0)
             {
                 throw new InvalidOperationException(
                     $"No QC lot information was found for material ID {qcLine.MaterialId}.");
             }
 
-            foreach (var qcLot in qcLine.Lots.Where(x => x.AcceptedQty > 0))
-            {
-                var lotNo = qcLot.LotNo?.Trim();
-
-                if (string.IsNullOrWhiteSpace(lotNo))
+            // ---------------------------------------------------------
+            // Determine whether this material is lot tracked.
+            // ---------------------------------------------------------
+            var material = await _context.Materials
+                .AsNoTracking()
+                .Where(x =>
+                    x.material_id == qcLine.MaterialId)
+                .Select(x => new
                 {
-                    throw new InvalidOperationException(
-                        $"Lot reference is missing for material ID {qcLine.MaterialId}.");
+                    x.material_id,
+                    x.material_name,
+                    x.is_lot_tracked
+                })
+                .FirstOrDefaultAsync();
+
+            if (material == null)
+            {
+                throw new InvalidOperationException(
+                    $"Material ID {qcLine.MaterialId} was not found.");
+            }
+
+            foreach (var qcLot in qcLine.Lots
+                .Where(x => x.AcceptedQty > 0))
+            {
+                // -----------------------------------------------------
+                // IMPORTANT:
+                //
+                // Lot-tracked:
+                //     use actual lot number.
+                //
+                // Non-lot-tracked:
+                //     always use ONE stable internal inventory key.
+                //
+                // Do NOT use QcLineId here because every QC would
+                // create another inventory balance row.
+                // -----------------------------------------------------
+
+                string inventoryLotNo;
+
+                if (material.is_lot_tracked)
+                {
+                    inventoryLotNo =
+                        qcLot.LotNo?.Trim().ToUpperInvariant()
+                        ?? string.Empty;
+
+                    if (string.IsNullOrWhiteSpace(inventoryLotNo))
+                    {
+                        throw new InvalidOperationException(
+                            $"Lot number is required for lot-tracked material " +
+                            $"{material.material_name}.");
+                    }
+                }
+                else
+                {
+                    inventoryLotNo =
+                        $"NON-LOT-MAT-{qcLine.MaterialId}";
                 }
 
-                /*
-                 * Idempotency protection:
-                 * Do not post the same QC material lot transaction twice.
-                 */
+                // -----------------------------------------------------
+                // Idempotency protection.
+                //
+                // Prevent same QC receipt from being posted twice.
+                // -----------------------------------------------------
                 var transactionExistsLocally =
-      _context.MaterialInventoryTransactions.Local.Any(x =>
-          x.material_id == qcLine.MaterialId &&
-          x.branch_id == branchId &&
-          x.lot_no == lotNo &&
-          x.transaction_type == "PURCHASE_RECEIPT" &&
-          x.reference_type == "QC" &&
-          x.reference_id == qc.QcId);
-
-                var transactionExistsInDatabase =
-                    await _context.MaterialInventoryTransactions.AnyAsync(x =>
+                    _context.MaterialInventoryTransactions.Local.Any(x =>
                         x.material_id == qcLine.MaterialId &&
                         x.branch_id == branchId &&
-                        x.lot_no == lotNo &&
+                        x.lot_no == inventoryLotNo &&
                         x.transaction_type == "PURCHASE_RECEIPT" &&
                         x.reference_type == "QC" &&
                         x.reference_id == qc.QcId);
 
-                if (transactionExistsLocally || transactionExistsInDatabase)
+                var transactionExistsInDatabase =
+                    await _context.MaterialInventoryTransactions
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.material_id == qcLine.MaterialId &&
+                            x.branch_id == branchId &&
+                            x.lot_no == inventoryLotNo &&
+                            x.transaction_type == "PURCHASE_RECEIPT" &&
+                            x.reference_type == "QC" &&
+                            x.reference_id == qc.QcId);
+
+                if (transactionExistsLocally ||
+                    transactionExistsInDatabase)
                 {
                     throw new InvalidOperationException(
-                        $"QC {qc.QcNo}, material ID {qcLine.MaterialId}, " +
-                        $"lot {lotNo} has already been committed to inventory.");
+                        $"QC {qc.QcNo}, material ID {qcLine.MaterialId} " +
+                        $"has already been committed to inventory.");
                 }
 
-
-
+                // -----------------------------------------------------
+                // Find existing inventory balance.
+                //
+                // NON-LOT material:
+                // Same Material + Branch + NON-LOT key
+                //
+                // LOT material:
+                // Same Material + Branch + actual Lot No.
+                // -----------------------------------------------------
                 var inventoryLot =
-     _context.MaterialLotNumbers.Local.FirstOrDefault(x =>
-         x.material_id == qcLine.MaterialId &&
-         x.branch_id == branchId &&
-         x.lot_no == lotNo);
+                    _context.MaterialLotNumbers.Local
+                        .FirstOrDefault(x =>
+                            x.material_id == qcLine.MaterialId &&
+                            x.branch_id == branchId &&
+                            x.lot_no == inventoryLotNo);
 
                 inventoryLot ??=
-                    await _context.MaterialLotNumbers.FirstOrDefaultAsync(x =>
-                        x.material_id == qcLine.MaterialId &&
-                        x.branch_id == branchId &&
-                        x.lot_no == lotNo);
+                    await _context.MaterialLotNumbers
+                        .FirstOrDefaultAsync(x =>
+                            x.material_id == qcLine.MaterialId &&
+                            x.branch_id == branchId &&
+                            x.lot_no == inventoryLotNo);
 
                 if (inventoryLot == null)
                 {
                     inventoryLot = new MaterialLotNumber
                     {
-                        material_id = qcLine.MaterialId,
-                        branch_id = branchId,
-                        lot_no = lotNo,
+                        material_id =
+                            qcLine.MaterialId,
 
-                        manufacturing_date = qcLot.ManufacturingDate,
-                        expiration_date = qcLot.ExpirationDate,
+                        branch_id =
+                            branchId,
 
-                        quantity = qcLot.AcceptedQty,
-                        uom = rrLine.Uom,
+                        lot_no =
+                            inventoryLotNo,
 
-                        supplier_id = qc.SupplierId,
+                        // Dates only apply to actual tracked lots.
+                        manufacturing_date =
+                            material.is_lot_tracked
+                                ? qcLot.ManufacturingDate
+                                : null,
 
-                        remarks = $"Accepted through QC {qc.QcNo}; RR {rr.RrNo}.",
-                        is_active = true,
+                        expiration_date =
+                            material.is_lot_tracked
+                                ? qcLot.ExpirationDate
+                                : null,
 
-                        created_at = now,
-                        updated_at = null
+                        quantity =
+                            qcLot.AcceptedQty,
+
+                        uom =
+                            rrLine.Uom.Trim(),
+
+                        supplier_id =
+    material.is_lot_tracked
+        ? qc.SupplierId
+        : null,
+
+                        remarks =
+                            $"Accepted through QC {qc.QcNo}; RR {rr.RrNo}.",
+
+                        is_active =
+                            true,
+
+                        created_at =
+                            now,
+
+                        updated_at =
+                            null
                     };
 
-                    await _context.MaterialLotNumbers.AddAsync(inventoryLot);
+                    await _context.MaterialLotNumbers
+                        .AddAsync(inventoryLot);
                 }
                 else
                 {
-                    inventoryLot.quantity += qcLot.AcceptedQty;
-                    inventoryLot.is_active = true;
-                    inventoryLot.updated_at = now;
+                    // -------------------------------------------------
+                    // EXISTING INVENTORY:
+                    // Add quantity instead of creating another row.
+                    // -------------------------------------------------
+                    inventoryLot.quantity +=
+                        qcLot.AcceptedQty;
+
+                    inventoryLot.is_active =
+                        true;
+
+                    inventoryLot.updated_at =
+                        now;
+
+                    if (material.is_lot_tracked)
+                    {
+                        inventoryLot.manufacturing_date ??=
+                            qcLot.ManufacturingDate;
+
+                        inventoryLot.expiration_date ??=
+                            qcLot.ExpirationDate;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(
+                        inventoryLot.uom))
+                    {
+                        inventoryLot.uom =
+                            rrLine.Uom.Trim();
+                    }
 
                     /*
-                     * Preserve existing dates unless they are currently empty.
+                     * Keep current supplier behavior.
+                     *
+                     * This means the inventory balance retains the
+                     * supplier already associated with the balance.
+                     *
+                     * Purchase/QC transaction history still identifies
+                     * each individual receipt.
                      */
-                    inventoryLot.manufacturing_date ??= qcLot.ManufacturingDate;
-                    inventoryLot.expiration_date ??= qcLot.ExpirationDate;
-                    inventoryLot.supplier_id ??= qc.SupplierId;
-                    if (string.IsNullOrWhiteSpace(inventoryLot.uom))
+                    if (material.is_lot_tracked)
                     {
-                        inventoryLot.uom = rrLine.Uom.Trim();
+                        inventoryLot.supplier_id ??=
+                            qc.SupplierId;
+                    }
+                    else
+                    {
+                        inventoryLot.supplier_id = null;
                     }
                 }
 
-                var inventoryTransaction = new MaterialInventoryTransaction
-                {
-                    material_id = qcLine.MaterialId,
-                    branch_id = branchId,
-                    lot_no = lotNo,
+                // -----------------------------------------------------
+                // ALWAYS create transaction history.
+                //
+                // Balance = one row for non-lot material.
+                // Transactions = one record per QC receipt.
+                // -----------------------------------------------------
+                var inventoryTransaction =
+     new MaterialInventoryTransaction
+     {
+         material_id =
+             qcLine.MaterialId,
 
-                    transaction_type = "PURCHASE_RECEIPT",
-                    quantity = qcLot.AcceptedQty,
-                    uom = rrLine.Uom,
+         branch_id =
+             branchId,
 
-                    reference_type = "QC",
-                    reference_id = qc.QcId,
-                    reference_no = qc.QcNo,
+         lot_no =
+             inventoryLotNo,
 
-                    remarks =
-                        $"Accepted inventory from RR {rr.RrNo}, PO {qc.PoNo}, " +
-                        $"lot {lotNo}.",
+         transaction_type =
+             "PURCHASE_RECEIPT",
 
-                    encoded_by = userId,
-                    transaction_date = now,
-                    created_at = now
-                };
+         quantity =
+             qcLot.AcceptedQty,
 
-                await _context.MaterialInventoryTransactions.AddAsync(
-                    inventoryTransaction);
+         uom =
+             rrLine.Uom.Trim(),
+
+         supplier_id =
+    qc.SupplierId,
+
+         reference_type =
+             "QC",
+
+         reference_id =
+             qc.QcId,
+
+         reference_no =
+             qc.QcNo,
+
+         remarks =
+             material.is_lot_tracked
+                 ? $"Accepted inventory from RR {rr.RrNo}, " +
+                   $"PO {qc.PoNo}, lot {inventoryLotNo}."
+                 : $"Accepted inventory from RR {rr.RrNo}, " +
+                   $"PO {qc.PoNo}. Non-lot-tracked material.",
+
+         encoded_by =
+             userId,
+
+         transaction_date =
+             now,
+
+         created_at =
+             now
+     };
+
+                await _context.MaterialInventoryTransactions
+                    .AddAsync(inventoryTransaction);
             }
         }
 

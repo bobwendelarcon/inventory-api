@@ -36,6 +36,69 @@ namespace inventory_api.Controllers.Inventory
             }
         }
 
+        [HttpGet("transactions")]
+        public async Task<IActionResult> GetAllTransactions(
+    [FromQuery] RawMaterialTransactionFilterDto filter)
+        {
+            try
+            {
+                var result =
+                    await _service.GetAllTransactionsAsync(filter);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
+        [HttpPost("manual-stock-in")]
+        public async Task<IActionResult> ManualStockIn(
+    [FromBody] ManualStockInDto dto)
+        {
+            try
+            {
+                await _service.ManualStockInAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Manual stock in saved successfully."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
 
         [HttpGet("{materialLotId:int}/transactions")]
         public async Task<IActionResult> GetTransactions(int materialLotId)

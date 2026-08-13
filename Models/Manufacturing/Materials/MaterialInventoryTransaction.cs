@@ -32,6 +32,9 @@ namespace inventory_api.Models.Manufacturing.Materials
         [Column("uom")]
         public string uom { get; set; } = string.Empty;
 
+        [Column("supplier_id")]
+        public int? supplier_id { get; set; }
+
         [Column("reference_type")]
         public string? reference_type { get; set; }
 

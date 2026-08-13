@@ -238,6 +238,166 @@ namespace inventory_api.Services.Purchasing.Canvassing
             return $"CAN-{year}-{maxNo + 1:D4}";
         }
 
+        private async Task<object?> GetPreviousSupplierAsync(
+    int materialId,
+    int currentCanvassId)
+        {
+            /*
+             * Get the latest previous PO for this material.
+             *
+             * We exclude cancelled POs.
+             * The current canvass normally has no PO yet,
+             * but excluding it makes the method safe.
+             */
+            var previousPurchase = await (
+                from poLine in _context.PurchaseOrderLines.AsNoTracking()
+
+                join po in _context.PurchaseOrderHeaders.AsNoTracking()
+                    on poLine.PoId equals po.PoId
+
+                join supplier in _context.Suppliers.AsNoTracking()
+                    on po.SupplierId equals supplier.SupplierId
+
+                where
+                    poLine.MaterialId == materialId &&
+                    po.Status != "CANCELLED" &&
+                    po.CanvassId != currentCanvassId &&
+                    supplier.IsActive &&
+                    !supplier.IsDeleted
+
+                orderby
+                    po.PoDate descending,
+                    po.PoId descending,
+                    poLine.PoLineId descending
+
+                select new
+                {
+                    po.PoId,
+                    po.PoNo,
+                    po.PrintedPoNo,
+                    po.PoDate,
+
+                    po.SupplierId,
+                    supplier.SupplierCode,
+                    supplier.SupplierName,
+                    supplier.PaymentTerms,
+                    supplier.LeadTimeDays,
+
+                    poLine.PoUnitPrice,
+                    poLine.MaterialId
+                }
+            )
+            .FirstOrDefaultAsync();
+
+
+            if (previousPurchase == null)
+                return null;
+
+
+            /*
+             * Get latest FINALIZED supplier evaluation
+             * that actually contains this material.
+             */
+            var evaluation = await (
+                from evaluationLine in
+                    _context.SupplierPerformanceEvaluationLines.AsNoTracking()
+
+                join evaluationHeader in
+                    _context.SupplierPerformanceEvaluations.AsNoTracking()
+                    on evaluationLine.EvaluationId
+                    equals evaluationHeader.EvaluationId
+
+                where
+                    evaluationLine.MaterialId == materialId &&
+                    evaluationHeader.SupplierId ==
+                        previousPurchase.SupplierId &&
+                    evaluationHeader.Status == "FINALIZED"
+
+                orderby
+                    evaluationHeader.EvaluationDate descending,
+                    evaluationHeader.EvaluationId descending
+
+                select new
+                {
+                    evaluationHeader.EvaluationId,
+                    evaluationHeader.EvaluationNo,
+                    evaluationHeader.TotalScore,
+                    evaluationHeader.PerformanceRating,
+
+                    evaluationLine.QualityGrade,
+                    evaluationLine.DeliveryGrade,
+                    evaluationLine.CostGrade,
+                    evaluationLine.ReliabilityGrade,
+                    evaluationLine.TotalGrade
+                }
+            )
+            .FirstOrDefaultAsync();
+
+
+            return new
+            {
+                supplierId =
+                    previousPurchase.SupplierId,
+
+                supplierCode =
+                    previousPurchase.SupplierCode,
+
+                supplierName =
+                    previousPurchase.SupplierName,
+
+                previousUnitPrice =
+                    previousPurchase.PoUnitPrice,
+
+                previousPoId =
+                    previousPurchase.PoId,
+
+                previousPoNo =
+                    string.IsNullOrWhiteSpace(
+                        previousPurchase.PrintedPoNo)
+                        ? previousPurchase.PoNo
+                        : previousPurchase.PrintedPoNo,
+
+                previousPoDate =
+                    previousPurchase.PoDate,
+
+                paymentTerms =
+                    previousPurchase.PaymentTerms,
+
+                leadTimeDays =
+                    previousPurchase.LeadTimeDays,
+
+                hasFinalizedEvaluation =
+                    evaluation != null,
+
+                evaluationId =
+                    evaluation?.EvaluationId,
+
+                evaluationNo =
+                    evaluation?.EvaluationNo,
+
+                evaluationScore =
+                    evaluation?.TotalScore,
+
+                evaluationRating =
+                    evaluation?.PerformanceRating,
+
+                materialEvaluationScore =
+                    evaluation?.TotalGrade,
+
+                /*
+                 * The supplier is automatically suggested because
+                 * it is the most recent supplier used for this material.
+                 */
+                isRepeatOrderRecommended = true,
+
+                recommendationReason =
+                    evaluation != null
+                        ? "Previous supplier for this material with finalized supplier evaluation."
+                        : "Previous supplier used for this material."
+            };
+        }
+
+
         public async Task<object?> GetByIdAsync(int canvassId)
         {
             var header = await (
@@ -330,10 +490,17 @@ namespace inventory_api.Services.Purchasing.Canvassing
                 }
             ).ToListAsync();
 
-            return new
+            var resultLines =
+     new List<object>();
+
+            foreach (var l in lines)
             {
-                header,
-                lines = lines.Select(l => new
+                var previousSupplier =
+                    await GetPreviousSupplierAsync(
+                        l.MaterialId,
+                        canvassId);
+
+                resultLines.Add(new
                 {
                     l.CanvassLineId,
                     l.MprfLineId,
@@ -344,8 +511,21 @@ namespace inventory_api.Services.Purchasing.Canvassing
                     l.PurchasingQty,
                     l.Uom,
                     l.Remarks,
-                    quotes = quotes.Where(q => q.CanvassLineId == l.CanvassLineId).ToList()
-                })
+
+                    previousSupplier,
+
+                    quotes = quotes
+                        .Where(q =>
+                            q.CanvassLineId ==
+                            l.CanvassLineId)
+                        .ToList()
+                });
+            }
+
+            return new
+            {
+                header,
+                lines = resultLines
             };
         }
 

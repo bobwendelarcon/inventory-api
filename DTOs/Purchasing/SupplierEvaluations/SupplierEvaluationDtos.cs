@@ -2,53 +2,6 @@
 
 namespace inventory_api.DTOs.Purchasing.SupplierEvaluations;
 
-/// <summary>
-/// Request used to generate or regenerate a monthly supplier evaluation.
-/// </summary>
-public class GenerateSupplierEvaluationDto
-{
-    [Required]
-    public int SupplierId { get; set; }
-
-    [Range(2000, 9999)]
-    public int EvaluationYear { get; set; }
-
-    [Range(0, 100)]
-    public decimal ReliabilityScore { get; set; }
-
-    [MaxLength(1000)]
-    public string? ReliabilityRemarks { get; set; }
-
-    [Range(1, 12)]
-    public int EvaluationMonth { get; set; }
-
-    [Required]
-    [MaxLength(50)]
-    public string GeneratedBy { get; set; } = string.Empty;
-
-    [MaxLength(1000)]
-    public string? Remarks { get; set; }
-}
-
-/// <summary>
-/// Request used to generate evaluations for all eligible suppliers in a month.
-/// </summary>
-public class GenerateMonthlySupplierEvaluationsDto
-{
-    [Range(2000, 9999)]
-    public int EvaluationYear { get; set; }
-
-    [Range(1, 12)]
-    public int EvaluationMonth { get; set; }
-
-    [Required]
-    [MaxLength(50)]
-    public string GeneratedBy { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// Query filters for the supplier evaluation list.
-/// </summary>
 public class SupplierEvaluationFilterDto
 {
     public int? SupplierId { get; set; }
@@ -66,9 +19,6 @@ public class SupplierEvaluationFilterDto
     public string? Search { get; set; }
 }
 
-/// <summary>
-/// Data displayed in the main supplier evaluation grid.
-/// </summary>
 public class SupplierEvaluationListDto
 {
     public int EvaluationId { get; set; }
@@ -81,15 +31,30 @@ public class SupplierEvaluationListDto
 
     public string SupplierName { get; set; } = string.Empty;
 
-    public int EvaluationYear { get; set; }
 
-    public int EvaluationMonth { get; set; }
+    // Delivery references
 
-    public string EvaluationMonthName { get; set; } = string.Empty;
+    public int? PoId { get; set; }
 
-    public DateTime PeriodStart { get; set; }
+    public string PoNo { get; set; } = string.Empty;
 
-    public DateTime PeriodEnd { get; set; }
+    public int? RrId { get; set; }
+
+    public string RrNo { get; set; } = string.Empty;
+
+    public int? QcId { get; set; }
+
+    public string QcNo { get; set; } = string.Empty;
+
+
+    // Evaluation dates
+
+    public DateTime? EvaluationDate { get; set; }
+
+    public DateTime? DeliveryDate { get; set; }
+
+
+    // Summary scores
 
     public decimal QualityScore { get; set; }
 
@@ -110,14 +75,14 @@ public class SupplierEvaluationListDto
     public string? GeneratedBy { get; set; }
 }
 
-/// <summary>
-/// Complete evaluation details displayed by View Details.
-/// </summary>
 public class SupplierEvaluationDetailsDto
 {
     public int EvaluationId { get; set; }
 
     public string EvaluationNo { get; set; } = string.Empty;
+
+
+    // Supplier
 
     public int SupplierId { get; set; }
 
@@ -129,15 +94,32 @@ public class SupplierEvaluationDetailsDto
 
     public string? ContactPerson { get; set; }
 
-    public int EvaluationYear { get; set; }
 
-    public int EvaluationMonth { get; set; }
+    // Purchasing references
 
-    public string EvaluationMonthName { get; set; } = string.Empty;
+    public int? PoId { get; set; }
 
-    public DateTime PeriodStart { get; set; }
+    public string PoNo { get; set; } = string.Empty;
 
-    public DateTime PeriodEnd { get; set; }
+    public int? ScheduleId { get; set; }
+
+    public int? RrId { get; set; }
+
+    public string RrNo { get; set; } = string.Empty;
+
+    public int? QcId { get; set; }
+
+    public string QcNo { get; set; } = string.Empty;
+
+
+    // Dates
+
+    public DateTime? EvaluationDate { get; set; }
+
+    public DateTime? DeliveryDate { get; set; }
+
+
+    // Header scores
 
     public decimal QualityScore { get; set; }
 
@@ -159,6 +141,9 @@ public class SupplierEvaluationDetailsDto
 
     public string PerformanceRating { get; set; } = string.Empty;
 
+
+    // Workflow
+
     public string Status { get; set; } = string.Empty;
 
     public string? Remarks { get; set; }
@@ -166,14 +151,6 @@ public class SupplierEvaluationDetailsDto
     public string? GeneratedBy { get; set; }
 
     public DateTime? GeneratedAt { get; set; }
-
-    public string? ReviewedBy { get; set; }
-
-    public DateTime? ReviewedAt { get; set; }
-
-    public string? ApprovedBy { get; set; }
-
-    public DateTime? ApprovedAt { get; set; }
 
     public string? FinalizedBy { get; set; }
 
@@ -183,13 +160,12 @@ public class SupplierEvaluationDetailsDto
 
     public DateTime? UpdatedAt { get; set; }
 
-    public SupplierEvaluationQualityMetricDto? QualityMetric { get; set; }
 
-    public SupplierEvaluationDeliveryMetricDto? DeliveryMetric { get; set; }
+    // Per-material evaluation
 
-    public SupplierEvaluationCostMetricDto? CostMetric { get; set; }
+    public List<SupplierEvaluationLineDto> Lines { get; set; }
+        = new();
 
-    public SupplierEvaluationReliabilityDto? ReliabilityAssessment { get; set; }
 
     public List<SupplierEvaluationWorkflowHistoryDto> WorkflowHistory { get; set; }
         = new();

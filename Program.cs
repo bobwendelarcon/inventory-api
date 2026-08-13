@@ -25,18 +25,25 @@ var connectionString =
         "Connection string 'DefaultConnection' was not found.");
 
 // Register AppDbContext only once
+//builder.Services.AddDbContext<AppDbContext>(options =>
+//{
+//    options.UseMySql(
+//        connectionString,
+//        ServerVersion.AutoDetect(connectionString),
+//        mysqlOptions =>
+//        {
+//            mysqlOptions.EnableRetryOnFailure(
+//                maxRetryCount: 5,
+//                maxRetryDelay: TimeSpan.FromSeconds(10),
+//                errorNumbersToAdd: null);
+//        });
+//});
+
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseMySql(
         connectionString,
-        ServerVersion.AutoDetect(connectionString),
-        mysqlOptions =>
-        {
-            mysqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(10),
-                errorNumbersToAdd: null);
-        });
+        ServerVersion.AutoDetect(connectionString));
 });
 
 // Core services
@@ -88,6 +95,10 @@ builder.Services.AddScoped<QcInspectionService>();
 builder.Services.AddScoped<SupplierEvaluationScoringService>();
 builder.Services.AddScoped<SupplierEvaluationGenerationService>();
 builder.Services.AddScoped<SupplierEvaluationService>();
+
+//raw mats out
+builder.Services.AddScoped<
+    MaterialRequisitionService>();
 
 var app = builder.Build();
 

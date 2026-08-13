@@ -33,6 +33,18 @@ namespace inventory_api.Controllers.Purchasing.Suppliers
             return Ok(result);
         }
 
+
+        [HttpGet("by-material/{materialId:int}")]
+        public async Task<IActionResult> GetByMaterial(
+    int materialId)
+        {
+            var result =
+                await _supplierService
+                    .GetByMaterialAsync(materialId);
+
+            return Ok(result);
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {

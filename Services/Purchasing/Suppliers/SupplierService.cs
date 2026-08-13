@@ -103,6 +103,39 @@ namespace inventory_api.Services.Purchasing.Suppliers
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<object> GetByMaterialAsync(int materialId)
+        {
+            var suppliers = await (
+                from supplierMaterial in _context.SupplierMaterials.AsNoTracking()
+
+                join supplier in _context.Suppliers.AsNoTracking()
+                    on supplierMaterial.SupplierId equals supplier.SupplierId
+
+                where
+                    supplierMaterial.MaterialId == materialId &&
+                    supplierMaterial.IsActive &&
+                    !supplierMaterial.IsDeleted &&
+                    supplier.IsActive &&
+                    !supplier.IsDeleted
+
+                orderby supplier.SupplierName
+
+                select new
+                {
+                    supplierId = supplier.SupplierId,
+                    supplierCode = supplier.SupplierCode,
+                    supplierName = supplier.SupplierName,
+                    supplierType = supplier.SupplierType,
+                    isPreferred = supplierMaterial.IsPreferred,
+                    manufacturerId = supplierMaterial.ManufacturerId
+                }
+            )
+            .Distinct()
+            .ToListAsync();
+
+            return suppliers;
+        }
+
         public async Task<int> CreateAsync(CreateSupplierDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.SupplierName))

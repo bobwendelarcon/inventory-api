@@ -17,80 +17,23 @@ public class SupplierEvaluationsController : ControllerBase
     }
 
     /// <summary>
-    /// Generates one monthly supplier evaluation.
-    /// The initial status is GENERATED.
+    /// Returns supplier evaluations.
+    /// Evaluations are automatically generated after QC commit.
     /// </summary>
-    [HttpPost("generate")]
-    public async Task<ActionResult<SupplierEvaluationResultDto>>
-        Generate(
-            [FromBody] GenerateSupplierEvaluationDto request)
+    [HttpGet]
+    public async Task<ActionResult<List<SupplierEvaluationListDto>>>
+        GetAll(
+            [FromQuery] SupplierEvaluationFilterDto filter)
     {
         var result =
-            await _service.GenerateEvaluationAsync(request);
-
-        if (!result.Success)
-        {
-            return Conflict(result);
-        }
-
-        return CreatedAtAction(
-            nameof(GetDetails),
-            new { id = result.EvaluationId },
-            result);
-    }
-
-    /// <summary>
-    /// Previews automatic supplier evaluation metrics without saving.
-    /// </summary>
-    [HttpGet("preview")]
-    public async Task<ActionResult<SupplierEvaluationGeneratedMetrics>>
-        Preview(
-            int supplierId,
-            int year,
-            int month)
-    {
-        var result =
-            await _service.PreviewEvaluationAsync(
-                supplierId,
-                year,
-                month);
+            await _service.GetAllAsync(filter);
 
         return Ok(result);
     }
 
     /// <summary>
-    /// Regenerates automatic metrics for a GENERATED evaluation.
-    /// Manual reliability values are preserved.
-    /// </summary>
-    [HttpPost("{id:int}/regenerate")]
-    public async Task<ActionResult<SupplierEvaluationResultDto>>
-        Regenerate(
-            int id,
-            [FromBody] SupplierEvaluationWorkflowActionDto request)
-    {
-        var result =
-            await _service.RegenerateAsync(id, request);
-
-        return ToActionResult(result);
-    }
-
-    /// <summary>
-    /// Finalizes a GENERATED supplier evaluation.
-    /// </summary>
-    [HttpPost("{id:int}/finalize")]
-    public async Task<ActionResult<SupplierEvaluationResultDto>>
-        FinalizeEvaluation(
-            int id,
-            [FromBody] SupplierEvaluationWorkflowActionDto request)
-    {
-        var result =
-            await _service.FinalizeAsync(id, request);
-
-        return ToActionResult(result);
-    }
-
-    /// <summary>
-    /// Returns complete details of one evaluation.
+    /// Returns complete details of one supplier evaluation.
+    /// Includes per-material evaluation lines.
     /// </summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<SupplierEvaluationDetailsDto>>
@@ -104,7 +47,8 @@ public class SupplierEvaluationsController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Supplier evaluation was not found."
+                message =
+                    "Supplier evaluation was not found."
             });
         }
 
@@ -112,10 +56,55 @@ public class SupplierEvaluationsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the supplier evaluation summary for one month.
+    /// Purchasing enters the manual Reliability / After Sales
+    /// assessment for each evaluation line.
+    ///
+    /// COA / Documents = max 5
+    /// Terms           = max 10
+    /// Others          = max 5
+    /// </summary>
+    [HttpPut("{id:int}/reliability")]
+    public async Task<ActionResult<SupplierEvaluationResultDto>>
+        SaveReliability(
+            int id,
+            [FromBody]
+            SaveSupplierEvaluationReliabilityDto request)
+    {
+        var result =
+            await _service.SaveReliabilityAsync(
+                id,
+                request);
+
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Finalizes a PENDING_PURCHASING evaluation.
+    /// </summary>
+    [HttpPost("{id:int}/finalize")]
+    public async Task<ActionResult<SupplierEvaluationResultDto>>
+        FinalizeEvaluation(
+            int id,
+            [FromBody]
+            SupplierEvaluationWorkflowActionDto request)
+    {
+        var result =
+            await _service.FinalizeAsync(
+                id,
+                request);
+
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Monthly supplier performance report.
+    ///
+    /// Evaluations themselves are no longer generated monthly.
+    /// This endpoint only groups delivery evaluations for reporting.
     /// </summary>
     [HttpGet("summary/{year:int}/{month:int}")]
-    public async Task<ActionResult<SupplierEvaluationMonthlySummaryDto>>
+    public async Task<
+        ActionResult<SupplierEvaluationMonthlySummaryDto>>
         GetMonthlySummary(
             int year,
             int month)

@@ -1,4 +1,8 @@
 ﻿using inventory_api.Data;
+using inventory_api.Models.Purchasing.PurchaseOrders;
+using inventory_api.Models.Purchasing.QcInspections;
+using inventory_api.Models.Purchasing.ReceivingReports;
+using inventory_api.Models.SupplierEvaluation;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Purchasing.SupplierEvaluations
@@ -14,616 +18,633 @@ namespace inventory_api.Services.Purchasing.SupplierEvaluations
         }
 
         /// <summary>
-        /// Generates the automatic Quality, Delivery and Cost metrics
-        /// for one supplier and one month.
+        /// Creates a supplier performance evaluation for one committed
+        /// Receiving Report / QC inspection.
+        ///
+        /// This method uses the existing DbContext transaction.
+        /// It does NOT start or commit its own transaction.
         /// </summary>
-        public async Task<SupplierEvaluationGeneratedMetrics> GenerateAsync(
-            int supplierId,
-            int evaluationYear,
-            int evaluationMonth)
+        public async Task<SupplierPerformanceEvaluation>
+            CreateFromCommittedQcAsync(
+                QcInspectionHeader qc,
+                ReceivingReportHeader rr,
+                PurchaseOrderHeader po,
+                string generatedBy,
+                DateTime now)
         {
-            ValidatePeriod(evaluationYear, evaluationMonth);
+            ArgumentNullException.ThrowIfNull(qc);
+            ArgumentNullException.ThrowIfNull(rr);
+            ArgumentNullException.ThrowIfNull(po);
 
-            var supplierExists = await _context.Suppliers
-                .AsNoTracking()
-                .AnyAsync(x =>
-                    x.SupplierId == supplierId &&
-                    x.IsDeleted == false);
+            if (string.IsNullOrWhiteSpace(generatedBy))
+            {
+                throw new ArgumentException(
+                    "GeneratedBy is required.",
+                    nameof(generatedBy));
+            }
 
-            if (!supplierExists)
+            /*
+             * Duplicate protection.
+             *
+             * Database also has UNIQUE(rr_id) and UNIQUE(qc_id),
+             * but we check first so we return a clearer error.
+             */
+            var alreadyExistsLocally =
+                _context.SupplierPerformanceEvaluations.Local.Any(x =>
+                    x.QcId == qc.QcId ||
+                    x.RrId == rr.RrId);
+
+            var alreadyExistsInDatabase =
+                await _context.SupplierPerformanceEvaluations
+                    .AsNoTracking()
+                    .AnyAsync(x =>
+                        x.QcId == qc.QcId ||
+                        x.RrId == rr.RrId);
+
+            if (alreadyExistsLocally ||
+                alreadyExistsInDatabase)
             {
                 throw new InvalidOperationException(
-                    $"Supplier with ID {supplierId} was not found.");
+                    $"Supplier evaluation already exists for " +
+                    $"QC {qc.QcNo} / RR {rr.RrNo}.");
             }
 
-            var periodStart = new DateTime(
-                evaluationYear,
-                evaluationMonth,
-                1);
-
-            var periodEndExclusive = periodStart.AddMonths(1);
-            var periodEnd = periodEndExclusive.AddTicks(-1);
-
-            var quality = await GenerateQualityMetricAsync(
-                supplierId,
-                periodStart,
-                periodEndExclusive);
-
-            var delivery = await GenerateDeliveryMetricAsync(
-                supplierId,
-                periodStart,
-                periodEndExclusive);
-
-            var cost = await GenerateCostMetricAsync(
-                supplierId,
-                periodStart,
-                periodEndExclusive);
-
-            return new SupplierEvaluationGeneratedMetrics
+            if (qc.Lines == null || qc.Lines.Count == 0)
             {
-                SupplierId = supplierId,
-                EvaluationYear = evaluationYear,
-                EvaluationMonth = evaluationMonth,
-                PeriodStart = periodStart,
-                PeriodEnd = periodEnd,
-
-                Quality = quality,
-                Delivery = delivery,
-                Cost = cost
-            };
-        }
-
-        private async Task<GeneratedQualityMetric>
-            GenerateQualityMetricAsync(
-                int supplierId,
-                DateTime periodStart,
-                DateTime periodEndExclusive)
-        {
-            /*
-             * Quality source:
-             * purchasing_qc_header
-             * purchasing_qc_line
-             *
-             * Only inspections inside the evaluation month are included.
-             */
-
-            var qcHeaders = await _context.QcInspectionHeaders
-                .AsNoTracking()
-               .Where(x =>
-    x.SupplierId == supplierId &&
-    x.Status == "COMMITTED" &&
-    x.InspectionDate >= periodStart &&
-    x.InspectionDate < periodEndExclusive)
-                .Select(x => new
-                {
-                    x.QcId,
-                    x.RrId,
-                    x.Status,
-                    x.Decision
-                })
-                .ToListAsync();
-
-            if (qcHeaders.Count == 0)
-            {
-                return new GeneratedQualityMetric
-                {
-                    ReceivingReportCount = 0,
-                    QcInspectionCount = 0,
-                    TotalReceivedQty = 0m,
-                    TotalAcceptedQty = 0m,
-                    TotalRejectedQty = 0m,
-                    AcceptanceRate = 0m,
-                    RejectionRate = 0m,
-                    QualityScore = 0m,
-                    CalculationRemarks =
-                        "No QA/QC inspections were found for the period."
-                };
-            }
-
-            var qcIds = qcHeaders
-                .Select(x => x.QcId)
-                .ToList();
-
-            var qcLines = await _context.QcInspectionLines
-                .AsNoTracking()
-                .Where(x => qcIds.Contains(x.QcId))
-                .Select(x => new
-                {
-                    x.ReceivedQty,
-                    x.AcceptedQty,
-                    x.RejectedQty
-                })
-                .ToListAsync();
-
-            var totalReceived = qcLines.Sum(x => x.ReceivedQty);
-            var totalAccepted = qcLines.Sum(x => x.AcceptedQty);
-            var totalRejected = qcLines.Sum(x => x.RejectedQty);
-
-            var acceptanceRate = totalReceived > 0m
-                ? totalAccepted / totalReceived * 100m
-                : 0m;
-
-            var rejectionRate = totalReceived > 0m
-                ? totalRejected / totalReceived * 100m
-                : 0m;
-
-            /*
-             * Current quality formula:
-             *
-             * Quality Score = Accepted Qty / Received Qty × 100
-             *
-             * This means a supplier with 100% accepted goods receives
-             * a raw Quality score of 100.
-             */
-            var qualityScore = acceptanceRate;
-
-            return new GeneratedQualityMetric
-            {
-                ReceivingReportCount = qcHeaders
-                    .Select(x => x.RrId)
-                    .Distinct()
-                    .Count(),
-
-                QcInspectionCount = qcHeaders.Count,
-
-                TotalReceivedQty = RoundQuantity(totalReceived),
-                TotalAcceptedQty = RoundQuantity(totalAccepted),
-                TotalRejectedQty = RoundQuantity(totalRejected),
-
-                AcceptanceRate = RoundScore(acceptanceRate),
-                RejectionRate = RoundScore(rejectionRate),
-                QualityScore = NormalizeScore(qualityScore),
-
-                CalculationRemarks =
-                    $"Quality was calculated from {qcHeaders.Count} " +
-                    "QA/QC inspection(s)."
-            };
-        }
-
-        private async Task<GeneratedDeliveryMetric>
-            GenerateDeliveryMetricAsync(
-                int supplierId,
-                DateTime periodStart,
-                DateTime periodEndExclusive)
-        {
-            /*
-             * Delivery source:
-             * purchasing_po_header
-             * purchasing_po_delivery_schedule
-             * purchasing_rr_header
-             *
-             * Schedules are selected by ScheduledDate.
-             */
-
-            var schedules = await (
-                from schedule in _context.PurchaseOrderDeliverySchedules
-                    .AsNoTracking()
-
-                join po in _context.PurchaseOrderHeaders
-                    .AsNoTracking()
-                    on schedule.PoId equals po.PoId
-
-                where po.SupplierId == supplierId
-                      && schedule.ScheduledDate >= periodStart
-                      && schedule.ScheduledDate < periodEndExclusive
-
-                select new
-                {
-                    schedule.ScheduleId,
-                    schedule.ScheduledDate,
-                    schedule.Status
-                })
-                .ToListAsync();
-
-            if (schedules.Count == 0)
-            {
-                return new GeneratedDeliveryMetric
-                {
-                    ScheduledDeliveries = 0,
-                    CompletedDeliveries = 0,
-                    OnTimeDeliveries = 0,
-                    EarlyDeliveries = 0,
-                    LateDeliveries = 0,
-                    IncompleteDeliveries = 0,
-                    UndeliveredSchedules = 0,
-                    OnTimeDeliveryRate = 0m,
-                    AverageDelayDays = 0m,
-                    DeliveryScore = 0m,
-                    CalculationRemarks =
-                        "No delivery schedules were found for the period."
-                };
-            }
-
-            var scheduleIds = schedules
-                .Select(x => x.ScheduleId)
-                .ToList();
-
-            var receivingReports = await _context.ReceivingReportHeaders
-     .AsNoTracking()
-     .Where(x =>
-         x.ScheduleId.HasValue &&
-         scheduleIds.Contains(x.ScheduleId.Value))
-     .Select(x => new
-     {
-         x.ScheduleId,
-         x.DeliveryDate,
-         x.Status
-     })
-     .ToListAsync();
-
-            var completed = 0;
-            var onTime = 0;
-            var early = 0;
-            var late = 0;
-            var incomplete = 0;
-            var undelivered = 0;
-
-            var delayDays = new List<decimal>();
-
-            foreach (var schedule in schedules)
-            {
-                var scheduleReceivingReports = receivingReports
-                    .Where(x => x.ScheduleId == schedule.ScheduleId)
-                    .ToList();
-
-                if (scheduleReceivingReports.Count == 0)
-                {
-                    undelivered++;
-                    continue;
-                }
-
-                /*
-                 * Use the latest delivery date because a delivery schedule
-                 * may be fulfilled through more than one receiving report.
-                 */
-                var actualDeliveryDate = scheduleReceivingReports
-                    .Max(x => x.DeliveryDate);
-
-                var isCompleted = string.Equals(
-                    schedule.Status,
-                    "COMPLETED",
-                    StringComparison.OrdinalIgnoreCase);
-
-                if (isCompleted)
-                {
-                    completed++;
-                }
-                else
-                {
-                    incomplete++;
-                }
-
-                var difference =
-                    actualDeliveryDate.Date -
-                    schedule.ScheduledDate.Date;
-
-                if (difference.TotalDays < 0)
-                {
-                    early++;
-
-                    // Early deliveries are considered timely.
-                    onTime++;
-                }
-                else if (difference.TotalDays == 0)
-                {
-                    onTime++;
-                }
-                else
-                {
-                    late++;
-                    delayDays.Add((decimal)difference.TotalDays);
-                }
+                throw new InvalidOperationException(
+                    $"QC {qc.QcNo} does not contain any inspection lines.");
             }
 
             /*
-             * Timely means delivered on or before the scheduled date.
-             *
-             * Denominator uses all scheduled deliveries. Therefore,
-             * undelivered schedules automatically reduce the score.
+             * Schedule is optional because RR.ScheduleId is nullable.
              */
-            var onTimeRate = schedules.Count > 0
-                ? (decimal)onTime / schedules.Count * 100m
-                : 0m;
+            PurchaseOrderDeliverySchedule? schedule = null;
 
-            var averageDelay = delayDays.Count > 0
-                ? delayDays.Average()
-                : 0m;
-
-            var deliveryScore = onTimeRate;
-
-            return new GeneratedDeliveryMetric
+            if (rr.ScheduleId.HasValue)
             {
-                ScheduledDeliveries = schedules.Count,
-                CompletedDeliveries = completed,
-                OnTimeDeliveries = onTime,
-                EarlyDeliveries = early,
-                LateDeliveries = late,
-                IncompleteDeliveries = incomplete,
-                UndeliveredSchedules = undelivered,
-
-                OnTimeDeliveryRate = RoundScore(onTimeRate),
-                AverageDelayDays = RoundScore(averageDelay),
-                DeliveryScore = NormalizeScore(deliveryScore),
-
-                CalculationRemarks =
-                    $"Delivery was calculated from {schedules.Count} " +
-                    "scheduled delivery record(s). Early deliveries are " +
-                    "included as timely deliveries."
-            };
-        }
-
-        private async Task<GeneratedCostMetric>
-            GenerateCostMetricAsync(
-                int supplierId,
-                DateTime periodStart,
-                DateTime periodEndExclusive)
-        {
-            /*
-             * Cost source:
-             * purchasing_po_header
-             * purchasing_po_line
-             *
-             * Supplier prices are compared with the average PO unit price
-             * from all suppliers for the same materials and period.
-             */
-
-            var periodPoLines = await (
-                from line in _context.PurchaseOrderLines
+                schedule = await _context
+                    .PurchaseOrderDeliverySchedules
                     .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.ScheduleId == rr.ScheduleId.Value);
+            }
 
-                join po in _context.PurchaseOrderHeaders
-                    .AsNoTracking()
-                    on line.PoId equals po.PoId
+            var evaluationNo =
+                await GenerateEvaluationNumberAsync(now);
 
-                where po.PoDate >= periodStart
-                      && po.PoDate < periodEndExclusive
-                      && line.PoQty > 0m
-                      && line.PoUnitPrice >= 0m
-
-                select new CostComparisonLine
+            var evaluation =
+                new SupplierPerformanceEvaluation
                 {
+                    EvaluationNo = evaluationNo,
+
+                    SupplierId = qc.SupplierId,
+
                     PoId = po.PoId,
-                    SupplierId = po.SupplierId,
-                    MaterialId = line.MaterialId,
-                    Quantity = line.PoQty,
-                    UnitPrice = line.PoUnitPrice,
-                    LineTotal = line.LineTotal
-                })
-                .ToListAsync();
+                    ScheduleId = rr.ScheduleId,
+                    RrId = rr.RrId,
+                    QcId = qc.QcId,
 
-            var supplierLines = periodPoLines
-                .Where(x => x.SupplierId == supplierId)
-                .ToList();
+                    EvaluationDate = now,
+                    DeliveryDate = rr.DeliveryDate,
 
-            if (supplierLines.Count == 0)
-            {
-                return new GeneratedCostMetric
-                {
-                    PurchaseOrderCount = 0,
-                    PurchaseOrderLineCount = 0,
-                    TotalPurchaseAmount = 0m,
-                    SupplierAverageUnitPrice = 0m,
-                    ComparisonAverageUnitPrice = 0m,
-                    PriceVarianceAmount = 0m,
-                    PriceVariancePercentage = 0m,
-                    CostScore = 0m,
-                    CalculationRemarks =
-                        "No purchase order lines were found for the period."
+                    /*
+                     * Keep legacy fields null.
+                     * New evaluations are no longer monthly records.
+                     */
+                    EvaluationYear = null,
+                    EvaluationMonth = null,
+                    PeriodStart = null,
+                    PeriodEnd = null,
+
+                    QualityScore = 0m,
+                    QualityWeightedScore = 0m,
+
+                    OnTimeDeliveryScore = 0m,
+                    DeliveryWeightedScore = 0m,
+
+                    CostCompetitivenessScore = 0m,
+                    CostWeightedScore = 0m,
+
+                    ReliabilityScore = 0m,
+                    ReliabilityWeightedScore = 0m,
+
+                    TotalScore = 0m,
+                    PerformanceRating = null,
+
+                    Status = "PENDING_PURCHASING",
+
+                    GeneratedBy = generatedBy,
+                    GeneratedAt = now,
+
+                    CreatedBy = generatedBy,
+                    CreatedAt = now,
+
+                    UpdatedBy = generatedBy,
+                    UpdatedAt = now
                 };
-            }
 
-            var materialMarketAverages = periodPoLines
-                .GroupBy(x => x.MaterialId)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group.Average(x => x.UnitPrice));
-
-            var comparisons = new List<MaterialPriceComparison>();
-
-            foreach (var supplierLine in supplierLines)
+            /*
+             * Build one evaluation line for every QC line/material.
+             */
+            foreach (var qcLine in qc.Lines)
             {
-                if (!materialMarketAverages.TryGetValue(
-                        supplierLine.MaterialId,
-                        out var comparisonPrice))
+                var rrLine = rr.Lines.FirstOrDefault(x =>
+                    x.RrLineId == qcLine.RrLineId);
+
+                if (rrLine == null)
                 {
-                    continue;
+                    throw new InvalidOperationException(
+                        $"RR line {qcLine.RrLineId} was not found.");
                 }
 
-                if (comparisonPrice <= 0m)
+                var poLine = po.Lines.FirstOrDefault(x =>
+                    x.PoLineId == qcLine.PoLineId);
+
+                if (poLine == null)
                 {
-                    continue;
+                    throw new InvalidOperationException(
+                        $"PO line {qcLine.PoLineId} was not found.");
                 }
+
+                PurchaseOrderDeliveryScheduleLine? scheduleLine = null;
+
+                if (rr.ScheduleId.HasValue)
+                {
+                    scheduleLine = await _context
+                        .PurchaseOrderDeliveryScheduleLines
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x =>
+                            x.ScheduleId == rr.ScheduleId.Value &&
+                            x.PoLineId == qcLine.PoLineId);
+                }
+
+                var previousUnitPrice =
+                    await GetPreviousUnitPriceAsync(
+                        currentPoId: po.PoId,
+                        supplierId: po.SupplierId,
+                        materialId: qcLine.MaterialId,
+                        currentPoDate: po.PoDate);
+
+                var line =
+                    new SupplierPerformanceEvaluationLine
+                    {
+                        QcLineId = qcLine.QcLineId,
+                        RrLineId = qcLine.RrLineId,
+                        PoLineId = qcLine.PoLineId,
+
+                        ScheduleLineId =
+                            scheduleLine?.ScheduleLineId,
+
+                        MaterialId = qcLine.MaterialId,
+
+                        ApprovedQty = qcLine.AcceptedQty,
+                        RejectedQty = qcLine.RejectedQty,
+                        TotalInspectedQty = qcLine.ReceivedQty,
+
+                        ScheduledDate =
+                            schedule?.ScheduledDate,
+
+                        ActualDeliveryDate =
+                            rr.DeliveryDate,
+
+                        ScheduledQty =
+                            scheduleLine?.ScheduledQty
+                            ?? rrLine.ReceiveQty,
+
+                        /*
+                         * Delivered quantity is the physical quantity
+                         * received in this RR.
+                         */
+                        DeliveredQty =
+                            rrLine.ReceiveQty,
+
+                        NewUnitPrice =
+                            poLine.PoUnitPrice,
+
+                        PreviousUnitPrice =
+                            previousUnitPrice,
+
+                        CoaPoints = 0m,
+                        TermsPoints = 0m,
+                        OtherPoints = 0m,
+
+                        ReliabilityScore = 0m,
+                        ReliabilityGrade = 0m,
+
+                        CreatedBy = generatedBy,
+                        CreatedAt = now
+                    };
+
+                CalculateQuality(line);
+                CalculateDelivery(line);
+                CalculateCost(line);
 
                 /*
-                 * 100 means equal to the comparison price.
-                 * Above 100 would mean cheaper, but raw scores are capped
-                 * at 100.
+                 * Reliability is still pending Purchasing input.
                  */
-                if (supplierLine.UnitPrice <= 0m)
-                {
-                    continue;
-                }
+                line.TotalGrade =
+                    RoundScore(
+                        line.QualityGrade +
+                        line.DeliveryGrade +
+                        line.CostGrade +
+                        line.ReliabilityGrade);
 
-                var lineScore =
-                    comparisonPrice /
-                    supplierLine.UnitPrice *
-                    100m;
+                evaluation.Lines.Add(line);
+            }
 
-                comparisons.Add(new MaterialPriceComparison
+            RecalculateHeader(evaluation);
+
+            evaluation.WorkflowHistory.Add(
+                new SupplierEvaluationWorkflowHistory
                 {
-                    SupplierPrice = supplierLine.UnitPrice,
-                    ComparisonPrice = comparisonPrice,
-                    Quantity = supplierLine.Quantity,
-                    Score = NormalizeScore(lineScore)
+                    FromStatus = null,
+                    ToStatus = "PENDING_PURCHASING",
+                    Action = "AUTO_GENERATED_FROM_QC",
+                    ActionBy = generatedBy,
+                    ActionAt = now,
+                    Remarks =
+                        $"Automatically created from QC {qc.QcNo} " +
+                        $"and RR {rr.RrNo}."
                 });
-            }
 
-            var totalPurchaseAmount = supplierLines.Sum(x =>
-                x.LineTotal > 0m
-                    ? x.LineTotal
-                    : x.Quantity * x.UnitPrice);
+            /*
+             * Add only.
+             * SaveChanges is handled by QcInspectionService so that
+             * QC commit + inventory + supplier evaluation are atomic.
+             */
+            _context.SupplierPerformanceEvaluations.Add(
+                evaluation);
 
-            var totalSupplierQuantity = supplierLines.Sum(x => x.Quantity);
-
-            var supplierAveragePrice = totalSupplierQuantity > 0m
-                ? supplierLines.Sum(x => x.UnitPrice * x.Quantity) /
-                  totalSupplierQuantity
-                : supplierLines.Average(x => x.UnitPrice);
-
-            var comparisonAveragePrice = comparisons.Count > 0
-                ? WeightedAverage(
-                    comparisons,
-                    x => x.ComparisonPrice,
-                    x => x.Quantity)
-                : supplierAveragePrice;
-
-            var costScore = comparisons.Count > 0
-                ? WeightedAverage(
-                    comparisons,
-                    x => x.Score,
-                    x => x.Quantity)
-                : 100m;
-
-            var varianceAmount =
-                supplierAveragePrice -
-                comparisonAveragePrice;
-
-            var variancePercentage = comparisonAveragePrice > 0m
-                ? varianceAmount / comparisonAveragePrice * 100m
-                : 0m;
-
-            return new GeneratedCostMetric
-            {
-                PurchaseOrderCount = supplierLines
-                    .Select(x => x.PoId)
-                    .Distinct()
-                    .Count(),
-
-                PurchaseOrderLineCount = supplierLines.Count,
-
-                TotalPurchaseAmount =
-                    RoundMoney(totalPurchaseAmount),
-
-                SupplierAverageUnitPrice =
-                    RoundMoney(supplierAveragePrice),
-
-                ComparisonAverageUnitPrice =
-                    RoundMoney(comparisonAveragePrice),
-
-                PriceVarianceAmount =
-                    RoundMoney(varianceAmount),
-
-                PriceVariancePercentage =
-                    RoundScore(variancePercentage),
-
-                CostScore =
-                    NormalizeScore(costScore),
-
-                CalculationRemarks =
-                    $"Cost competitiveness was calculated from " +
-                    $"{supplierLines.Count} purchase order line(s)."
-            };
+            return evaluation;
         }
 
-        private static decimal WeightedAverage<T>(
-            IEnumerable<T> items,
-            Func<T, decimal> valueSelector,
-            Func<T, decimal> weightSelector)
+        private async Task<decimal?> GetPreviousUnitPriceAsync(
+      int currentPoId,
+      int supplierId,
+      int materialId,
+      DateTime currentPoDate)
         {
-            var itemList = items.ToList();
+            /*
+             * Previous price:
+             *
+             * SAME SUPPLIER
+             * + SAME MATERIAL
+             * + valid PO status
+             * + PO must be before the current PO
+             *
+             * Same-day POs are allowed.
+             * PoId is used as the tie-breaker.
+             */
 
-            if (itemList.Count == 0)
-            {
-                return 0m;
-            }
+            return await (
+                from previousLine in _context.PurchaseOrderLines
+                    .AsNoTracking()
 
-            var totalWeight = itemList.Sum(weightSelector);
+                join previousPo in _context.PurchaseOrderHeaders
+                    .AsNoTracking()
+                    on previousLine.PoId equals previousPo.PoId
 
-            if (totalWeight <= 0m)
-            {
-                return itemList.Average(valueSelector);
-            }
+                where previousPo.SupplierId == supplierId
+                      && previousLine.MaterialId == materialId
+                      && previousPo.PoId != currentPoId
 
-            var weightedTotal = itemList.Sum(x =>
-                valueSelector(x) * weightSelector(x));
+                      // Previous PO:
+                      // earlier date OR same date with lower PoId
+                      && (
+                          previousPo.PoDate < currentPoDate
+                          ||
+                          (
+                              previousPo.PoDate == currentPoDate
+                              && previousPo.PoId < currentPoId
+                          )
+                      )
 
-            return weightedTotal / totalWeight;
+                      && (
+                          previousPo.Status == "APPROVED"
+                          || previousPo.Status == "PARTIALLY_RECEIVED"
+                          || previousPo.Status == "FULLY_RECEIVED"
+                      )
+
+                orderby previousPo.PoDate descending,
+                        previousPo.PoId descending
+
+                select (decimal?)previousLine.PoUnitPrice
+            )
+            .FirstOrDefaultAsync();
         }
 
-        private static void ValidatePeriod(
-            int evaluationYear,
-            int evaluationMonth)
+        private static void CalculateQuality(
+            SupplierPerformanceEvaluationLine line)
         {
-            if (evaluationYear < 2000)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(evaluationYear),
-                    "Evaluation year must be 2000 or later.");
-            }
+            /*
+             * Quality raw score:
+             *
+             * Accepted / Inspected × 100
+             *
+             * Weight = 40%
+             */
+            line.QualityScore =
+                line.TotalInspectedQty > 0m
+                    ? NormalizeScore(
+                        line.ApprovedQty /
+                        line.TotalInspectedQty *
+                        100m)
+                    : 0m;
 
-            if (evaluationMonth < 1 || evaluationMonth > 12)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(evaluationMonth),
-                    "Evaluation month must be between 1 and 12.");
-            }
+            line.QualityGrade =
+                RoundScore(
+                    line.QualityScore * 0.40m);
         }
 
-        private static decimal NormalizeScore(decimal value)
+        private static void CalculateDelivery(
+            SupplierPerformanceEvaluationLine line)
         {
-            value = Math.Clamp(value, 0m, 100m);
+            /*
+             * ON TIME = 50% of Delivery criterion.
+             *
+             * Early/on-date = 100
+             * Late = 0
+             */
+            if (line.ScheduledDate.HasValue)
+            {
+                line.IsOnTime =
+                    line.ActualDeliveryDate.Date <=
+                    line.ScheduledDate.Value.Date;
 
-            return RoundScore(value);
+                line.OnTimeScore =
+                    line.IsOnTime
+                        ? 100m
+                        : 0m;
+            }
+            else
+            {
+                /*
+                 * No delivery schedule.
+                 * Do not award an automatic on-time score.
+                 */
+                line.IsOnTime = false;
+                line.OnTimeScore = 0m;
+            }
+
+            /*
+             * IN FULL = Delivered / Scheduled × 100.
+             * Cap at 100 for over-delivery.
+             */
+            line.InFullScore =
+                line.ScheduledQty > 0m
+                    ? NormalizeScore(
+                        line.DeliveredQty /
+                        line.ScheduledQty *
+                        100m)
+                    : 0m;
+
+            /*
+             * Delivery raw score:
+             *
+             * 50% On Time
+             * 50% In Full
+             */
+            line.DeliveryScore =
+                RoundScore(
+                    line.OnTimeScore * 0.50m +
+                    line.InFullScore * 0.50m);
+
+            /*
+             * Whole delivery criterion is 30%.
+             */
+            line.DeliveryGrade =
+                RoundScore(
+                    line.DeliveryScore * 0.30m);
         }
 
-        private static decimal RoundScore(decimal value)
+        private static void CalculateCost(
+    SupplierPerformanceEvaluationLine line)
+        {
+            if (!line.PreviousUnitPrice.HasValue ||
+                line.PreviousUnitPrice.Value <= 0m)
+            {
+                line.PriceChangePercent = null;
+                line.CostStatus = "NO_PREVIOUS_PRICE";
+
+                // First purchase: no basis for penalty.
+                line.CostScore = 100m;
+                line.CostGrade = 20m;
+
+                return;
+            }
+
+            var previousPrice = line.PreviousUnitPrice.Value;
+            var newPrice = line.NewUnitPrice;
+
+            var changePercent =
+                ((newPrice - previousPrice) / previousPrice) * 100m;
+
+            line.PriceChangePercent = Math.Round(
+                changePercent,
+                4,
+                MidpointRounding.AwayFromZero);
+
+            if (changePercent < 0m)
+            {
+                line.CostStatus = "PRICE_DECREASED";
+
+                line.CostScore = 100m;
+                line.CostGrade = 20m;
+            }
+            else if (changePercent == 0m)
+            {
+                line.CostStatus = "PRICE_UNCHANGED";
+
+                line.CostScore = 100m;
+                line.CostGrade = 20m;
+            }
+            else
+            {
+                line.CostStatus = "PRICE_INCREASED";
+
+                var remainingScore =
+                    Math.Max(0m, 100m - changePercent);
+
+                line.CostScore = Math.Round(
+                    remainingScore,
+                    2,
+                    MidpointRounding.AwayFromZero);
+
+                line.CostGrade = Math.Round(
+                    remainingScore / 100m * 20m,
+                    2,
+                    MidpointRounding.AwayFromZero);
+            }
+        }
+
+        public static void RecalculateHeader(
+            SupplierPerformanceEvaluation evaluation)
+        {
+            if (evaluation.Lines.Count == 0)
+            {
+                evaluation.QualityScore = 0m;
+                evaluation.QualityWeightedScore = 0m;
+
+                evaluation.OnTimeDeliveryScore = 0m;
+                evaluation.DeliveryWeightedScore = 0m;
+
+                evaluation.CostCompetitivenessScore = 0m;
+                evaluation.CostWeightedScore = 0m;
+
+                evaluation.ReliabilityScore = 0m;
+                evaluation.ReliabilityWeightedScore = 0m;
+
+                evaluation.TotalScore = 0m;
+                evaluation.PerformanceRating = null;
+
+                return;
+            }
+
+            evaluation.QualityScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.QualityScore));
+
+            evaluation.QualityWeightedScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.QualityGrade));
+
+            evaluation.OnTimeDeliveryScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.DeliveryScore));
+
+            evaluation.DeliveryWeightedScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.DeliveryGrade));
+
+            /*
+             * Lines with NO_PREVIOUS_PRICE should not make the
+             * supplier look artificially expensive.
+             *
+             * Only lines with an actual historical comparison
+             * are included in the header Cost average.
+             */
+            /*
+  * Cost Competitiveness
+  *
+  * Every evaluation line participates.
+  *
+  * NO_PREVIOUS_PRICE receives:
+  * Raw Score = 100
+  * Grade     = 20
+  */
+            evaluation.CostCompetitivenessScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.CostScore));
+
+            evaluation.CostWeightedScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.CostGrade));
+
+            evaluation.ReliabilityScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.ReliabilityScore));
+
+            evaluation.ReliabilityWeightedScore =
+                RoundScore(
+                    evaluation.Lines.Average(x =>
+                        x.ReliabilityGrade));
+
+            evaluation.TotalScore =
+                RoundScore(
+                    evaluation.QualityWeightedScore +
+                    evaluation.DeliveryWeightedScore +
+                    evaluation.CostWeightedScore +
+                    evaluation.ReliabilityWeightedScore);
+
+            /*
+             * Do not give the final rating yet because Purchasing
+             * still needs to complete Reliability / After Sales.
+             */
+            evaluation.PerformanceRating =
+                GetPerformanceRating(
+                    evaluation.TotalScore);
+        }
+
+        private async Task<string>
+            GenerateEvaluationNumberAsync(
+                DateTime date)
+        {
+            var prefix =
+                $"SPE-{date:yyyy}-";
+
+            var existingNumbers =
+                await _context
+                    .SupplierPerformanceEvaluations
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.EvaluationNo.StartsWith(prefix))
+                    .Select(x => x.EvaluationNo)
+                    .ToListAsync();
+
+            var highestSequence = 0;
+
+            foreach (var number in existingNumbers)
+            {
+                var sequencePart =
+                    number.Replace(
+                        prefix,
+                        string.Empty);
+
+                if (int.TryParse(
+                        sequencePart,
+                        out var sequence) &&
+                    sequence > highestSequence)
+                {
+                    highestSequence = sequence;
+                }
+            }
+
+            return
+                $"{prefix}{highestSequence + 1:0000}";
+        }
+
+        private static string GetPerformanceRating(
+            decimal totalScore)
+        {
+            if (totalScore >= 90m)
+                return "EXCELLENT";
+
+            if (totalScore >= 80m)
+                return "VERY GOOD";
+
+            if (totalScore >= 70m)
+                return "GOOD";
+
+            if (totalScore >= 60m)
+                return "NEEDS IMPROVEMENT";
+
+            return "POOR";
+        }
+
+        private static decimal NormalizeScore(
+            decimal score)
+        {
+            return RoundScore(
+                Math.Clamp(
+                    score,
+                    0m,
+                    100m));
+        }
+
+        private static decimal RoundScore(
+            decimal value)
         {
             return Math.Round(
                 value,
                 2,
                 MidpointRounding.AwayFromZero);
-        }
-
-        private static decimal RoundQuantity(decimal value)
-        {
-            return Math.Round(
-                value,
-                4,
-                MidpointRounding.AwayFromZero);
-        }
-
-        private static decimal RoundMoney(decimal value)
-        {
-            return Math.Round(
-                value,
-                4,
-                MidpointRounding.AwayFromZero);
-        }
-
-        private sealed class CostComparisonLine
-        {
-            public int PoId { get; set; }
-
-            public int SupplierId { get; set; }
-
-            public int MaterialId { get; set; }
-
-            public decimal Quantity { get; set; }
-
-            public decimal UnitPrice { get; set; }
-
-            public decimal LineTotal { get; set; }
-        }
-
-        private sealed class MaterialPriceComparison
-        {
-            public decimal SupplierPrice { get; set; }
-
-            public decimal ComparisonPrice { get; set; }
-
-            public decimal Quantity { get; set; }
-
-            public decimal Score { get; set; }
         }
     }
 }

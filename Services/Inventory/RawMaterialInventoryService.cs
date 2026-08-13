@@ -1,5 +1,6 @@
 ﻿using inventory_api.Data;
 using inventory_api.DTOs.Inventory.RawMaterials;
+using inventory_api.Models.Manufacturing.Materials;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Inventory
@@ -282,32 +283,49 @@ namespace inventory_api.Services.Inventory
             }
 
             var transactions = await (
-     from transaction in _context.MaterialInventoryTransactions.AsNoTracking()
+    from transaction in
+        _context.MaterialInventoryTransactions.AsNoTracking()
 
-     join user in _context.Users.AsNoTracking()
-         on transaction.encoded_by equals user.user_id
-         into userJoin
+    join user in
+        _context.Users.AsNoTracking()
+        on transaction.encoded_by equals user.user_id
+        into userJoin
 
-     from user in userJoin.DefaultIfEmpty()
+    from user in userJoin.DefaultIfEmpty()
 
-     where
-         transaction.material_id == lot.material_id &&
-         transaction.branch_id == lot.branch_id &&
-         transaction.lot_no == lot.lot_no
+    join supplier in
+        _context.Suppliers.AsNoTracking()
+        on transaction.supplier_id equals supplier.SupplierId
+        into supplierJoin
 
-     orderby
-         transaction.transaction_date,
-         transaction.transaction_id
+    from supplier in supplierJoin.DefaultIfEmpty()
 
-     select new
-     {
-         Transaction = transaction,
+    where
+        transaction.material_id == lot.material_id &&
+        transaction.branch_id == lot.branch_id &&
+        transaction.lot_no == lot.lot_no
 
-         EncodedByName = user != null
-             ? user.full_name
-             : transaction.encoded_by
-     }
- ).ToListAsync();
+    orderby
+        transaction.transaction_date,
+        transaction.transaction_id
+
+    select new
+    {
+        Transaction = transaction,
+
+        SupplierName =
+            supplier != null
+                ? supplier.SupplierName
+                : "Not Specified",
+
+        EncodedByName =
+            user != null
+                ? user.full_name
+                : transaction.encoded_by
+    }
+).ToListAsync();
+
+
 
             decimal runningBalance = 0;
 
@@ -352,9 +370,14 @@ namespace inventory_api.Services.Inventory
 
                     Uom = transaction.uom,
 
-                    ReferenceType =
-                        transaction.reference_type ?? string.Empty,
+                    SupplierId =
+    transaction.supplier_id,
 
+                    SupplierName =
+    record.SupplierName,
+
+                    ReferenceType =
+    transaction.reference_type ?? string.Empty,
                     ReferenceId =
                         transaction.reference_id,
 
@@ -377,6 +400,613 @@ namespace inventory_api.Services.Inventory
                 .OrderByDescending(x => x.TransactionDate)
                 .ThenByDescending(x => x.TransactionId)
                 .ToList();
+        }
+
+
+        public async Task<RawMaterialTransactionResponseDto>
+    GetAllTransactionsAsync(
+        RawMaterialTransactionFilterDto filter)
+        {
+            filter ??= new RawMaterialTransactionFilterDto();
+
+            var records = await (
+                from transaction in
+                    _context.MaterialInventoryTransactions.AsNoTracking()
+
+                join material in
+                    _context.Materials.AsNoTracking()
+                    on transaction.material_id equals material.material_id
+
+                join branch in
+                    _context.Branches.AsNoTracking()
+                    on transaction.branch_id equals branch.branch_id
+                    into branchJoin
+
+                from branch in branchJoin.DefaultIfEmpty()
+
+                join supplier in
+    _context.Suppliers.AsNoTracking()
+    on transaction.supplier_id equals supplier.SupplierId
+    into supplierJoin
+
+                from supplier in supplierJoin.DefaultIfEmpty()
+
+                join user in
+                    _context.Users.AsNoTracking()
+                    on transaction.encoded_by equals user.user_id
+                    into userJoin
+
+                from user in userJoin.DefaultIfEmpty()
+
+                where material.is_active &&
+                      !material.is_deleted
+
+                orderby
+                    transaction.transaction_date,
+                    transaction.transaction_id
+
+                select new
+                {
+                    Transaction = transaction,
+                    Material = material,
+
+                    BranchName =
+         branch != null
+             ? branch.branch_name
+             : transaction.branch_id,
+
+                    SupplierName =
+         supplier != null
+             ? supplier.SupplierName
+             : "Not Specified",
+
+                    EncodedByName =
+         user != null
+             ? user.full_name
+             : transaction.encoded_by
+                }
+            ).ToListAsync();
+
+
+            // ----------------------------------------------------
+            // Calculate running balance PER:
+            // Material + Branch + Lot
+            // ----------------------------------------------------
+
+            var balances =
+                new Dictionary<string, decimal>();
+
+            var allItems =
+                new List<RawMaterialTransactionListDto>();
+
+            foreach (var record in records)
+            {
+                var transaction = record.Transaction;
+
+                var lotNo =
+                    transaction.lot_no?.Trim()
+                    ?? string.Empty;
+
+                var balanceKey =
+                    $"{transaction.material_id}|" +
+                    $"{transaction.branch_id}|" +
+                    $"{lotNo}";
+
+                if (!balances.ContainsKey(balanceKey))
+                {
+                    balances[balanceKey] = 0m;
+                }
+
+                var isOutbound =
+                    IsOutboundTransaction(
+                        transaction.transaction_type);
+
+                var absoluteQty =
+                    Math.Abs(transaction.quantity);
+
+                var qtyIn =
+                    isOutbound
+                        ? 0m
+                        : absoluteQty;
+
+                var qtyOut =
+                    isOutbound
+                        ? absoluteQty
+                        : 0m;
+
+                balances[balanceKey] += qtyIn;
+                balances[balanceKey] -= qtyOut;
+
+                var isInternalNonLot =
+                    lotNo.StartsWith(
+                        "NON-LOT",
+                        StringComparison.OrdinalIgnoreCase)
+                    ||
+                    lotNo.StartsWith(
+                        "NOLOT",
+                        StringComparison.OrdinalIgnoreCase);
+
+                allItems.Add(
+                    new RawMaterialTransactionListDto
+                    {
+                        TransactionId =
+                            transaction.transaction_id,
+
+                        MaterialId =
+                            transaction.material_id,
+
+                        MaterialCode =
+                            record.Material.material_code,
+
+                        MaterialName =
+                            record.Material.material_name,
+
+                        BranchId =
+                            transaction.branch_id,
+
+                        BranchName =
+                            record.BranchName,
+
+                        LotNo =
+                            lotNo,
+
+                        LotDisplay =
+                            !record.Material.is_lot_tracked ||
+                            isInternalNonLot
+                                ? "Not Lot Tracked"
+                                : lotNo,
+
+                        TransactionType =
+                            transaction.transaction_type,
+
+                        Movement =
+                            isOutbound
+                                ? "OUT"
+                                : "IN",
+
+                        Quantity =
+                            transaction.quantity,
+
+                        QuantityIn =
+                            qtyIn,
+
+                        QuantityOut =
+                            qtyOut,
+
+                        RunningBalance =
+                            balances[balanceKey],
+
+                        Uom =
+                            transaction.uom,
+
+                        SupplierId =
+    transaction.supplier_id,
+
+                        SupplierName =
+    record.SupplierName,
+
+                        ReferenceType =
+                            transaction.reference_type
+                            ?? string.Empty,
+
+                        ReferenceId =
+                            transaction.reference_id,
+
+                        ReferenceNo =
+                            transaction.reference_no
+                            ?? string.Empty,
+
+                        EncodedBy =
+                            record.EncodedByName
+                            ?? string.Empty,
+
+                        Remarks =
+                            transaction.remarks
+                            ?? string.Empty,
+
+                        TransactionDate =
+                            transaction.transaction_date
+                    });
+            }
+
+
+            // ----------------------------------------------------
+            // FILTERS
+            //
+            // Apply AFTER running balance is calculated so date
+            // filtering does not destroy the real balance.
+            // ----------------------------------------------------
+
+            IEnumerable<RawMaterialTransactionListDto> filtered =
+                allItems;
+
+
+            // Search
+            if (!string.IsNullOrWhiteSpace(filter.Search))
+            {
+                var search =
+                    filter.Search
+                        .Trim()
+                        .ToLowerInvariant();
+
+                filtered = filtered.Where(x =>
+                    x.MaterialCode
+                        .ToLowerInvariant()
+                        .Contains(search)
+                    ||
+                    x.MaterialName
+                        .ToLowerInvariant()
+                        .Contains(search)
+                    ||
+                    x.ReferenceNo
+                        .ToLowerInvariant()
+                        .Contains(search)
+                    ||
+                    x.EncodedBy
+    .ToLowerInvariant()
+    .Contains(search)
+||
+x.SupplierName
+    .ToLowerInvariant()
+    .Contains(search));
+            }
+
+
+            // Branch
+            if (!string.IsNullOrWhiteSpace(filter.BranchId))
+            {
+                var branchId =
+                    filter.BranchId.Trim();
+
+                filtered = filtered.Where(x =>
+                    x.BranchId == branchId);
+            }
+
+
+            // IN / OUT
+            if (!string.IsNullOrWhiteSpace(filter.Movement))
+            {
+                var movement =
+                    filter.Movement
+                        .Trim()
+                        .ToUpperInvariant();
+
+                filtered = filtered.Where(x =>
+                    x.Movement == movement);
+            }
+
+
+            // Transaction Type
+            if (!string.IsNullOrWhiteSpace(
+                filter.TransactionType))
+            {
+                var transactionType =
+                    filter.TransactionType
+                        .Trim()
+                        .ToUpperInvariant();
+
+                filtered = filtered.Where(x =>
+                    x.TransactionType
+                        .ToUpperInvariant()
+                        == transactionType);
+            }
+
+
+            // Date From
+            if (filter.FromDate.HasValue)
+            {
+                var from =
+                    filter.FromDate.Value.Date;
+
+                filtered = filtered.Where(x =>
+                    x.TransactionDate >= from);
+            }
+
+
+            // Date To
+            if (filter.ToDate.HasValue)
+            {
+                var toExclusive =
+                    filter.ToDate.Value.Date
+                        .AddDays(1);
+
+                filtered = filtered.Where(x =>
+                    x.TransactionDate < toExclusive);
+            }
+
+
+            var result = filtered
+                .OrderByDescending(x =>
+                    x.TransactionDate)
+                .ThenByDescending(x =>
+                    x.TransactionId)
+                .ToList();
+
+
+            var today =
+                DateTime.Today;
+
+            return new RawMaterialTransactionResponseDto
+            {
+                Summary =
+                    new RawMaterialTransactionSummaryDto
+                    {
+                        TotalTransactions =
+                            result.Count,
+
+                        InTransactions =
+                            result.Count(x =>
+                                x.Movement == "IN"),
+
+                        OutTransactions =
+                            result.Count(x =>
+                                x.Movement == "OUT"),
+
+                        TodayTransactions =
+                            result.Count(x =>
+                                x.TransactionDate.Date ==
+                                today)
+                    },
+
+                Items = result
+            };
+        }
+
+        public async Task ManualStockInAsync(ManualStockInDto dto)
+        {
+            if (dto == null)
+            {
+                throw new ArgumentNullException(nameof(dto));
+            }
+
+            if (dto.MaterialId <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Material is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.BranchId))
+            {
+                throw new InvalidOperationException(
+                    "Branch is required.");
+            }
+
+            if (dto.Quantity <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Stock in quantity must be greater than zero.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.EncodedBy))
+            {
+                throw new InvalidOperationException(
+                    "Encoded by is required.");
+            }
+
+            var material = await _context.Materials
+                .FirstOrDefaultAsync(x =>
+                    x.material_id == dto.MaterialId &&
+                    x.is_active &&
+                    !x.is_deleted);
+
+            if (material == null)
+            {
+                throw new KeyNotFoundException(
+                    $"Material ID {dto.MaterialId} was not found.");
+            }
+
+            var branchId = dto.BranchId.Trim();
+            var now = DateTime.Now;
+
+            string lotNo;
+
+            // ---------------------------------------------------------
+            // LOT NUMBER
+            // ---------------------------------------------------------
+
+            if (material.is_lot_tracked)
+            {
+                if (string.IsNullOrWhiteSpace(dto.LotNo))
+                {
+                    throw new InvalidOperationException(
+                        "Lot number is required for this material.");
+                }
+
+                lotNo = dto.LotNo.Trim();
+
+                if (dto.ExpirationDate.HasValue &&
+                    dto.ManufacturingDate.HasValue &&
+                    dto.ExpirationDate.Value.Date <
+                    dto.ManufacturingDate.Value.Date)
+                {
+                    throw new InvalidOperationException(
+                        "Expiration date cannot be earlier than manufacturing date.");
+                }
+            }
+            else
+            {
+                // Keep the same stable internal key used by QC inventory posting.
+                // Branch is already stored separately in branch_id.
+                lotNo = $"NON-LOT-MAT-{dto.MaterialId}";
+            }
+
+            await using var dbTransaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                // ---------------------------------------------------------
+                // FIND EXISTING INVENTORY LOT
+                // ---------------------------------------------------------
+
+                var inventoryLot =
+                    await _context.MaterialLotNumbers
+                        .FirstOrDefaultAsync(x =>
+                            x.material_id == dto.MaterialId &&
+                            x.branch_id == branchId &&
+                            x.lot_no == lotNo);
+
+                // ---------------------------------------------------------
+                // CREATE NEW INVENTORY LOT
+                // ---------------------------------------------------------
+
+                if (inventoryLot == null)
+                {
+                    inventoryLot = new MaterialLotNumber
+                    {
+                        material_id = dto.MaterialId,
+
+                        branch_id = branchId,
+
+                        lot_no = lotNo,
+
+                        manufacturing_date =
+                            material.is_lot_tracked
+                                ? dto.ManufacturingDate
+                                : null,
+
+                        expiration_date =
+                            material.is_lot_tracked
+                                ? dto.ExpirationDate
+                                : null,
+
+                        quantity = dto.Quantity,
+
+                        uom = material.uom,
+
+                        supplier_id =
+    material.is_lot_tracked
+        ? dto.SupplierId
+        : null,
+
+                        remarks =
+                            string.IsNullOrWhiteSpace(dto.Remarks)
+                                ? "Manual stock in."
+                                : dto.Remarks.Trim(),
+
+                        is_active = true,
+
+                        created_at = now,
+
+                        updated_at = null
+                    };
+
+                    await _context.MaterialLotNumbers
+                        .AddAsync(inventoryLot);
+                }
+
+                // ---------------------------------------------------------
+                // UPDATE EXISTING INVENTORY LOT
+                // ---------------------------------------------------------
+
+                else
+                {
+                    inventoryLot.quantity += dto.Quantity;
+
+                    inventoryLot.is_active = true;
+
+                    inventoryLot.updated_at = now;
+
+                    /*
+                     * Don't replace existing lot information.
+                     * Only fill missing values.
+                     */
+
+                    if (material.is_lot_tracked)
+                    {
+                        inventoryLot.manufacturing_date ??=
+                            dto.ManufacturingDate;
+
+                        inventoryLot.expiration_date ??=
+                            dto.ExpirationDate;
+                    }
+
+                    if (material.is_lot_tracked)
+                    {
+                        inventoryLot.supplier_id ??=
+                            dto.SupplierId;
+                    }
+                    else
+                    {
+                        inventoryLot.supplier_id = null;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(
+                            inventoryLot.uom))
+                    {
+                        inventoryLot.uom =
+                            material.uom;
+                    }
+                }
+
+                // ---------------------------------------------------------
+                // CREATE INVENTORY TRANSACTION
+                // ---------------------------------------------------------
+
+                var inventoryTransaction =
+       new MaterialInventoryTransaction
+       {
+           material_id =
+               dto.MaterialId,
+
+           branch_id =
+               branchId,
+
+           lot_no =
+               lotNo,
+
+           transaction_type =
+               "MANUAL_STOCK_IN",
+
+           quantity =
+               dto.Quantity,
+
+           uom =
+               material.uom,
+
+           supplier_id =
+               dto.SupplierId,
+
+           reference_type =
+               "MANUAL",
+
+           reference_id =
+               null,
+
+           reference_no =
+               $"MSI-{now:yyyyMMddHHmmssfff}",
+
+           remarks =
+               string.IsNullOrWhiteSpace(dto.Remarks)
+                   ? "Manual stock in."
+                   : dto.Remarks.Trim(),
+
+           encoded_by =
+               dto.EncodedBy.Trim(),
+
+           transaction_date =
+               now,
+
+           created_at =
+               now
+       };
+
+                await _context.MaterialInventoryTransactions
+                    .AddAsync(inventoryTransaction);
+
+                // ---------------------------------------------------------
+                // SAVE BOTH INVENTORY + TRANSACTION
+                // ---------------------------------------------------------
+
+                await _context.SaveChangesAsync();
+
+                await dbTransaction.CommitAsync();
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
         }
 
         private static bool IsOutboundTransaction(string? transactionType)

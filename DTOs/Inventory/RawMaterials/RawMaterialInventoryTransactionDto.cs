@@ -17,6 +17,9 @@
 
         public string Uom { get; set; } = string.Empty;
 
+        public int? SupplierId { get; set; }
+        public string SupplierName { get; set; } = string.Empty;
+
         public string ReferenceType { get; set; } = string.Empty;
         public int? ReferenceId { get; set; }
         public string ReferenceNo { get; set; } = string.Empty;

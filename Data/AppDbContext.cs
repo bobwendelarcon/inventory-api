@@ -1,13 +1,14 @@
-﻿using inventory_api.Models.SupplierEvaluation;
-using inventory_api.Data;
+﻿using inventory_api.Data;
 using inventory_api.Models;
 using inventory_api.Models.Manufacturing.Materials;
+using inventory_api.Models.Manufacturing.Materials.Requisitions;
 using inventory_api.Models.Purchasing;
 using inventory_api.Models.Purchasing.Canvassing;
 using inventory_api.Models.Purchasing.PurchaseOrders;
 using inventory_api.Models.Purchasing.QcInspections;
 using inventory_api.Models.Purchasing.ReceivingReports;
 using inventory_api.Models.Purchasing.Suppliers;
+using inventory_api.Models.SupplierEvaluation;
 using Microsoft.EntityFrameworkCore;
 
 
@@ -62,6 +63,10 @@ namespace inventory_api.Data
         public DbSet<MaterialInventoryTransaction> MaterialInventoryTransactions { get; set; }
         public DbSet<MaterialInventoryPlanning> MaterialInventoryPlannings { get; set; }
         public DbSet<MaterialPurchaseRecommendation> MaterialPurchaseRecommendations { get; set; }
+
+        // Material Requisition / Stock OUT
+        public DbSet<MaterialRequisition> MaterialRequisitions { get; set; }
+        public DbSet<MaterialRequisitionLine> MaterialRequisitionLines { get; set; }
 
 
         //purchasing
@@ -130,6 +135,10 @@ namespace inventory_api.Data
 
         public DbSet<SupplierEvaluationWorkflowHistory>
             SupplierEvaluationWorkflowHistory
+        { get; set; }
+
+        public DbSet<SupplierPerformanceEvaluationLine>
+    SupplierPerformanceEvaluationLines
         { get; set; }
 
 
@@ -285,6 +294,132 @@ namespace inventory_api.Data
                 entity.Property(e => e.encoded_by)
                     .HasMaxLength(50);
             });
+
+
+            // Material Requisition / Raw Material Stock OUT
+            modelBuilder.Entity<MaterialRequisition>(entity =>
+            {
+                entity.ToTable("material_requisition");
+
+                entity.HasKey(e => e.RequisitionId);
+
+                entity.Property(e => e.RequisitionId)
+                    .HasColumnName("requisition_id");
+
+                entity.Property(e => e.RequisitionNo)
+                    .HasColumnName("requisition_no")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.BranchId)
+                    .HasColumnName("branch_id")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.RequisitionDate)
+                    .HasColumnName("requisition_date");
+
+                entity.Property(e => e.RequestedBy)
+                    .HasColumnName("requested_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.ReleasedBy)
+                    .HasColumnName("released_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.ReceivedBy)
+                    .HasColumnName("received_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.VerifiedBy)
+                    .HasColumnName("verified_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.TimeRequested)
+                    .HasColumnName("time_requested");
+
+                entity.Property(e => e.TimeServed)
+                    .HasColumnName("time_served");
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status")
+                    .HasMaxLength(20);
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks")
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.CreatedBy)
+                    .HasColumnName("created_by")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.PostedBy)
+                    .HasColumnName("posted_by")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.Property(e => e.PostedAt)
+                    .HasColumnName("posted_at");
+
+                entity.HasMany(e => e.Lines)
+                    .WithOne(e => e.Requisition)
+                    .HasForeignKey(e => e.RequisitionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+
+            modelBuilder.Entity<MaterialRequisitionLine>(entity =>
+            {
+                entity.ToTable("material_requisition_line");
+
+                entity.HasKey(e => e.RequisitionLineId);
+
+                entity.Property(e => e.RequisitionLineId)
+                    .HasColumnName("requisition_line_id");
+
+                entity.Property(e => e.RequisitionId)
+                    .HasColumnName("requisition_id");
+
+                entity.Property(e => e.MaterialId)
+                    .HasColumnName("material_id");
+
+                entity.Property(e => e.MaterialLotId)
+                    .HasColumnName("material_lot_id");
+
+                entity.Property(e => e.LotNo)
+                    .HasColumnName("lot_no")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.RequestedQuantity)
+                    .HasColumnName("requested_quantity")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.ActualQuantity)
+                    .HasColumnName("actual_quantity")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.Uom)
+                    .HasColumnName("uom")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.ExpirationDate)
+                    .HasColumnName("expiration_date");
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks")
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+            });
+
+
 
             //purchasing
 
@@ -743,174 +878,209 @@ namespace inventory_api.Data
 
         }
 
+
         private static void ConfigureSupplierPerformanceEvaluation(
     ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<SupplierPerformanceEvaluation>(entity =>
             {
+                entity.ToTable("supplier_performance_evaluations");
+
                 entity.HasKey(x => x.EvaluationId);
 
                 entity.HasIndex(x => x.EvaluationNo)
-                    .IsUnique();
+                    .IsUnique()
+                    .HasDatabaseName("uq_supplier_evaluation_no");
 
-                /*
-                 * Critical business rule:
-                 * Only one evaluation per supplier per year and month.
-                 */
-                entity.HasIndex(x => new
-                {
-                    x.SupplierId,
-                    x.EvaluationYear,
-                    x.EvaluationMonth
-                })
-                .IsUnique()
-                .HasDatabaseName("uq_supplier_evaluation_period");
+                entity.HasIndex(x => x.RrId)
+                    .IsUnique()
+                    .HasDatabaseName("uq_supplier_evaluation_rr");
+
+                entity.HasIndex(x => x.QcId)
+                    .IsUnique()
+                    .HasDatabaseName("uq_supplier_evaluation_qc");
+
+                entity.HasIndex(x => x.SupplierId)
+                    .HasDatabaseName(
+                        "ix_supplier_performance_evaluation_supplier_id");
+
+                entity.HasIndex(x => x.PoId)
+                    .HasDatabaseName("ix_supplier_evaluation_po");
+
+                entity.HasIndex(x => x.ScheduleId)
+                    .HasDatabaseName("ix_supplier_evaluation_schedule");
+
+                entity.HasIndex(x => x.EvaluationDate)
+                    .HasDatabaseName("ix_supplier_evaluation_date");
 
                 entity.HasIndex(x => x.Status)
                     .HasDatabaseName("ix_supplier_evaluation_status");
 
-                entity.HasIndex(x => new
-                {
-                    x.EvaluationYear,
-                    x.EvaluationMonth
-                })
-                .HasDatabaseName("ix_supplier_evaluation_month");
-
                 entity.Property(x => x.Status)
-                    .HasDefaultValue("DRAFT");
+                    .HasMaxLength(40);
 
                 entity.Property(x => x.CreatedAt)
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                entity.ToTable("supplier_performance_evaluations", table =>
-                {
-                    table.HasCheckConstraint(
-                        "ck_supplier_evaluation_month",
-                        "`evaluation_month` BETWEEN 1 AND 12");
-
-                    table.HasCheckConstraint(
-                        "ck_supplier_evaluation_year",
-                        "`evaluation_year` >= 2000");
-
-                    table.HasCheckConstraint(
-                        "ck_supplier_evaluation_quality_score",
-                        "`quality_score` BETWEEN 0 AND 100");
-
-                    table.HasCheckConstraint(
-                        "ck_supplier_evaluation_delivery_score",
-                        "`on_time_delivery_score` BETWEEN 0 AND 100");
-
-                    table.HasCheckConstraint(
-                        "ck_supplier_evaluation_cost_score",
-                        "`cost_competitiveness_score` BETWEEN 0 AND 100");
-
-                    table.HasCheckConstraint(
-                        "ck_supplier_evaluation_reliability_score",
-                        "`reliability_score` BETWEEN 0 AND 100");
-
-                    table.HasCheckConstraint(
-                        "ck_supplier_evaluation_total_score",
-                        "`total_score` BETWEEN 0 AND 100");
-                });
-            });
-
-
-
-            modelBuilder.Entity<SupplierEvaluationQualityMetric>(entity =>
-            {
-                entity.HasKey(x => x.QualityMetricId);
-
-                entity.HasIndex(x => x.EvaluationId)
-                    .IsUnique();
-
-                entity.HasOne(x => x.Evaluation)
-                    .WithOne(x => x.QualityMetric)
-                    .HasForeignKey<SupplierEvaluationQualityMetric>(
-                        x => x.EvaluationId)
+                entity.HasMany(x => x.Lines)
+                    .WithOne(x => x.Evaluation)
+                    .HasForeignKey(x => x.EvaluationId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                entity.ToTable("supplier_evaluation_quality_metrics", table =>
-                {
-                    table.HasCheckConstraint(
-                        "ck_supplier_quality_quantities",
-                        "`total_received_qty` >= 0 AND `total_accepted_qty` >= 0 AND `total_rejected_qty` >= 0");
-
-                    table.HasCheckConstraint(
-                        "ck_supplier_quality_score",
-                        "`quality_score` BETWEEN 0 AND 100");
-                });
-            });
-
-            modelBuilder.Entity<SupplierEvaluationDeliveryMetric>(entity =>
-            {
-                entity.HasKey(x => x.DeliveryMetricId);
-
-                entity.HasIndex(x => x.EvaluationId)
-                    .IsUnique();
-
-                entity.HasOne(x => x.Evaluation)
-                    .WithOne(x => x.DeliveryMetric)
-                    .HasForeignKey<SupplierEvaluationDeliveryMetric>(
-                        x => x.EvaluationId)
+                entity.HasMany(x => x.WorkflowHistory)
+                    .WithOne(x => x.Evaluation)
+                    .HasForeignKey(x => x.EvaluationId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                entity.ToTable("supplier_evaluation_delivery_metrics", table =>
-                {
-                    table.HasCheckConstraint(
-                        "ck_supplier_delivery_score",
-                        "`delivery_score` BETWEEN 0 AND 100");
-                });
+                entity.HasOne<Models.Purchasing.Suppliers.Supplier>()
+                    .WithMany()
+                    .HasForeignKey(x => x.SupplierId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Models.Purchasing.PurchaseOrders.PurchaseOrderHeader>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PoId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Models.Purchasing.PurchaseOrders.PurchaseOrderDeliverySchedule>()
+                    .WithMany()
+                    .HasForeignKey(x => x.ScheduleId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Models.Purchasing.ReceivingReports.ReceivingReportHeader>()
+                    .WithMany()
+                    .HasForeignKey(x => x.RrId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Models.Purchasing.QcInspections.QcInspectionHeader>()
+                    .WithMany()
+                    .HasForeignKey(x => x.QcId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
-            modelBuilder.Entity<SupplierEvaluationCostMetric>(entity =>
+            modelBuilder.Entity<SupplierPerformanceEvaluationLine>(entity =>
             {
-                entity.HasKey(x => x.CostMetricId);
+                entity.ToTable("supplier_performance_evaluation_lines");
+
+                entity.HasKey(x => x.EvaluationLineId);
+
+                entity.HasIndex(x => x.QcLineId)
+                    .IsUnique()
+                    .HasDatabaseName("uq_spe_line_qc_line");
 
                 entity.HasIndex(x => x.EvaluationId)
-                    .IsUnique();
+                    .HasDatabaseName("ix_spe_line_evaluation");
 
-                entity.HasOne(x => x.Evaluation)
-                    .WithOne(x => x.CostMetric)
-                    .HasForeignKey<SupplierEvaluationCostMetric>(
-                        x => x.EvaluationId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(x => x.MaterialId)
+                    .HasDatabaseName("ix_spe_line_material");
 
-                entity.ToTable("supplier_evaluation_cost_metrics", table =>
-                {
-                    table.HasCheckConstraint(
-                        "ck_supplier_cost_score",
-                        "`cost_score` BETWEEN 0 AND 100");
-                });
-            });
+                entity.HasIndex(x => x.PoLineId)
+                    .HasDatabaseName("ix_spe_line_po_line");
 
-            modelBuilder.Entity<SupplierEvaluationReliabilityScore>(entity =>
-            {
-                entity.HasKey(x => x.ReliabilityScoreId);
+                entity.HasIndex(x => x.RrLineId)
+                    .HasDatabaseName("ix_spe_line_rr_line");
 
-                entity.HasIndex(x => x.EvaluationId)
-                    .IsUnique();
+                entity.HasIndex(x => x.ScheduleLineId)
+                    .HasDatabaseName("ix_spe_line_schedule_line");
 
-                entity.HasOne(x => x.Evaluation)
-                    .WithOne(x => x.ReliabilityAssessment)
-                    .HasForeignKey<SupplierEvaluationReliabilityScore>(
-                        x => x.EvaluationId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(x => x.ApprovedQty)
+                    .HasPrecision(18, 4);
 
-                entity.ToTable("supplier_evaluation_reliability_scores", table =>
-                {
-                    table.HasCheckConstraint(
-                        "ck_supplier_reliability_scores",
-                        "`responsiveness_score` BETWEEN 0 AND 100 " +
-                        "AND `issue_resolution_score` BETWEEN 0 AND 100 " +
-                        "AND `replacement_support_score` BETWEEN 0 AND 100 " +
-                        "AND `communication_score` BETWEEN 0 AND 100 " +
-                        "AND `reliability_score` BETWEEN 0 AND 100");
-             
-            });
+                entity.Property(x => x.RejectedQty)
+                    .HasPrecision(18, 4);
+
+                entity.Property(x => x.TotalInspectedQty)
+                    .HasPrecision(18, 4);
+
+                entity.Property(x => x.QualityScore)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.QualityGrade)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.OnTimeScore)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.ScheduledQty)
+                    .HasPrecision(18, 4);
+
+                entity.Property(x => x.DeliveredQty)
+                    .HasPrecision(18, 4);
+
+                entity.Property(x => x.InFullScore)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.DeliveryScore)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.DeliveryGrade)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.NewUnitPrice)
+                    .HasPrecision(18, 4);
+
+                entity.Property(x => x.PreviousUnitPrice)
+                    .HasPrecision(18, 4);
+
+                entity.Property(x => x.PriceChangePercent)
+                    .HasPrecision(10, 4);
+
+                entity.Property(x => x.CostScore)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.CostGrade)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.CoaPoints)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.TermsPoints)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.OtherPoints)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.ReliabilityScore)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.ReliabilityGrade)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.TotalGrade)
+                    .HasPrecision(6, 2);
+
+                entity.Property(x => x.CostStatus)
+                    .HasMaxLength(40)
+                    .HasDefaultValue("NO_PREVIOUS_PRICE");
+
+                entity.Property(x => x.CreatedAt)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne<Models.Purchasing.QcInspections.QcInspectionLine>()
+                    .WithMany()
+                    .HasForeignKey(x => x.QcLineId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Models.Purchasing.ReceivingReports.ReceivingReportLine>()
+                    .WithMany()
+                    .HasForeignKey(x => x.RrLineId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Models.Purchasing.PurchaseOrders.PurchaseOrderLine>()
+                    .WithMany()
+                    .HasForeignKey(x => x.PoLineId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Models.Purchasing.PurchaseOrders.PurchaseOrderDeliveryScheduleLine>()
+                    .WithMany()
+                    .HasForeignKey(x => x.ScheduleLineId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<SupplierEvaluationWorkflowHistory>(entity =>
             {
+                entity.ToTable("supplier_evaluation_workflow_history");
+
                 entity.HasKey(x => x.HistoryId);
 
                 entity.HasIndex(x => x.EvaluationId)
@@ -923,24 +1093,10 @@ namespace inventory_api.Data
                 })
                 .HasDatabaseName("ix_supplier_evaluation_history_date");
 
-                entity.HasOne(x => x.Evaluation)
-                    .WithMany(x => x.WorkflowHistory)
-                    .HasForeignKey(x => x.EvaluationId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
                 entity.Property(x => x.ActionAt)
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
-
-            /*
-             * Enable this after confirming the actual Supplier model and table:
-             *
-             * modelBuilder.Entity<SupplierPerformanceEvaluation>()
-             *     .HasOne(x => x.Supplier)
-             *     .WithMany()
-             *     .HasForeignKey(x => x.SupplierId)
-             *     .OnDelete(DeleteBehavior.Restrict);
-             */
         }
+
     }
 }

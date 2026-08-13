@@ -9,850 +9,252 @@ namespace inventory_api.Services.Purchasing.SupplierEvaluations
     {
         private readonly AppDbContext _context;
         private readonly SupplierEvaluationGenerationService _generationService;
-        private readonly SupplierEvaluationScoringService _scoringService;
 
         public SupplierEvaluationService(
             AppDbContext context,
-            SupplierEvaluationGenerationService generationService,
-            SupplierEvaluationScoringService scoringService)
+            SupplierEvaluationGenerationService generationService)
         {
             _context = context;
             _generationService = generationService;
-            _scoringService = scoringService;
         }
 
-        /// <summary>
-        /// Creates one monthly evaluation for a supplier.
-        /// Only one evaluation per supplier, year and month is allowed.
-        /// </summary>
-        public async Task<SupplierEvaluationResultDto> GenerateEvaluationAsync(
-            GenerateSupplierEvaluationDto request)
+        public async Task<List<SupplierEvaluationListDto>> GetAllAsync(
+            SupplierEvaluationFilterDto? filter = null)
         {
-            ValidateGenerateRequest(request);
-
-            var existingEvaluation = await _context
-                .SupplierPerformanceEvaluations
+            var query = _context.SupplierPerformanceEvaluations
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x =>
-                    x.SupplierId == request.SupplierId &&
-                    x.EvaluationYear == request.EvaluationYear &&
-                    x.EvaluationMonth == request.EvaluationMonth);
+                .AsQueryable();
 
-            if (existingEvaluation != null)
+            if (filter?.SupplierId.HasValue == true)
             {
-                return new SupplierEvaluationResultDto
-                {
-                    Success = false,
-                    Message =
-                        "An evaluation already exists for this supplier " +
-                        "and evaluation month.",
-                    EvaluationId = existingEvaluation.EvaluationId,
-                    EvaluationNo = existingEvaluation.EvaluationNo,
-                    Status = existingEvaluation.Status
-                };
+                query = query.Where(x =>
+                    x.SupplierId == filter.SupplierId.Value);
             }
 
-            var generatedMetrics =
-                await _generationService.GenerateAsync(
-                    request.SupplierId,
-                    request.EvaluationYear,
-                    request.EvaluationMonth);
-
-            /*
-             * Reliability is manual and is initially zero.
-             */
-            var scoreResult =
-    _scoringService.CalculateAllScores(
-        generatedMetrics.Quality.QualityScore,
-        generatedMetrics.Delivery.DeliveryScore,
-        generatedMetrics.Cost.CostScore,
-        request.ReliabilityScore);
-
-            var strategy =
-     _context.Database.CreateExecutionStrategy();
-
-            return await strategy.ExecuteAsync(async () =>
+            if (!string.IsNullOrWhiteSpace(filter?.Status))
             {
-                await using var transaction =
-                    await _context.Database.BeginTransactionAsync();
+                var status = filter.Status.Trim();
 
-                try
-                {
-                    var now = DateTime.UtcNow;
-
-                    var evaluationNo =
-                        await GenerateEvaluationNumberAsync(
-                            request.EvaluationYear,
-                            request.EvaluationMonth);
-
-                    var evaluation =
-                        new SupplierPerformanceEvaluation
-                        {
-                            EvaluationNo = evaluationNo,
-
-                            SupplierId = request.SupplierId,
-
-                            EvaluationYear =
-                                request.EvaluationYear,
-
-                            EvaluationMonth =
-                                request.EvaluationMonth,
-
-                            PeriodStart =
-                                generatedMetrics.PeriodStart,
-
-                            PeriodEnd =
-                                generatedMetrics.PeriodEnd,
-
-                            QualityScore =
-                                scoreResult.QualityScore,
-
-                            QualityWeightedScore =
-                                scoreResult.QualityWeightedScore,
-
-                            OnTimeDeliveryScore =
-                                scoreResult.DeliveryScore,
-
-                            DeliveryWeightedScore =
-                                scoreResult.DeliveryWeightedScore,
-
-                            CostCompetitivenessScore =
-                                scoreResult.CostScore,
-
-                            CostWeightedScore =
-                                scoreResult.CostWeightedScore,
-
-                            ReliabilityScore =
-                                scoreResult.ReliabilityScore,
-
-                            ReliabilityWeightedScore =
-                                scoreResult.ReliabilityWeightedScore,
-
-                            TotalScore =
-                                scoreResult.TotalScore,
-
-                            PerformanceRating =
-                                scoreResult.PerformanceRating,
-
-                            Status = "GENERATED",
-
-                            Remarks = request.Remarks,
-
-                            GeneratedBy = request.GeneratedBy,
-                            GeneratedAt = now,
-
-                            CreatedBy = request.GeneratedBy,
-                            CreatedAt = now,
-
-                            UpdatedBy = request.GeneratedBy,
-                            UpdatedAt = now
-                        };
-
-                    _context.SupplierPerformanceEvaluations
-                        .Add(evaluation);
-
-                    await _context.SaveChangesAsync();
-
-                    evaluation.QualityMetric =
-      CreateQualityMetric(
-          evaluation.EvaluationId,
-          generatedMetrics.Quality,
-          request.GeneratedBy);
-
-                    evaluation.DeliveryMetric =
-                        CreateDeliveryMetric(
-                            evaluation.EvaluationId,
-                            generatedMetrics.Delivery,
-                            request.GeneratedBy);
-
-                    evaluation.CostMetric =
-                        CreateCostMetric(
-                            evaluation.EvaluationId,
-                            generatedMetrics.Cost,
-                            request.GeneratedBy);
-
-                    evaluation.ReliabilityAssessment =
-     CreateGeneratedReliabilityAssessment(
-         evaluation.EvaluationId,
-         request.ReliabilityScore,
-         request.ReliabilityRemarks,
-         request.GeneratedBy,
-         now);
-
-                    evaluation.WorkflowHistory.Add(
-                        CreateWorkflowHistory(
-                            evaluation.EvaluationId,
-                          fromStatus: null,
-toStatus: "GENERATED",
-action: "GENERATED",
-                            actionBy: request.GeneratedBy,
-                            remarks: request.Remarks,
-                            actionAt: now));
-
-                    await _context.SaveChangesAsync();
-
-                    await transaction.CommitAsync();
-
-                    return new SupplierEvaluationResultDto
-                    {
-                        Success = true,
-                        Message =
-                            "Supplier evaluation was generated successfully.",
-                        EvaluationId = evaluation.EvaluationId,
-                        EvaluationNo = evaluation.EvaluationNo,
-                        Status = evaluation.Status
-                    };
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            });
-        }
-
-        /// <summary>
-        /// Recalculates automatic metrics of an existing GENERATED evaluation.
-        /// Manual reliability values are preserved.
-        /// Manual reliability values are preserved.
-        /// </summary>
-        /// 
-
-        private static SupplierEvaluationReliabilityScore
-    CreateGeneratedReliabilityAssessment(
-        int evaluationId,
-        decimal reliabilityScore,
-        string? remarks,
-        string scoredBy,
-        DateTime scoredAt)
-        {
-            return new SupplierEvaluationReliabilityScore
-            {
-                EvaluationId = evaluationId,
-
-                /*
-                 * The current wizard provides one consolidated
-                 * Reliability score instead of the old four-part
-                 * reliability assessment.
-                 */
-                ResponsivenessScore = 0m,
-                IssueResolutionScore = 0m,
-                ReplacementSupportScore = 0m,
-                CommunicationScore = 0m,
-
-                ReliabilityScore = reliabilityScore,
-                Remarks = remarks,
-
-                ScoredBy = scoredBy,
-                ScoredAt = scoredAt,
-
-                UpdatedBy = scoredBy,
-                UpdatedAt = scoredAt
-            };
-        }
-        public async Task<SupplierEvaluationResultDto> RegenerateAsync(
-            int evaluationId,
-            SupplierEvaluationWorkflowActionDto request)
-        {
-            if (evaluationId <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(evaluationId));
+                query = query.Where(x =>
+                    x.Status == status);
             }
 
-            if (string.IsNullOrWhiteSpace(request.ActionBy))
+            if (filter?.EvaluationYear.HasValue == true)
             {
-                throw new ArgumentException(
-                    "ActionBy is required.",
-                    nameof(request));
+                var year = filter.EvaluationYear.Value;
+
+                query = query.Where(x =>
+                    x.EvaluationDate.HasValue &&
+                    x.EvaluationDate.Value.Year == year);
             }
 
-            var evaluation = await _context
-                .SupplierPerformanceEvaluations
-                .Include(x => x.QualityMetric)
-                .Include(x => x.DeliveryMetric)
-                .Include(x => x.CostMetric)
-                .Include(x => x.ReliabilityAssessment)
-                .Include(x => x.WorkflowHistory)
-                .FirstOrDefaultAsync(x =>
-                    x.EvaluationId == evaluationId);
-
-            if (evaluation == null)
+            if (filter?.EvaluationMonth.HasValue == true)
             {
-                return new SupplierEvaluationResultDto
-                {
-                    Success = false,
-                    Message = "Supplier evaluation was not found."
-                };
+                var month = filter.EvaluationMonth.Value;
+
+                query = query.Where(x =>
+                    x.EvaluationDate.HasValue &&
+                    x.EvaluationDate.Value.Month == month);
             }
 
-            if (!string.Equals(
-                   evaluation.Status,
-"GENERATED",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return new SupplierEvaluationResultDto
-                {
-                    Success = false,
-                    Message =
-                        "Only GENERATED evaluations can be regenerated.",
-                    EvaluationId = evaluation.EvaluationId,
-                    EvaluationNo = evaluation.EvaluationNo,
-                    Status = evaluation.Status
-                };
-            }
-
-            var generatedMetrics =
-                await _generationService.GenerateAsync(
-                    evaluation.SupplierId,
-                    evaluation.EvaluationYear,
-                    evaluation.EvaluationMonth);
-
-            var reliabilityScore =
-                evaluation.ReliabilityAssessment?.ReliabilityScore ?? 0m;
-
-            var scoreResult = _scoringService.CalculateAllScores(
-                generatedMetrics.Quality.QualityScore,
-                generatedMetrics.Delivery.DeliveryScore,
-                generatedMetrics.Cost.CostScore,
-                reliabilityScore);
-            var actionBy = request.ActionBy!;
-
-            var strategy =
-                _context.Database.CreateExecutionStrategy();
-
-            return await strategy.ExecuteAsync(async () =>
-            {
-                await using var transaction =
-                    await _context.Database.BeginTransactionAsync();
-
-                try
-                {
-                    var now = DateTime.UtcNow;
-
-                    UpdateEvaluationScores(
-                        evaluation,
-                        generatedMetrics,
-                        scoreResult);
-
-                    UpdateQualityMetric(
-                        evaluation,
-                        generatedMetrics.Quality,
-                        actionBy);
-
-                    UpdateDeliveryMetric(
-                        evaluation,
-                        generatedMetrics.Delivery,
-                        actionBy);
-
-                    UpdateCostMetric(
-                        evaluation,
-                        generatedMetrics.Cost,
-                        actionBy);
-
-                    evaluation.UpdatedBy = actionBy;
-                    evaluation.UpdatedAt = now;
-
-                    evaluation.WorkflowHistory.Add(
-                        CreateWorkflowHistory(
-                            evaluation.EvaluationId,
-                         fromStatus: "GENERATED",
-toStatus: "GENERATED",
-action: "REGENERATED",
-                            actionBy: actionBy,
-                            remarks: request.Remarks,
-                            actionAt: now));
-
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    return new SupplierEvaluationResultDto
-                    {
-                        Success = true,
-                        Message =
-                            "Supplier evaluation was regenerated successfully.",
-                        EvaluationId = evaluation.EvaluationId,
-                        EvaluationNo = evaluation.EvaluationNo,
-                        Status = evaluation.Status
-                    };
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            });
-
-        }
-
-        private static void ValidateGenerateRequest(
-            GenerateSupplierEvaluationDto request)
-        {
-            ArgumentNullException.ThrowIfNull(request);
-
-            if (request.SupplierId <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(request.SupplierId),
-                    "Supplier ID must be greater than zero.");
-            }
-
-            if (request.ReliabilityScore < 0m ||
-    request.ReliabilityScore > 100m)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(request.ReliabilityScore),
-                    "Reliability score must be between 0 and 100.");
-            }
-
-            if (request.EvaluationYear < 2000)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(request.EvaluationYear),
-                    "Evaluation year must be 2000 or later.");
-            }
-
-            if (request.EvaluationMonth is < 1 or > 12)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(request.EvaluationMonth),
-                    "Evaluation month must be between 1 and 12.");
-            }
-
-            if (string.IsNullOrWhiteSpace(request.GeneratedBy))
-            {
-                throw new ArgumentException(
-                    "GeneratedBy is required.",
-                    nameof(request.GeneratedBy));
-            }
-        }
-
-        private async Task<string> GenerateEvaluationNumberAsync(
-            int year,
-            int month)
-        {
-            var prefix = $"SPE-{year}-{month:00}-";
-
-            var existingNumbers = await _context
-                .SupplierPerformanceEvaluations
-                .AsNoTracking()
-                .Where(x => x.EvaluationNo.StartsWith(prefix))
-                .Select(x => x.EvaluationNo)
+            var evaluations = await query
+                .OrderByDescending(x => x.EvaluationId)
                 .ToListAsync();
 
-            var highestSequence = 0;
+            var supplierIds = evaluations
+                .Select(x => x.SupplierId)
+                .Distinct()
+                .ToList();
 
-            foreach (var evaluationNo in existingNumbers)
-            {
-                var sequencePart = evaluationNo
-                    .Replace(prefix, string.Empty);
-
-                if (int.TryParse(
-                        sequencePart,
-                        out var sequence) &&
-                    sequence > highestSequence)
+            var suppliers = await _context.Suppliers
+                .AsNoTracking()
+                .Where(x => supplierIds.Contains(x.SupplierId))
+                .Select(x => new
                 {
-                    highestSequence = sequence;
-                }
-            }
+                    x.SupplierId,
+                    x.SupplierCode,
+                    x.SupplierName
+                })
+                .ToDictionaryAsync(
+                    x => x.SupplierId,
+                    x => x);
 
-            return $"{prefix}{highestSequence + 1:0000}";
-        }
-        private static SupplierEvaluationQualityMetric CreateQualityMetric(
-       int evaluationId,
-       GeneratedQualityMetric source,
-       string calculatedBy)
-        {
-            return new SupplierEvaluationQualityMetric
-            {
-                EvaluationId = evaluationId,
-                TotalReceivingReportCount = source.ReceivingReportCount,
-                TotalQcCount = source.QcInspectionCount,
-                TotalReceivedQty = source.TotalReceivedQty,
-                TotalAcceptedQty = source.TotalAcceptedQty,
-                TotalRejectedQty = source.TotalRejectedQty,
-                AcceptanceRate = source.AcceptanceRate,
-                RejectionRate = source.RejectionRate,
-                QualityScore = source.QualityScore,
-                CalculationNotes = source.CalculationRemarks,
-                CalculatedAt = DateTime.UtcNow,
-                CalculatedBy = calculatedBy
-            };
-        }
-        private static SupplierEvaluationDeliveryMetric CreateDeliveryMetric(
-     int evaluationId,
-     GeneratedDeliveryMetric source,
-     string calculatedBy)
-        {
-            return new SupplierEvaluationDeliveryMetric
-            {
-                EvaluationId = evaluationId,
-                TotalScheduledDeliveries = source.ScheduledDeliveries,
-                CompletedDeliveries = source.CompletedDeliveries,
-                OnTimeDeliveries = source.OnTimeDeliveries,
-                LateDeliveries = source.LateDeliveries,
-                EarlyDeliveries = source.EarlyDeliveries,
-                IncompleteDeliveries = source.IncompleteDeliveries,
-                UndeliveredSchedules = source.UndeliveredSchedules,
-                OnTimeRate = source.OnTimeDeliveryRate,
-                AverageDelayDays = source.AverageDelayDays,
-                DeliveryScore = source.DeliveryScore,
-                CalculationNotes = source.CalculationRemarks,
-                CalculatedAt = DateTime.UtcNow,
-                CalculatedBy = calculatedBy
-            };
-        }
+            var poIds = evaluations
+                .Where(x => x.PoId.HasValue)
+                .Select(x => x.PoId!.Value)
+                .Distinct()
+                .ToList();
 
-        private static SupplierEvaluationCostMetric CreateCostMetric(
-    int evaluationId,
-    GeneratedCostMetric source,
-    string calculatedBy)
-        {
-            return new SupplierEvaluationCostMetric
-            {
-                EvaluationId = evaluationId,
-                TotalPoCount = source.PurchaseOrderCount,
-                TotalPoLineCount = source.PurchaseOrderLineCount,
-                TotalPurchaseAmount = source.TotalPurchaseAmount,
-                SupplierAverageUnitPrice = source.SupplierAverageUnitPrice,
-                ComparisonAverageUnitPrice = source.ComparisonAverageUnitPrice,
-                PriceVarianceAmount = source.PriceVarianceAmount,
-                PriceVariancePercent = source.PriceVariancePercentage,
-
-                LowestPriceLineCount = 0,
-                ComparedLineCount = 0,
-
-                CostScore = source.CostScore,
-                CalculationNotes = source.CalculationRemarks,
-                CalculatedAt = DateTime.UtcNow,
-                CalculatedBy = calculatedBy
-            };
-        }
-
-   
-
-        private static SupplierEvaluationWorkflowHistory
-            CreateWorkflowHistory(
-                int evaluationId,
-                string? fromStatus,
-                string toStatus,
-                string action,
-                string actionBy,
-                string? remarks,
-                DateTime actionAt)
-        {
-            return new SupplierEvaluationWorkflowHistory
-            {
-                EvaluationId = evaluationId,
-                FromStatus = fromStatus,
-                ToStatus = toStatus,
-                Action = action,
-                ActionBy = actionBy,
-                Remarks = remarks,
-                ActionAt = actionAt
-            };
-        }
-
-        private static void UpdateEvaluationScores(
-            SupplierPerformanceEvaluation evaluation,
-            SupplierEvaluationGeneratedMetrics metrics,
-            SupplierEvaluationScoreResult scores)
-        {
-            evaluation.PeriodStart = metrics.PeriodStart;
-            evaluation.PeriodEnd = metrics.PeriodEnd;
-
-            evaluation.QualityScore =
-                scores.QualityScore;
-
-            evaluation.QualityWeightedScore =
-                scores.QualityWeightedScore;
-
-            evaluation.OnTimeDeliveryScore =
-                scores.DeliveryScore;
-
-            evaluation.DeliveryWeightedScore =
-                scores.DeliveryWeightedScore;
-
-            evaluation.CostCompetitivenessScore =
-                scores.CostScore;
-
-            evaluation.CostWeightedScore =
-                scores.CostWeightedScore;
-
-            evaluation.ReliabilityScore =
-                scores.ReliabilityScore;
-
-            evaluation.ReliabilityWeightedScore =
-                scores.ReliabilityWeightedScore;
-
-            evaluation.TotalScore =
-                scores.TotalScore;
-
-            evaluation.PerformanceRating =
-                scores.PerformanceRating;
-        }
-
-        private static void UpdateQualityMetric(
-      SupplierPerformanceEvaluation evaluation,
-      GeneratedQualityMetric source,
-      string calculatedBy)
-        {
-            evaluation.QualityMetric ??=
-                CreateQualityMetric(
-                    evaluation.EvaluationId,
-                    source,
-                    calculatedBy);
-
-            evaluation.QualityMetric.TotalReceivingReportCount =
-                source.ReceivingReportCount;
-
-            evaluation.QualityMetric.TotalQcCount =
-                source.QcInspectionCount;
-
-            evaluation.QualityMetric.TotalReceivedQty =
-                source.TotalReceivedQty;
-
-            evaluation.QualityMetric.TotalAcceptedQty =
-                source.TotalAcceptedQty;
-
-            evaluation.QualityMetric.TotalRejectedQty =
-                source.TotalRejectedQty;
-
-            evaluation.QualityMetric.AcceptanceRate =
-                source.AcceptanceRate;
-
-            evaluation.QualityMetric.RejectionRate =
-                source.RejectionRate;
-
-            evaluation.QualityMetric.QualityScore =
-                source.QualityScore;
-
-            evaluation.QualityMetric.CalculationNotes =
-                source.CalculationRemarks;
-
-            evaluation.QualityMetric.CalculatedAt =
-                DateTime.UtcNow;
-
-            evaluation.QualityMetric.CalculatedBy =
-                calculatedBy;
-        }
-        private static void UpdateDeliveryMetric(
-         SupplierPerformanceEvaluation evaluation,
-         GeneratedDeliveryMetric source,
-         string calculatedBy)
-        {
-            evaluation.DeliveryMetric ??=
-                CreateDeliveryMetric(
-                    evaluation.EvaluationId,
-                    source,
-                    calculatedBy);
-
-            evaluation.DeliveryMetric.TotalScheduledDeliveries =
-                source.ScheduledDeliveries;
-
-            evaluation.DeliveryMetric.CompletedDeliveries =
-                source.CompletedDeliveries;
-
-            evaluation.DeliveryMetric.OnTimeDeliveries =
-                source.OnTimeDeliveries;
-
-            evaluation.DeliveryMetric.LateDeliveries =
-                source.LateDeliveries;
-
-            evaluation.DeliveryMetric.EarlyDeliveries =
-                source.EarlyDeliveries;
-
-            evaluation.DeliveryMetric.IncompleteDeliveries =
-                source.IncompleteDeliveries;
-
-            evaluation.DeliveryMetric.UndeliveredSchedules =
-                source.UndeliveredSchedules;
-
-            evaluation.DeliveryMetric.OnTimeRate =
-                source.OnTimeDeliveryRate;
-
-            evaluation.DeliveryMetric.AverageDelayDays =
-                source.AverageDelayDays;
-
-            evaluation.DeliveryMetric.DeliveryScore =
-                source.DeliveryScore;
-
-            evaluation.DeliveryMetric.CalculationNotes =
-                source.CalculationRemarks;
-
-            evaluation.DeliveryMetric.CalculatedAt =
-                DateTime.UtcNow;
-
-            evaluation.DeliveryMetric.CalculatedBy =
-                calculatedBy;
-        }
-        private static void UpdateCostMetric(
-      SupplierPerformanceEvaluation evaluation,
-      GeneratedCostMetric source,
-      string calculatedBy)
-        {
-            evaluation.CostMetric ??=
-                CreateCostMetric(
-                    evaluation.EvaluationId,
-                    source,
-                    calculatedBy);
-
-            evaluation.CostMetric.TotalPoCount =
-                source.PurchaseOrderCount;
-
-            evaluation.CostMetric.TotalPoLineCount =
-                source.PurchaseOrderLineCount;
-
-            evaluation.CostMetric.TotalPurchaseAmount =
-                source.TotalPurchaseAmount;
-
-            evaluation.CostMetric.SupplierAverageUnitPrice =
-                source.SupplierAverageUnitPrice;
-
-            evaluation.CostMetric.ComparisonAverageUnitPrice =
-                source.ComparisonAverageUnitPrice;
-
-            evaluation.CostMetric.PriceVarianceAmount =
-                source.PriceVarianceAmount;
-
-            evaluation.CostMetric.PriceVariancePercent =
-                source.PriceVariancePercentage;
-
-            evaluation.CostMetric.CostScore =
-                source.CostScore;
-
-            evaluation.CostMetric.CalculationNotes =
-                source.CalculationRemarks;
-
-            evaluation.CostMetric.CalculatedAt =
-                DateTime.UtcNow;
-
-            evaluation.CostMetric.CalculatedBy =
-                calculatedBy;
-        }
-
-   
-      
-     
-        private static SupplierEvaluationResultDto CreateSuccessResult(
-    SupplierPerformanceEvaluation evaluation,
-    string message)
-        {
-            return new SupplierEvaluationResultDto
-            {
-                Success = true,
-                Message = message,
-                EvaluationId = evaluation.EvaluationId,
-                EvaluationNo = evaluation.EvaluationNo,
-                Status = evaluation.Status
-            };
-        }
-        private static SupplierEvaluationResultDto CreateFailedResult(
-    string message,
-    SupplierPerformanceEvaluation? evaluation = null)
-        {
-            return new SupplierEvaluationResultDto
-            {
-                Success = false,
-                Message = message,
-                EvaluationId = evaluation?.EvaluationId,
-                EvaluationNo = evaluation?.EvaluationNo,
-                Status = evaluation?.Status
-            };
-        }
-
-
-        public Task<SupplierEvaluationResultDto> FinalizeAsync(
-       int evaluationId,
-       SupplierEvaluationWorkflowActionDto request)
-        {
-            return ChangeStatusAsync(
-                evaluationId,
-                expectedStatus: "GENERATED",
-                newStatus: "FINALIZED",
-                action: "FINALIZED",
-                actionBy: request.ActionBy,
-                remarks: request.Remarks,
-                applyAdditionalChanges: (evaluation, now) =>
+            var pos = await _context.PurchaseOrderHeaders
+                .AsNoTracking()
+                .Where(x => poIds.Contains(x.PoId))
+                .Select(x => new
                 {
-                    evaluation.FinalizedBy = request.ActionBy;
-                    evaluation.FinalizedAt = now;
-                });
+                    x.PoId,
+                    x.PoNo,
+                    x.PrintedPoNo
+                })
+                .ToDictionaryAsync(
+                    x => x.PoId,
+                    x => x);
+
+            var rrIds = evaluations
+                .Where(x => x.RrId.HasValue)
+                .Select(x => x.RrId!.Value)
+                .Distinct()
+                .ToList();
+
+            var rrs = await _context.ReceivingReportHeaders
+                .AsNoTracking()
+                .Where(x => rrIds.Contains(x.RrId))
+                .Select(x => new
+                {
+                    x.RrId,
+                    x.RrNo
+                })
+                .ToDictionaryAsync(
+                    x => x.RrId,
+                    x => x);
+
+            var qcIds = evaluations
+                .Where(x => x.QcId.HasValue)
+                .Select(x => x.QcId!.Value)
+                .Distinct()
+                .ToList();
+
+            var qcs = await _context.QcInspectionHeaders
+                .AsNoTracking()
+                .Where(x => qcIds.Contains(x.QcId))
+                .Select(x => new
+                {
+                    x.QcId,
+                    x.QcNo
+                })
+                .ToDictionaryAsync(
+                    x => x.QcId,
+                    x => x);
+
+            return evaluations
+                .Select(evaluation =>
+                {
+                    suppliers.TryGetValue(
+                        evaluation.SupplierId,
+                        out var supplier);
+
+                    object? po = null;
+                    object? rr = null;
+                    object? qc = null;
+
+                    string poNo = string.Empty;
+                    string rrNo = string.Empty;
+                    string qcNo = string.Empty;
+
+                    if (evaluation.PoId.HasValue &&
+                        pos.TryGetValue(
+                            evaluation.PoId.Value,
+                            out var poRecord))
+                    {
+                        poNo =
+                            !string.IsNullOrWhiteSpace(
+                                poRecord.PrintedPoNo)
+                                ? poRecord.PrintedPoNo
+                                : poRecord.PoNo;
+                    }
+
+                    if (evaluation.RrId.HasValue &&
+                        rrs.TryGetValue(
+                            evaluation.RrId.Value,
+                            out var rrRecord))
+                    {
+                        rrNo = rrRecord.RrNo;
+                    }
+
+                    if (evaluation.QcId.HasValue &&
+                        qcs.TryGetValue(
+                            evaluation.QcId.Value,
+                            out var qcRecord))
+                    {
+                        qcNo = qcRecord.QcNo;
+                    }
+
+                    return new SupplierEvaluationListDto
+                    {
+                        EvaluationId =
+                            evaluation.EvaluationId,
+
+                        EvaluationNo =
+                            evaluation.EvaluationNo,
+
+                        SupplierId =
+                            evaluation.SupplierId,
+
+                        SupplierCode =
+                            supplier?.SupplierCode ??
+                            string.Empty,
+
+                        SupplierName =
+                            supplier?.SupplierName ??
+                            string.Empty,
+
+                        PoId =
+                            evaluation.PoId,
+
+                        PoNo =
+                            poNo,
+
+                        RrId =
+                            evaluation.RrId,
+
+                        RrNo =
+                            rrNo,
+
+                        QcId =
+                            evaluation.QcId,
+
+                        QcNo =
+                            qcNo,
+
+                        EvaluationDate =
+                            evaluation.EvaluationDate,
+
+                        DeliveryDate =
+                            evaluation.DeliveryDate,
+
+                        QualityScore =
+                            evaluation.QualityScore,
+
+                        OnTimeDeliveryScore =
+                            evaluation.OnTimeDeliveryScore,
+
+                        CostCompetitivenessScore =
+                            evaluation.CostCompetitivenessScore,
+
+                        ReliabilityScore =
+                            evaluation.ReliabilityScore,
+
+                        TotalScore =
+                            evaluation.TotalScore,
+
+                        PerformanceRating =
+                            evaluation.PerformanceRating ??
+                            string.Empty,
+
+                        Status =
+                            evaluation.Status,
+
+                        CreatedAt =
+                            evaluation.CreatedAt,
+
+                        GeneratedBy =
+                            evaluation.GeneratedBy
+                    };
+                })
+                .ToList();
         }
-        private async Task<SupplierEvaluationResultDto> ChangeStatusAsync(
-     int evaluationId,
-     string expectedStatus,
-     string newStatus,
-     string action,
-     string actionBy,
-     string? remarks,
-     Action<SupplierPerformanceEvaluation, DateTime>? applyAdditionalChanges = null)
-        {
-            if (evaluationId <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(evaluationId));
-            }
 
-            if (string.IsNullOrWhiteSpace(actionBy))
-            {
-                throw new ArgumentException(
-                    "ActionBy is required.",
-                    nameof(actionBy));
-            }
-
-            var evaluation = await _context
-                .SupplierPerformanceEvaluations
-                .Include(x => x.WorkflowHistory)
-                .FirstOrDefaultAsync(x =>
-                    x.EvaluationId == evaluationId);
-
-            if (evaluation == null)
-            {
-                return CreateFailedResult(
-                    "Supplier evaluation was not found.");
-            }
-
-            if (!string.Equals(
-                    evaluation.Status,
-                    expectedStatus,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return CreateFailedResult(
-                    $"Only {expectedStatus} evaluations can be changed to {newStatus}.",
-                    evaluation);
-            }
-
-            var now = DateTime.UtcNow;
-
-            var oldStatus = evaluation.Status;
-
-            evaluation.Status = newStatus;
-            evaluation.UpdatedBy = actionBy;
-            evaluation.UpdatedAt = now;
-
-            evaluation.WorkflowHistory.Add(
-                CreateWorkflowHistory(
-                    evaluation.EvaluationId,
-                    fromStatus: oldStatus,
-                    toStatus: newStatus,
-                    action: action,
-                    actionBy: actionBy,
-                    remarks: remarks,
-                    actionAt: now));
-
-            applyAdditionalChanges?.Invoke(
-    evaluation,
-    now);
-
-            await _context.SaveChangesAsync();
-
-            return CreateSuccessResult(
-                evaluation,
-                $"Supplier evaluation status changed to {newStatus}.");
-        }
-
-        public async Task<SupplierEvaluationDetailsDto?> GetDetailsAsync(
-    int evaluationId)
+        public async Task<SupplierEvaluationDetailsDto?>
+            GetDetailsAsync(
+                int evaluationId)
         {
             if (evaluationId <= 0)
             {
@@ -861,49 +263,137 @@ action: "REGENERATED",
             }
 
             var evaluation = await _context
-    .SupplierPerformanceEvaluations
-    .AsNoTracking()
-    .Include(x => x.QualityMetric)
-    .Include(x => x.DeliveryMetric)
-    .Include(x => x.CostMetric)
-    .Include(x => x.ReliabilityAssessment)
-    .Include(x => x.WorkflowHistory)
-    .FirstOrDefaultAsync(x =>
-        x.EvaluationId == evaluationId);
+                .SupplierPerformanceEvaluations
+                .AsNoTracking()
+                .Include(x => x.Lines)
+                .Include(x => x.WorkflowHistory)
+                .FirstOrDefaultAsync(x =>
+                    x.EvaluationId == evaluationId);
 
             if (evaluation == null)
             {
                 return null;
             }
 
+            var supplier = await _context.Suppliers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.SupplierId ==
+                    evaluation.SupplierId);
+
+            var po = evaluation.PoId.HasValue
+                ? await _context.PurchaseOrderHeaders
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.PoId ==
+                        evaluation.PoId.Value)
+                : null;
+
+            var rr = evaluation.RrId.HasValue
+                ? await _context.ReceivingReportHeaders
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.RrId ==
+                        evaluation.RrId.Value)
+                : null;
+
+            var qc = evaluation.QcId.HasValue
+                ? await _context.QcInspectionHeaders
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.QcId ==
+                        evaluation.QcId.Value)
+                : null;
+
+            var materialIds = evaluation.Lines
+                .Select(x => x.MaterialId)
+                .Distinct()
+                .ToList();
+
+            var materials = await _context.Materials
+                .AsNoTracking()
+                .Where(x =>
+                    materialIds.Contains(x.material_id))
+                .Select(x => new
+                {
+                    x.material_id,
+                    x.material_code,
+                    x.material_name
+                })
+                .ToDictionaryAsync(
+                    x => x.material_id,
+                    x => x);
+
             return new SupplierEvaluationDetailsDto
             {
-                EvaluationId = evaluation.EvaluationId,
-                EvaluationNo = evaluation.EvaluationNo,
+                EvaluationId =
+                    evaluation.EvaluationId,
 
-                SupplierId = evaluation.SupplierId,
+                EvaluationNo =
+                    evaluation.EvaluationNo,
 
-                SupplierCode = string.Empty,
-                SupplierName = string.Empty,
-                SupplierType = null,
-                ContactPerson = null,
+                SupplierId =
+                    evaluation.SupplierId,
 
-                EvaluationYear = evaluation.EvaluationYear,
-                EvaluationMonth = evaluation.EvaluationMonth,
+                SupplierCode =
+                    supplier?.SupplierCode ??
+                    string.Empty,
 
-                EvaluationMonthName = new DateTime(
-                    evaluation.EvaluationYear,
-                    evaluation.EvaluationMonth,
-                    1).ToString("MMMM"),
+                SupplierName =
+                    supplier?.SupplierName ??
+                    string.Empty,
 
-                PeriodStart = evaluation.PeriodStart,
-                PeriodEnd = evaluation.PeriodEnd,
+                SupplierType =
+                    supplier?.SupplierType,
 
-                QualityScore = evaluation.QualityScore,
-                QualityWeightedScore = evaluation.QualityWeightedScore,
+                ContactPerson =
+                    supplier?.ContactPerson,
 
-                OnTimeDeliveryScore = evaluation.OnTimeDeliveryScore,
-                DeliveryWeightedScore = evaluation.DeliveryWeightedScore,
+                PoId =
+                    evaluation.PoId,
+
+                PoNo =
+                    po == null
+                        ? string.Empty
+                        : !string.IsNullOrWhiteSpace(
+                            po.PrintedPoNo)
+                            ? po.PrintedPoNo
+                            : po.PoNo,
+
+                ScheduleId =
+                    evaluation.ScheduleId,
+
+                RrId =
+                    evaluation.RrId,
+
+                RrNo =
+                    rr?.RrNo ??
+                    string.Empty,
+
+                QcId =
+                    evaluation.QcId,
+
+                QcNo =
+                    qc?.QcNo ??
+                    string.Empty,
+
+                EvaluationDate =
+                    evaluation.EvaluationDate,
+
+                DeliveryDate =
+                    evaluation.DeliveryDate,
+
+                QualityScore =
+                    evaluation.QualityScore,
+
+                QualityWeightedScore =
+                    evaluation.QualityWeightedScore,
+
+                OnTimeDeliveryScore =
+                    evaluation.OnTimeDeliveryScore,
+
+                DeliveryWeightedScore =
+                    evaluation.DeliveryWeightedScore,
 
                 CostCompetitivenessScore =
                     evaluation.CostCompetitivenessScore,
@@ -917,245 +407,451 @@ action: "REGENERATED",
                 ReliabilityWeightedScore =
                     evaluation.ReliabilityWeightedScore,
 
-                TotalScore = evaluation.TotalScore,
-                PerformanceRating = evaluation.PerformanceRating,
+                TotalScore =
+                    evaluation.TotalScore,
 
-                Status = evaluation.Status,
-                Remarks = evaluation.Remarks,
+                PerformanceRating =
+                    evaluation.PerformanceRating ??
+                    string.Empty,
 
-                GeneratedBy = evaluation.GeneratedBy,
-                GeneratedAt = evaluation.GeneratedAt,
-
-                ReviewedBy = evaluation.ReviewedBy,
-                ReviewedAt = evaluation.ReviewedAt,
-
-                ApprovedBy = evaluation.ApprovedBy,
-                ApprovedAt = evaluation.ApprovedAt,
-
-                FinalizedBy = evaluation.FinalizedBy,
-                FinalizedAt = evaluation.FinalizedAt,
-
-                CreatedAt = evaluation.CreatedAt,
-                UpdatedAt = evaluation.UpdatedAt,
-
-                QualityMetric =
-                    MapQualityMetric(evaluation.QualityMetric),
-
-                DeliveryMetric =
-                    MapDeliveryMetric(evaluation.DeliveryMetric),
-
-                CostMetric =
-                    MapCostMetric(evaluation.CostMetric),
-
-                ReliabilityAssessment =
-                    MapReliabilityAssessment(
-                        evaluation.ReliabilityAssessment),
-
-                WorkflowHistory = evaluation.WorkflowHistory
-                    .OrderBy(x => x.ActionAt)
-                    .Select(MapWorkflowHistory)
-                    .ToList()
-            };
-        }
-
-        private static SupplierEvaluationQualityMetricDto?
-    MapQualityMetric(
-        SupplierEvaluationQualityMetric? metric)
-        {
-            if (metric == null)
-            {
-                return null;
-            }
-
-            return new SupplierEvaluationQualityMetricDto
-            {
-                QualityMetricId = metric.QualityMetricId,
-                EvaluationId = metric.EvaluationId,
-
-                ReceivingReportCount =
-                    metric.TotalReceivingReportCount,
-
-                QcInspectionCount =
-                    metric.TotalQcCount,
-
-                TotalReceivedQty =
-                    metric.TotalReceivedQty,
-
-                TotalAcceptedQty =
-                    metric.TotalAcceptedQty,
-
-                TotalRejectedQty =
-                    metric.TotalRejectedQty,
-
-                AcceptanceRate =
-                    metric.AcceptanceRate,
-
-                RejectionRate =
-                    metric.RejectionRate,
-
-                QualityScore =
-                    metric.QualityScore,
-
-                CalculationRemarks =
-                    metric.CalculationNotes
-            };
-        }
-
-        private static SupplierEvaluationDeliveryMetricDto?
-    MapDeliveryMetric(
-        SupplierEvaluationDeliveryMetric? metric)
-        {
-            if (metric == null)
-            {
-                return null;
-            }
-
-            return new SupplierEvaluationDeliveryMetricDto
-            {
-                DeliveryMetricId = metric.DeliveryMetricId,
-                EvaluationId = metric.EvaluationId,
-
-                ScheduledDeliveries =
-                    metric.TotalScheduledDeliveries,
-
-                CompletedDeliveries =
-                    metric.CompletedDeliveries,
-
-                OnTimeDeliveries =
-                    metric.OnTimeDeliveries,
-
-                LateDeliveries =
-                    metric.LateDeliveries,
-
-                EarlyDeliveries =
-                    metric.EarlyDeliveries,
-
-                IncompleteDeliveries =
-                    metric.IncompleteDeliveries,
-
-                UndeliveredSchedules =
-                    metric.UndeliveredSchedules,
-
-                OnTimeDeliveryRate =
-                    metric.OnTimeRate,
-
-                AverageDelayDays =
-                    metric.AverageDelayDays,
-
-                DeliveryScore =
-                    metric.DeliveryScore,
-
-                CalculationRemarks =
-                    metric.CalculationNotes
-            };
-        }
-
-        private static SupplierEvaluationCostMetricDto?
-    MapCostMetric(
-        SupplierEvaluationCostMetric? metric)
-        {
-            if (metric == null)
-            {
-                return null;
-            }
-
-            return new SupplierEvaluationCostMetricDto
-            {
-                CostMetricId = metric.CostMetricId,
-                EvaluationId = metric.EvaluationId,
-
-                PurchaseOrderCount =
-                    metric.TotalPoCount,
-
-                PurchaseOrderLineCount =
-                    metric.TotalPoLineCount,
-
-                TotalPurchaseAmount =
-                    metric.TotalPurchaseAmount,
-
-                SupplierAverageUnitPrice =
-                    metric.SupplierAverageUnitPrice,
-
-                ComparisonAverageUnitPrice =
-                    metric.ComparisonAverageUnitPrice,
-
-                PriceVarianceAmount =
-                    metric.PriceVarianceAmount,
-
-                PriceVariancePercentage =
-                    metric.PriceVariancePercent,
-
-                CostScore =
-                    metric.CostScore,
-
-                CalculationRemarks =
-                    metric.CalculationNotes
-            };
-        }
-
-        private static SupplierEvaluationReliabilityDto?
-    MapReliabilityAssessment(
-        SupplierEvaluationReliabilityScore? reliability)
-        {
-            if (reliability == null)
-            {
-                return null;
-            }
-
-            return new SupplierEvaluationReliabilityDto
-            {
-                ReliabilityScoreId =
-                    reliability.ReliabilityScoreId,
-
-                EvaluationId =
-                    reliability.EvaluationId,
-
-                ResponsivenessScore =
-                    reliability.ResponsivenessScore,
-
-                IssueResolutionScore =
-                    reliability.IssueResolutionScore,
-
-                ReplacementSupportScore =
-                    reliability.ReplacementSupportScore,
-
-                CommunicationScore =
-                    reliability.CommunicationScore,
-
-                ReliabilityScore =
-                    reliability.ReliabilityScore,
+                Status =
+                    evaluation.Status,
 
                 Remarks =
-                    reliability.Remarks,
+                    evaluation.Remarks,
 
-                ScoredBy =
-                    reliability.ScoredBy,
+                GeneratedBy =
+                    evaluation.GeneratedBy,
 
-                ScoredAt =
-                    reliability.ScoredAt
+                GeneratedAt =
+                    evaluation.GeneratedAt,
+
+                FinalizedBy =
+                    evaluation.FinalizedBy,
+
+                FinalizedAt =
+                    evaluation.FinalizedAt,
+
+                CreatedAt =
+                    evaluation.CreatedAt,
+
+                UpdatedAt =
+                    evaluation.UpdatedAt,
+
+                Lines = evaluation.Lines
+                    .OrderBy(x =>
+                        x.EvaluationLineId)
+                    .Select(line =>
+                    {
+                        materials.TryGetValue(
+                            line.MaterialId,
+                            out var material);
+
+                        return new SupplierEvaluationLineDto
+                        {
+                            EvaluationLineId =
+                                line.EvaluationLineId,
+
+                            EvaluationId =
+                                line.EvaluationId,
+
+                            QcLineId =
+                                line.QcLineId,
+
+                            RrLineId =
+                                line.RrLineId,
+
+                            PoLineId =
+                                line.PoLineId,
+
+                            ScheduleLineId =
+                                line.ScheduleLineId,
+
+                            MaterialId =
+                                line.MaterialId,
+
+                            MaterialCode =
+                                material?.material_code ??
+                                string.Empty,
+
+                            MaterialName =
+                                material?.material_name ??
+                                string.Empty,
+
+                            ApprovedQty =
+                                line.ApprovedQty,
+
+                            RejectedQty =
+                                line.RejectedQty,
+
+                            TotalInspectedQty =
+                                line.TotalInspectedQty,
+
+                            QualityScore =
+                                line.QualityScore,
+
+                            QualityGrade =
+                                line.QualityGrade,
+
+                            ScheduledDate =
+                                line.ScheduledDate,
+
+                            ActualDeliveryDate =
+                                line.ActualDeliveryDate,
+
+                            IsOnTime =
+                                line.IsOnTime,
+
+                            OnTimeScore =
+                                line.OnTimeScore,
+
+                            ScheduledQty =
+                                line.ScheduledQty,
+
+                            DeliveredQty =
+                                line.DeliveredQty,
+
+                            InFullScore =
+                                line.InFullScore,
+
+                            DeliveryScore =
+                                line.DeliveryScore,
+
+                            DeliveryGrade =
+                                line.DeliveryGrade,
+
+                            NewUnitPrice =
+                                line.NewUnitPrice,
+
+                            PreviousUnitPrice =
+                                line.PreviousUnitPrice,
+
+                            PriceChangePercent =
+                                line.PriceChangePercent,
+
+                            CostStatus =
+                                line.CostStatus,
+
+                            CostScore =
+                                line.CostScore,
+
+                            CostGrade =
+                                line.CostGrade,
+
+                            CoaPoints =
+                                line.CoaPoints,
+
+                            TermsPoints =
+                                line.TermsPoints,
+
+                            OtherPoints =
+                                line.OtherPoints,
+
+                            ReliabilityScore =
+                                line.ReliabilityScore,
+
+                            ReliabilityGrade =
+                                line.ReliabilityGrade,
+
+                            TotalGrade =
+                                line.TotalGrade,
+
+                            Remarks =
+                                line.Remarks
+                        };
+                    })
+                    .ToList(),
+
+                WorkflowHistory =
+                    evaluation.WorkflowHistory
+                        .OrderBy(x => x.ActionAt)
+                        .Select(x =>
+                            new SupplierEvaluationWorkflowHistoryDto
+                            {
+                                HistoryId =
+                                    x.HistoryId,
+
+                                EvaluationId =
+                                    x.EvaluationId,
+
+                                FromStatus =
+                                    x.FromStatus,
+
+                                ToStatus =
+                                    x.ToStatus,
+
+                                Action =
+                                    x.Action,
+
+                                Remarks =
+                                    x.Remarks,
+
+                                ActionBy =
+                                    x.ActionBy,
+
+                                ActionAt =
+                                    x.ActionAt
+                            })
+                        .ToList()
             };
         }
 
-        private static SupplierEvaluationWorkflowHistoryDto
-    MapWorkflowHistory(
-        SupplierEvaluationWorkflowHistory history)
+        public async Task<SupplierEvaluationResultDto>
+            SaveReliabilityAsync(
+                int evaluationId,
+                SaveSupplierEvaluationReliabilityDto request)
         {
-            return new SupplierEvaluationWorkflowHistoryDto
+            if (evaluationId <= 0)
             {
-                HistoryId = history.HistoryId,
-                EvaluationId = history.EvaluationId,
+                throw new ArgumentOutOfRangeException(
+                    nameof(evaluationId));
+            }
 
-                FromStatus = history.FromStatus,
-                ToStatus = history.ToStatus,
+            ArgumentNullException.ThrowIfNull(request);
 
-                Action = history.Action,
-                Remarks = history.Remarks,
+            if (string.IsNullOrWhiteSpace(
+                request.UpdatedBy))
+            {
+                throw new ArgumentException(
+                    "UpdatedBy is required.",
+                    nameof(request));
+            }
 
-                ActionBy = history.ActionBy,
-                ActionAt = history.ActionAt
-            };
+            var evaluation = await _context
+                .SupplierPerformanceEvaluations
+                .Include(x => x.Lines)
+                .Include(x => x.WorkflowHistory)
+                .FirstOrDefaultAsync(x =>
+                    x.EvaluationId ==
+                    evaluationId);
+
+            if (evaluation == null)
+            {
+                return CreateFailedResult(
+                    "Supplier evaluation was not found.");
+            }
+
+            if (!string.Equals(
+                evaluation.Status,
+                "PENDING_PURCHASING",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return CreateFailedResult(
+                    "Only PENDING_PURCHASING evaluations can be updated.",
+                    evaluation);
+            }
+
+            var now = DateTime.UtcNow;
+
+            foreach (var lineRequest in request.Lines)
+            {
+                var line = evaluation.Lines
+                    .FirstOrDefault(x =>
+                        x.EvaluationLineId ==
+                        lineRequest.EvaluationLineId);
+
+                if (line == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Evaluation line " +
+                        $"{lineRequest.EvaluationLineId} " +
+                        "was not found.");
+                }
+
+                ValidateReliabilityPoints(
+                    lineRequest);
+
+                line.CoaPoints =
+                    lineRequest.CoaPoints;
+
+                line.TermsPoints =
+                    lineRequest.TermsPoints;
+
+                line.OtherPoints =
+                    lineRequest.OtherPoints;
+
+                /*
+                 * Maximum manual raw points:
+                 * COA    = 5
+                 * Terms  = 10
+                 * Others = 5
+                 *
+                 * Total raw = 20
+                 *
+                 * Reliability criterion = 10%.
+                 */
+                var manualPoints =
+                    line.CoaPoints +
+                    line.TermsPoints +
+                    line.OtherPoints;
+
+                line.ReliabilityScore =
+                    Math.Round(
+                        manualPoints / 20m * 100m,
+                        2,
+                        MidpointRounding.AwayFromZero);
+
+                line.ReliabilityGrade =
+                    Math.Round(
+                        manualPoints / 20m * 10m,
+                        2,
+                        MidpointRounding.AwayFromZero);
+
+                line.TotalGrade =
+                    Math.Round(
+                        line.QualityGrade +
+                        line.DeliveryGrade +
+                        line.CostGrade +
+                        line.ReliabilityGrade,
+                        2,
+                        MidpointRounding.AwayFromZero);
+
+                line.Remarks =
+                    lineRequest.Remarks;
+
+                line.UpdatedBy =
+                    request.UpdatedBy;
+
+                line.UpdatedAt =
+                    now;
+            }
+
+            SupplierEvaluationGenerationService
+                .RecalculateHeader(evaluation);
+
+            evaluation.UpdatedBy =
+                request.UpdatedBy;
+
+            evaluation.UpdatedAt =
+                now;
+
+            evaluation.WorkflowHistory.Add(
+                new SupplierEvaluationWorkflowHistory
+                {
+                    EvaluationId =
+                        evaluation.EvaluationId,
+
+                    FromStatus =
+                        evaluation.Status,
+
+                    ToStatus =
+                        evaluation.Status,
+
+                    Action =
+                        "PURCHASING_UPDATED",
+
+                    ActionBy =
+                        request.UpdatedBy,
+
+                    ActionAt =
+                        now,
+
+                    Remarks =
+                        request.Remarks
+                });
+
+            await _context.SaveChangesAsync();
+
+            return CreateSuccessResult(
+                evaluation,
+                "Supplier evaluation was updated successfully.");
         }
 
+        public async Task<SupplierEvaluationResultDto>
+            FinalizeAsync(
+                int evaluationId,
+                SupplierEvaluationWorkflowActionDto request)
+        {
+            if (evaluationId <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(evaluationId));
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                request.ActionBy))
+            {
+                throw new ArgumentException(
+                    "ActionBy is required.",
+                    nameof(request));
+            }
+
+            var evaluation = await _context
+                .SupplierPerformanceEvaluations
+                .Include(x => x.Lines)
+                .Include(x => x.WorkflowHistory)
+                .FirstOrDefaultAsync(x =>
+                    x.EvaluationId ==
+                    evaluationId);
+
+            if (evaluation == null)
+            {
+                return CreateFailedResult(
+                    "Supplier evaluation was not found.");
+            }
+
+            if (!string.Equals(
+                evaluation.Status,
+                "PENDING_PURCHASING",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return CreateFailedResult(
+                    "Only PENDING_PURCHASING evaluations can be finalized.",
+                    evaluation);
+            }
+
+            SupplierEvaluationGenerationService
+                .RecalculateHeader(evaluation);
+
+            var now = DateTime.UtcNow;
+            var oldStatus = evaluation.Status;
+
+            evaluation.Status =
+                "FINALIZED";
+
+            evaluation.FinalizedBy =
+                request.ActionBy;
+
+            evaluation.FinalizedAt =
+                now;
+
+            evaluation.UpdatedBy =
+                request.ActionBy;
+
+            evaluation.UpdatedAt =
+                now;
+
+            evaluation.WorkflowHistory.Add(
+                new SupplierEvaluationWorkflowHistory
+                {
+                    EvaluationId =
+                        evaluation.EvaluationId,
+
+                    FromStatus =
+                        oldStatus,
+
+                    ToStatus =
+                        "FINALIZED",
+
+                    Action =
+                        "FINALIZED",
+
+                    ActionBy =
+                        request.ActionBy,
+
+                    ActionAt =
+                        now,
+
+                    Remarks =
+                        request.Remarks
+                });
+
+            await _context.SaveChangesAsync();
+
+            return CreateSuccessResult(
+                evaluation,
+                "Supplier evaluation was finalized successfully.");
+        }
 
         public async Task<SupplierEvaluationMonthlySummaryDto>
             GetMonthlySummaryAsync(
@@ -1165,76 +861,68 @@ action: "REGENERATED",
             if (year < 2000)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(year),
-                    "Year must be 2000 or later.");
+                    nameof(year));
             }
 
             if (month is < 1 or > 12)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(month),
-                    "Month must be between 1 and 12.");
+                    nameof(month));
             }
+
+            var start =
+                new DateTime(
+                    year,
+                    month,
+                    1);
+
+            var end =
+                start.AddMonths(1);
 
             var evaluations = await _context
                 .SupplierPerformanceEvaluations
                 .AsNoTracking()
                 .Where(x =>
-                    x.EvaluationYear == year &&
-                    x.EvaluationMonth == month)
-                .OrderBy(x => x.EvaluationNo)
+                    x.EvaluationDate.HasValue &&
+                    x.EvaluationDate.Value >= start &&
+                    x.EvaluationDate.Value < end)
                 .ToListAsync();
 
-            var supplierIds = evaluations
-                .Select(x => x.SupplierId)
-                .Distinct()
-                .ToList();
-
-            var suppliers = await _context
-                .Suppliers
-                .AsNoTracking()
-                .Where(x =>
-                    supplierIds.Contains(x.SupplierId))
-                .Select(x => new
-                {
-                    x.SupplierId,
-                    x.SupplierCode,
-                    x.SupplierName
-                })
-                .ToDictionaryAsync(
-                    x => x.SupplierId,
-                    x => x);
-
-            var totalEvaluations =
+            var total =
                 evaluations.Count;
 
             return new SupplierEvaluationMonthlySummaryDto
             {
-                EvaluationYear = year,
-                EvaluationMonth = month,
+                EvaluationYear =
+                    year,
+
+                EvaluationMonth =
+                    month,
 
                 EvaluationMonthName =
-                    new DateTime(year, month, 1)
-                        .ToString("MMMM"),
+                    start.ToString("MMMM"),
 
-                TotalSuppliers = evaluations
-                    .Select(x => x.SupplierId)
-                    .Distinct()
-                    .Count(),
+                TotalSuppliers =
+                    evaluations
+                        .Select(x => x.SupplierId)
+                        .Distinct()
+                        .Count(),
 
                 TotalEvaluations =
-                    totalEvaluations,
+                    total,
 
                 GeneratedCount =
                     evaluations.Count(x =>
-                        x.Status == "GENERATED"),
+                        x.Status ==
+                        "PENDING_PURCHASING"),
 
                 FinalizedCount =
                     evaluations.Count(x =>
-                        x.Status == "FINALIZED"),
+                        x.Status ==
+                        "FINALIZED"),
 
                 AverageQualityScore =
-                    totalEvaluations == 0
+                    total == 0
                         ? 0m
                         : Math.Round(
                             evaluations.Average(x =>
@@ -1242,7 +930,7 @@ action: "REGENERATED",
                             2),
 
                 AverageDeliveryScore =
-                    totalEvaluations == 0
+                    total == 0
                         ? 0m
                         : Math.Round(
                             evaluations.Average(x =>
@@ -1250,7 +938,7 @@ action: "REGENERATED",
                             2),
 
                 AverageCostScore =
-                    totalEvaluations == 0
+                    total == 0
                         ? 0m
                         : Math.Round(
                             evaluations.Average(x =>
@@ -1258,7 +946,7 @@ action: "REGENERATED",
                             2),
 
                 AverageReliabilityScore =
-                    totalEvaluations == 0
+                    total == 0
                         ? 0m
                         : Math.Round(
                             evaluations.Average(x =>
@@ -1266,7 +954,7 @@ action: "REGENERATED",
                             2),
 
                 AverageTotalScore =
-                    totalEvaluations == 0
+                    total == 0
                         ? 0m
                         : Math.Round(
                             evaluations.Average(x =>
@@ -1275,15 +963,18 @@ action: "REGENERATED",
 
                 ExcellentCount =
                     evaluations.Count(x =>
-                        x.PerformanceRating == "EXCELLENT"),
+                        x.PerformanceRating ==
+                        "EXCELLENT"),
 
                 VeryGoodCount =
                     evaluations.Count(x =>
-                        x.PerformanceRating == "VERY GOOD"),
+                        x.PerformanceRating ==
+                        "VERY GOOD"),
 
                 GoodCount =
                     evaluations.Count(x =>
-                        x.PerformanceRating == "GOOD"),
+                        x.PerformanceRating ==
+                        "GOOD"),
 
                 NeedsImprovementCount =
                     evaluations.Count(x =>
@@ -1292,119 +983,70 @@ action: "REGENERATED",
 
                 PoorCount =
                     evaluations.Count(x =>
-                        x.PerformanceRating == "POOR"),
-
-                Evaluations = evaluations
-                    .Select(evaluation =>
-                    {
-                        suppliers.TryGetValue(
-                            evaluation.SupplierId,
-                            out var supplier);
-
-                        return MapEvaluationList(
-                            evaluation,
-                            supplier?.SupplierCode ??
-                                string.Empty,
-                            supplier?.SupplierName ??
-                                string.Empty);
-                    })
-                    .ToList()
+                        x.PerformanceRating ==
+                        "POOR")
             };
         }
 
-        private static SupplierEvaluationListDto
-      MapEvaluationList(
-          SupplierPerformanceEvaluation evaluation,
-          string supplierCode,
-          string supplierName)
+        private static void ValidateReliabilityPoints(
+            SaveSupplierEvaluationReliabilityLineDto line)
         {
-            return new SupplierEvaluationListDto
+            if (line.CoaPoints < 0m ||
+                line.CoaPoints > 5m)
             {
-                EvaluationId =
-                    evaluation.EvaluationId,
-
-                EvaluationNo =
-                    evaluation.EvaluationNo,
-
-                SupplierId =
-                    evaluation.SupplierId,
-
-                SupplierCode =
-                    supplierCode,
-
-                SupplierName =
-                    supplierName,
-
-                EvaluationYear =
-                    evaluation.EvaluationYear,
-
-                EvaluationMonth =
-                    evaluation.EvaluationMonth,
-
-                EvaluationMonthName =
-                    new DateTime(
-                        evaluation.EvaluationYear,
-                        evaluation.EvaluationMonth,
-                        1)
-                    .ToString("MMMM"),
-
-                PeriodStart =
-                    evaluation.PeriodStart,
-
-                PeriodEnd =
-                    evaluation.PeriodEnd,
-
-                QualityScore =
-                    evaluation.QualityScore,
-
-                OnTimeDeliveryScore =
-                    evaluation.OnTimeDeliveryScore,
-
-                CostCompetitivenessScore =
-                    evaluation.CostCompetitivenessScore,
-
-                ReliabilityScore =
-                    evaluation.ReliabilityScore,
-
-                TotalScore =
-                    evaluation.TotalScore,
-
-                PerformanceRating =
-                    evaluation.PerformanceRating,
-
-                Status =
-                    evaluation.Status,
-
-                CreatedAt =
-                    evaluation.CreatedAt,
-
-                GeneratedBy =
-                    evaluation.GeneratedBy
-            };
-        }
-
-
-        public async Task<SupplierEvaluationGeneratedMetrics>
-    PreviewEvaluationAsync(
-        int supplierId,
-        int evaluationYear,
-        int evaluationMonth)
-        {
-            if (supplierId <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(supplierId),
-                    "Supplier ID must be greater than zero.");
+                throw new InvalidOperationException(
+                    "COA points must be between 0 and 5.");
             }
 
-            return await _generationService.GenerateAsync(
-                supplierId,
-                evaluationYear,
-                evaluationMonth);
+            if (line.TermsPoints < 0m ||
+                line.TermsPoints > 10m)
+            {
+                throw new InvalidOperationException(
+                    "Terms points must be between 0 and 10.");
+            }
+
+            if (line.OtherPoints < 0m ||
+                line.OtherPoints > 5m)
+            {
+                throw new InvalidOperationException(
+                    "Other points must be between 0 and 5.");
+            }
         }
-        
 
+        private static SupplierEvaluationResultDto
+            CreateSuccessResult(
+                SupplierPerformanceEvaluation evaluation,
+                string message)
+        {
+            return new SupplierEvaluationResultDto
+            {
+                Success = true,
+                Message = message,
+                EvaluationId =
+                    evaluation.EvaluationId,
+                EvaluationNo =
+                    evaluation.EvaluationNo,
+                Status =
+                    evaluation.Status
+            };
+        }
 
-
+        private static SupplierEvaluationResultDto
+            CreateFailedResult(
+                string message,
+                SupplierPerformanceEvaluation? evaluation = null)
+        {
+            return new SupplierEvaluationResultDto
+            {
+                Success = false,
+                Message = message,
+                EvaluationId =
+                    evaluation?.EvaluationId,
+                EvaluationNo =
+                    evaluation?.EvaluationNo,
+                Status =
+                    evaluation?.Status
+            };
+        }
     }
 }
