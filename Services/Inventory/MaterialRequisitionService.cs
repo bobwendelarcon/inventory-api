@@ -923,17 +923,34 @@ namespace inventory_api.Services.Inventory
                             .AsNoTracking()
 
                     join branch in
-                        _context.Branches
-                            .AsNoTracking()
+                        _context.Branches.AsNoTracking()
                         on requisition.BranchId
                         equals branch.branch_id
                         into branchJoin
 
-                    from branch in
-                        branchJoin.DefaultIfEmpty()
+                    from branch in branchJoin.DefaultIfEmpty()
 
-                    orderby
-                        requisition.RequisitionId descending
+                        // Requested By
+                    join requestedUser in
+                        _context.Users.AsNoTracking()
+                        on requisition.RequestedBy
+                        equals requestedUser.user_id
+                        into requestedUserJoin
+
+                    from requestedUser in
+                        requestedUserJoin.DefaultIfEmpty()
+
+                        // Created By
+                    join createdUser in
+                        _context.Users.AsNoTracking()
+                        on requisition.CreatedBy
+                        equals createdUser.user_id
+                        into createdUserJoin
+
+                    from createdUser in
+                        createdUserJoin.DefaultIfEmpty()
+
+                    orderby requisition.RequisitionId descending
 
                     select new
                     {
@@ -954,8 +971,15 @@ namespace inventory_api.Services.Inventory
                                 ? branch.branch_name
                                 : requisition.BranchId,
 
+                        // Keep ID
                         requestedBy =
                             requisition.RequestedBy,
+
+                        // Display name
+                        requestedByName =
+                            requestedUser != null
+                                ? requestedUser.full_name
+                                : requisition.RequestedBy,
 
                         timeRequested =
                             requisition.TimeRequested,
@@ -963,8 +987,15 @@ namespace inventory_api.Services.Inventory
                         status =
                             requisition.Status,
 
+                        // Keep ID
                         createdBy =
                             requisition.CreatedBy,
+
+                        // Display name
+                        createdByName =
+                            createdUser != null
+                                ? createdUser.full_name
+                                : requisition.CreatedBy,
 
                         createdAt =
                             requisition.CreatedAt,
@@ -992,7 +1023,6 @@ namespace inventory_api.Services.Inventory
 
             return requisitions;
         }
-
 
 
     }
