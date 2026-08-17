@@ -914,6 +914,85 @@ namespace inventory_api.Services.Inventory
         }
 
 
+        public async Task<object> GetAllAsync()
+        {
+            var requisitions =
+                await (
+                    from requisition in
+                        _context.MaterialRequisitions
+                            .AsNoTracking()
+
+                    join branch in
+                        _context.Branches
+                            .AsNoTracking()
+                        on requisition.BranchId
+                        equals branch.branch_id
+                        into branchJoin
+
+                    from branch in
+                        branchJoin.DefaultIfEmpty()
+
+                    orderby
+                        requisition.RequisitionId descending
+
+                    select new
+                    {
+                        requisitionId =
+                            requisition.RequisitionId,
+
+                        requisitionNo =
+                            requisition.RequisitionNo,
+
+                        requisitionDate =
+                            requisition.RequisitionDate,
+
+                        branchId =
+                            requisition.BranchId,
+
+                        branchName =
+                            branch != null
+                                ? branch.branch_name
+                                : requisition.BranchId,
+
+                        requestedBy =
+                            requisition.RequestedBy,
+
+                        timeRequested =
+                            requisition.TimeRequested,
+
+                        status =
+                            requisition.Status,
+
+                        createdBy =
+                            requisition.CreatedBy,
+
+                        createdAt =
+                            requisition.CreatedAt,
+
+                        submittedBy =
+                            requisition.SubmittedBy,
+
+                        submittedAt =
+                            requisition.SubmittedAt,
+
+                        approvedBy =
+                            requisition.ApprovedBy,
+
+                        approvedAt =
+                            requisition.ApprovedAt,
+
+                        postedBy =
+                            requisition.PostedBy,
+
+                        postedAt =
+                            requisition.PostedAt
+                    }
+                )
+                .ToListAsync();
+
+            return requisitions;
+        }
+
 
 
     }

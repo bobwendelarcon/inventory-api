@@ -106,6 +106,31 @@ namespace inventory_api.Controllers.Inventory
         }
 
 
+
+
+        // =========================================================
+        // GET ALL REQUISITIONS
+        // =========================================================
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            try
+            {
+                var result =
+                    await _service.GetAllAsync();
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(
     int id)
