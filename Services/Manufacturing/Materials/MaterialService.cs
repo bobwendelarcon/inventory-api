@@ -133,9 +133,6 @@ namespace inventory_api.Services.Manufacturing.Materials
 
         public async Task AddAsync(CreateMaterialDto dto)
         {
-            if (string.IsNullOrWhiteSpace(dto.material_code))
-                throw new Exception("Material code is required.");
-
             if (string.IsNullOrWhiteSpace(dto.material_name))
                 throw new Exception("Material name is required.");
 
@@ -145,53 +142,127 @@ namespace inventory_api.Services.Manufacturing.Materials
             if (string.IsNullOrWhiteSpace(dto.uom))
                 throw new Exception("UOM is required.");
 
-            var exists = await _context.Materials
-                .AnyAsync(x =>
-                    x.material_code == dto.material_code.Trim() &&
-                    !x.is_deleted);
-
-            if (exists)
-                throw new Exception("Material code already exists.");
-
+            // =====================================================
+            // VALIDATE CATEGORY
+            // =====================================================
             var categoryExists = await _context.MaterialCategories
                 .AnyAsync(x =>
-                    x.material_category_id == dto.material_category_id.Value &&
+                    x.material_category_id ==
+                        dto.material_category_id.Value &&
                     x.is_active);
 
             if (!categoryExists)
                 throw new Exception("Category not found.");
 
+            // =====================================================
+            // VALIDATE SUB CATEGORY
+            // =====================================================
             if (dto.material_subcategory_id.HasValue)
             {
-                var subCategoryExists = await _context.MaterialSubCategories
-                    .AnyAsync(x =>
-                        x.material_subcategory_id == dto.material_subcategory_id.Value &&
-                        x.material_category_id == dto.material_category_id.Value &&
-                        x.is_active &&
-                        !x.is_deleted);
+                var subCategoryExists =
+                    await _context.MaterialSubCategories
+                        .AnyAsync(x =>
+                            x.material_subcategory_id ==
+                                dto.material_subcategory_id.Value &&
+                            x.material_category_id ==
+                                dto.material_category_id.Value &&
+                            x.is_active &&
+                            !x.is_deleted);
 
                 if (!subCategoryExists)
-                    throw new Exception("Sub category not found under selected category.");
+                    throw new Exception(
+                        "Sub category not found under selected category.");
             }
 
-            var material = new Material
+            // =====================================================
+            // AUTO GENERATE MATERIAL CODE
+            // RM-0001, RM-0002, RM-0003...
+            // =====================================================
+            var existingCodes =
+                await _context.Materials
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.material_code.StartsWith("RM-"))
+                    .Select(x => x.material_code)
+                    .ToListAsync();
+
+            var highestNumber = 0;
+
+            foreach (var code in existingCodes)
             {
-                material_code = dto.material_code.Trim(),
-                material_name = dto.material_name.Trim(),
-                material_category_id = dto.material_category_id,
-                material_subcategory_id = dto.material_subcategory_id,
-                uom = dto.uom.Trim().ToUpper(),
-                pack_uom = dto.pack_uom?.Trim().ToUpper(),
-                pack_qty = dto.pack_qty,
-                minimum_stock = dto.minimum_stock,
-                description = dto.description,
-                is_lot_tracked = dto.is_lot_tracked,
-                is_active = true,
-                is_deleted = false,
-                created_at = DateTime.UtcNow
-            };
+                if (string.IsNullOrWhiteSpace(code))
+                    continue;
+
+                var numberPart =
+                    code.Substring(3);
+
+                if (int.TryParse(
+                    numberPart,
+                    out var number))
+                {
+                    if (number > highestNumber)
+                        highestNumber = number;
+                }
+            }
+
+            var nextNumber =
+                highestNumber + 1;
+
+            var materialCode =
+                $"RM-{nextNumber:D4}";
+
+            // =====================================================
+            // CREATE MATERIAL
+            // =====================================================
+            var material =
+                new Material
+                {
+                    material_code =
+                        materialCode,
+
+                    material_name =
+                        dto.material_name.Trim(),
+
+                    material_category_id =
+                        dto.material_category_id,
+
+                    material_subcategory_id =
+                        dto.material_subcategory_id,
+
+                    uom =
+                        dto.uom.Trim().ToUpper(),
+
+                    pack_uom =
+                        string.IsNullOrWhiteSpace(dto.pack_uom)
+                            ? null
+                            : dto.pack_uom.Trim().ToUpper(),
+
+                    pack_qty =
+                        dto.pack_qty,
+
+                    minimum_stock =
+                        dto.minimum_stock,
+
+                    description =
+                        string.IsNullOrWhiteSpace(dto.description)
+                            ? null
+                            : dto.description.Trim(),
+
+                    is_lot_tracked =
+                        dto.is_lot_tracked,
+
+                    is_active =
+                        true,
+
+                    is_deleted =
+                        false,
+
+                    created_at =
+                        DateTime.UtcNow
+                };
 
             _context.Materials.Add(material);
+
             await _context.SaveChangesAsync();
         }
 

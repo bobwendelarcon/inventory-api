@@ -351,6 +351,37 @@ namespace inventory_api.Data
                     .HasColumnName("created_by")
                     .HasMaxLength(50);
 
+
+                entity.Property(e => e.SubmittedBy)
+    .HasColumnName("submitted_by")
+    .HasMaxLength(50);
+
+                entity.Property(e => e.SubmittedAt)
+                    .HasColumnName("submitted_at");
+
+                entity.Property(e => e.ApprovedBy)
+                    .HasColumnName("approved_by")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.ApprovedAt)
+                    .HasColumnName("approved_at");
+
+                entity.Property(e => e.ApprovalRemarks)
+                    .HasColumnName("approval_remarks")
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.RejectedBy)
+                    .HasColumnName("rejected_by")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.RejectedAt)
+                    .HasColumnName("rejected_at");
+
+                entity.Property(e => e.RejectionReason)
+                    .HasColumnName("rejection_reason")
+                    .HasMaxLength(500);
+
+
                 entity.Property(e => e.PostedBy)
                     .HasColumnName("posted_by")
                     .HasMaxLength(50);

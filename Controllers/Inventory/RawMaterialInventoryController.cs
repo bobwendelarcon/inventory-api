@@ -127,5 +127,75 @@ namespace inventory_api.Controllers.Inventory
                 });
             }
         }
+
+
+        [HttpGet("consolidated")]
+        public async Task<IActionResult>
+    GetConsolidatedInventory(
+        [FromQuery]
+        RawMaterialConsolidatedFilterDto filter)
+        {
+            try
+            {
+                var result =
+                    await _service
+                        .GetConsolidatedInventoryAsync(
+                            filter);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        success = false,
+                        message = ex.Message
+                    });
+            }
+        }
+
+
+        [HttpPost("adjust-stock")]
+        public async Task<IActionResult> AdjustStock(
+    [FromBody] AdjustRawMaterialStockDto dto)
+        {
+            try
+            {
+                await _service.AdjustStockAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message =
+                        "Stock adjustment saved successfully."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
     }
 }

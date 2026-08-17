@@ -221,13 +221,28 @@ namespace inventory_api.Services.Inventory
             }).ToList();
 
             // Computed-status filters
+      
             if (!string.IsNullOrWhiteSpace(filter.StockStatus))
             {
-                var stockStatus = filter.StockStatus.Trim().ToUpper();
+                var stockStatus =
+                    filter.StockStatus
+                        .Trim()
+                        .ToUpperInvariant();
 
-                result = result
-                    .Where(x => x.StockStatus == stockStatus)
-                    .ToList();
+                if (stockStatus == "AVAILABLE")
+                {
+                    result = result
+                        .Where(x =>
+                            x.StockStatus != "OUT_OF_STOCK")
+                        .ToList();
+                }
+                else
+                {
+                    result = result
+                        .Where(x =>
+                            x.StockStatus == stockStatus)
+                        .ToList();
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(filter.ExpiryStatus))
@@ -244,11 +259,12 @@ namespace inventory_api.Services.Inventory
                 Summary = new RawMaterialInventorySummaryDto
                 {
                     TotalMaterials = result
-             .Select(x => x.MaterialId)
-             .Distinct()
-             .Count(),
+        .Select(x => x.MaterialId)
+        .Distinct()
+        .Count(),
 
-                    InventoryLots = result.Count,
+                    InventoryLots = result.Count(x =>
+                        x.IsLotTracked),
 
                     LowStock = result.Count(x =>
                         x.StockStatus == "LOW_STOCK"),
@@ -1008,6 +1024,538 @@ x.SupplierName
                 throw;
             }
         }
+
+
+        public async Task AdjustStockAsync(
+    AdjustRawMaterialStockDto dto)
+        {
+            if (dto == null)
+            {
+                throw new ArgumentNullException(nameof(dto));
+            }
+
+            if (dto.MaterialLotId <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Inventory lot is required.");
+            }
+
+            if (dto.Quantity <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Adjustment quantity must be greater than zero.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.AdjustmentType))
+            {
+                throw new InvalidOperationException(
+                    "Adjustment type is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Reason))
+            {
+                throw new InvalidOperationException(
+                    "Adjustment reason is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.EncodedBy))
+            {
+                throw new InvalidOperationException(
+                    "Encoded by is required.");
+            }
+
+            var adjustmentType =
+                dto.AdjustmentType
+                    .Trim()
+                    .ToUpperInvariant();
+
+            if (adjustmentType != "INCREASE" &&
+                adjustmentType != "DECREASE")
+            {
+                throw new InvalidOperationException(
+                    "Adjustment type must be INCREASE or DECREASE.");
+            }
+
+            var inventoryLot =
+                await _context.MaterialLotNumbers
+                    .FirstOrDefaultAsync(x =>
+                        x.material_lot_id == dto.MaterialLotId &&
+                        x.is_active);
+
+            if (inventoryLot == null)
+            {
+                throw new KeyNotFoundException(
+                    $"Inventory lot ID {dto.MaterialLotId} was not found.");
+            }
+
+            var material =
+                await _context.Materials
+                    .FirstOrDefaultAsync(x =>
+                        x.material_id == inventoryLot.material_id &&
+                        x.is_active &&
+                        !x.is_deleted);
+
+            if (material == null)
+            {
+                throw new KeyNotFoundException(
+                    "Material was not found.");
+            }
+
+            // Prevent negative inventory
+            if (adjustmentType == "DECREASE" &&
+                dto.Quantity > inventoryLot.quantity)
+            {
+                throw new InvalidOperationException(
+                    $"Adjustment cannot exceed current stock of " +
+                    $"{inventoryLot.quantity:0.####} {inventoryLot.uom}.");
+            }
+
+            var now = DateTime.Now;
+
+            await using var dbTransaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                decimal transactionQuantity;
+                string transactionType;
+
+                if (adjustmentType == "INCREASE")
+                {
+                    inventoryLot.quantity +=
+                        dto.Quantity;
+
+                    transactionQuantity =
+                        dto.Quantity;
+
+                    transactionType =
+                        "MANUAL_ADJUSTMENT_IN";
+                }
+                else
+                {
+                    inventoryLot.quantity -=
+                        dto.Quantity;
+
+                    transactionQuantity =
+                        -dto.Quantity;
+
+                    transactionType =
+                        "MANUAL_ADJUSTMENT_OUT";
+                }
+
+                inventoryLot.updated_at =
+                    now;
+
+                var remarks =
+                    $"Reason: {dto.Reason.Trim()}";
+
+                if (!string.IsNullOrWhiteSpace(dto.Remarks))
+                {
+                    remarks +=
+                        $" | {dto.Remarks.Trim()}";
+                }
+
+                var inventoryTransaction =
+                    new MaterialInventoryTransaction
+                    {
+                        material_id =
+                            inventoryLot.material_id,
+
+                        branch_id =
+                            inventoryLot.branch_id,
+
+                        lot_no =
+                            inventoryLot.lot_no,
+
+                        transaction_type =
+                            transactionType,
+
+                        quantity =
+                            transactionQuantity,
+
+                        uom =
+                            string.IsNullOrWhiteSpace(
+                                inventoryLot.uom)
+                                ? material.uom
+                                : inventoryLot.uom,
+
+                        supplier_id =
+                            inventoryLot.supplier_id,
+
+                        reference_type =
+                            "MANUAL_ADJUSTMENT",
+
+                        reference_id =
+                            null,
+
+                        reference_no =
+                            $"ADJ-{now:yyyyMMddHHmmssfff}",
+
+                        remarks =
+                            remarks,
+
+                        encoded_by =
+                            dto.EncodedBy.Trim(),
+
+                        transaction_date =
+                            now,
+
+                        created_at =
+                            now
+                    };
+
+                await _context
+                    .MaterialInventoryTransactions
+                    .AddAsync(inventoryTransaction);
+
+                await _context.SaveChangesAsync();
+
+                await dbTransaction.CommitAsync();
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
+        }
+
+
+        public async Task<RawMaterialConsolidatedResponseDto>
+    GetConsolidatedInventoryAsync(
+        RawMaterialConsolidatedFilterDto filter)
+        {
+            filter ??=
+                new RawMaterialConsolidatedFilterDto();
+
+
+            // =========================================================
+            // MATERIAL MASTER
+            // Start from Materials so ZERO-STOCK materials still appear.
+            // =========================================================
+
+            var materialQuery =
+                _context.Materials
+                    .AsNoTracking()
+                    .Include(x => x.Category)
+                    .Include(x => x.SubCategory)
+                    .Where(x =>
+                        x.is_active &&
+                        !x.is_deleted);
+
+
+            // =========================================================
+            // SEARCH
+            // =========================================================
+
+            if (!string.IsNullOrWhiteSpace(
+                filter.Search))
+            {
+                var search =
+                    filter.Search
+                        .Trim()
+                        .ToLowerInvariant();
+
+                materialQuery =
+                    materialQuery.Where(x =>
+
+                        x.material_code
+                            .ToLower()
+                            .Contains(search)
+
+                        ||
+
+                        x.material_name
+                            .ToLower()
+                            .Contains(search)
+
+                        ||
+
+                        (
+                            x.Category != null &&
+                            x.Category.category_name
+                                .ToLower()
+                                .Contains(search)
+                        )
+
+                        ||
+
+                        (
+                            x.SubCategory != null &&
+                            x.SubCategory.subcategory_name
+                                .ToLower()
+                                .Contains(search)
+                        )
+                    );
+            }
+
+
+            // =========================================================
+            // CATEGORY
+            // =========================================================
+
+            if (filter.CategoryId.HasValue)
+            {
+                materialQuery =
+                    materialQuery.Where(x =>
+                        x.material_category_id ==
+                        filter.CategoryId.Value);
+            }
+
+
+            // =========================================================
+            // SUB CATEGORY
+            // =========================================================
+
+            if (filter.SubCategoryId.HasValue)
+            {
+                materialQuery =
+                    materialQuery.Where(x =>
+                        x.material_subcategory_id ==
+                        filter.SubCategoryId.Value);
+            }
+
+
+            var materials =
+                await materialQuery
+                    .OrderBy(x =>
+                        x.material_name)
+                    .ToListAsync();
+
+
+            if (materials.Count == 0)
+            {
+                return new RawMaterialConsolidatedResponseDto
+                {
+                    Summary =
+                        new RawMaterialConsolidatedSummaryDto(),
+
+                    Items =
+                        new List<
+                            RawMaterialConsolidatedListDto>()
+                };
+            }
+
+
+            var materialIds =
+                materials
+                    .Select(x =>
+                        x.material_id)
+                    .ToList();
+
+
+            // =========================================================
+            // INVENTORY LOTS
+            // =========================================================
+
+            var lotQuery =
+                _context.MaterialLotNumbers
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.is_active &&
+                        materialIds.Contains(
+                            x.material_id));
+
+
+            // Branch filter applies to inventory quantity,
+            // NOT to the material master.
+            //
+            // This means if a material has no stock in BR1,
+            // it will still appear as zero in BR1.
+            if (!string.IsNullOrWhiteSpace(
+                filter.BranchId))
+            {
+                var branchId =
+                    filter.BranchId.Trim();
+
+                lotQuery =
+                    lotQuery.Where(x =>
+                        x.branch_id ==
+                        branchId);
+            }
+
+
+            var lots =
+                await lotQuery
+                    .ToListAsync();
+
+
+            // =========================================================
+            // BUILD CONSOLIDATED RESULT
+            // =========================================================
+
+            var result =
+                new List<
+                    RawMaterialConsolidatedListDto>();
+
+
+            foreach (var material in materials)
+            {
+                var materialLots =
+                    lots
+                        .Where(x =>
+                            x.material_id ==
+                            material.material_id)
+                        .ToList();
+
+
+                var totalQuantity =
+                    materialLots.Sum(x =>
+                        x.quantity);
+
+
+                string stockStatus;
+
+
+                if (totalQuantity <= 0)
+                {
+                    stockStatus =
+                        "OUT_OF_STOCK";
+                }
+                else if (
+                    material.minimum_stock > 0 &&
+                    totalQuantity <=
+                    material.minimum_stock)
+                {
+                    stockStatus =
+                        "LOW_STOCK";
+                }
+                else
+                {
+                    stockStatus =
+                        "IN_STOCK";
+                }
+
+
+                int? availableLots = null;
+
+
+                if (material.is_lot_tracked)
+                {
+                    availableLots =
+                        materialLots.Count(x =>
+                            x.quantity > 0);
+                }
+
+
+                result.Add(
+                    new RawMaterialConsolidatedListDto
+                    {
+                        MaterialId =
+                            material.material_id,
+
+                        MaterialCode =
+                            material.material_code,
+
+                        MaterialName =
+                            material.material_name,
+
+
+                        CategoryId =
+                            material.material_category_id,
+
+                        CategoryName =
+                            material.Category
+                                ?.category_name
+                            ??
+                            "Uncategorized",
+
+
+                        SubCategoryId =
+                            material.material_subcategory_id,
+
+                        SubCategoryName =
+                            material.SubCategory
+                                ?.subcategory_name
+                            ??
+                            "No Sub Category",
+
+
+                        Quantity =
+                            totalQuantity,
+
+                        Uom =
+                            material.uom,
+
+                        MinimumStock =
+                            material.minimum_stock,
+
+                        IsLotTracked =
+                            material.is_lot_tracked,
+
+                        AvailableLots =
+                            availableLots,
+
+                        StockStatus =
+                            stockStatus
+                    });
+            }
+
+
+            // =========================================================
+            // STOCK STATUS FILTER
+            // =========================================================
+
+            if (!string.IsNullOrWhiteSpace(
+                filter.StockStatus))
+            {
+                var stockStatus =
+                    filter.StockStatus
+                        .Trim()
+                        .ToUpperInvariant();
+
+                result =
+                    result
+                        .Where(x =>
+                            x.StockStatus ==
+                            stockStatus)
+                        .ToList();
+            }
+
+
+            // =========================================================
+            // SUMMARY
+            // =========================================================
+
+            var response =
+                new RawMaterialConsolidatedResponseDto
+                {
+                    Summary =
+                        new RawMaterialConsolidatedSummaryDto
+                        {
+                            TotalMaterials =
+                                result.Count,
+
+                            InStock =
+                                result.Count(x =>
+                                    x.StockStatus ==
+                                    "IN_STOCK"),
+
+                            LowStock =
+                                result.Count(x =>
+                                    x.StockStatus ==
+                                    "LOW_STOCK"),
+
+                            OutOfStock =
+                                result.Count(x =>
+                                    x.StockStatus ==
+                                    "OUT_OF_STOCK"),
+
+                            AvailableLots =
+                                result.Sum(x =>
+                                    x.AvailableLots ?? 0)
+                        },
+
+                    Items =
+                        result
+                            .OrderBy(x =>
+                                x.MaterialName)
+                            .ToList()
+                };
+
+
+            return response;
+        }
+
 
         private static bool IsOutboundTransaction(string? transactionType)
         {
