@@ -27,6 +27,62 @@ namespace inventory_api.Controllers.Purchasing.ReceivingReports
             });
         }
 
+        [HttpPost(
+    "final-rr/{processingId:int}/complete"
+)]
+        public async Task<IActionResult> CompleteFinalRr(
+    int processingId,
+    [FromBody] CompleteFinalRrDto dto)
+        {
+            try
+            {
+                var userId =
+                    Request.Headers["X-User-Id"]
+                        .FirstOrDefault()
+                    ?? User.FindFirst("user_id")?.Value
+                    ?? User.FindFirst("UserId")?.Value
+                    ?? User.Identity?.Name
+                    ?? "";
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message =
+                            "User ID is required."
+                    });
+                }
+
+                var result =
+                    await _service.CompleteFinalRrAsync(
+                        processingId,
+                        dto,
+                        userId.Trim()
+                    );
+
+                return Ok(new
+                {
+                    message =
+                        $"Final Receiving Report {result.RrNo} " +
+                        "completed and committed to inventory.",
+
+                    rr_id =
+                        result.RrId,
+
+                    rr_no =
+                        result.RrNo
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        ex.GetBaseException().Message
+                });
+            }
+        }
+
         [HttpGet("create-options/{scheduleId}")]
         public async Task<IActionResult> GetCreateOptions(int scheduleId)
         {
@@ -189,5 +245,61 @@ namespace inventory_api.Controllers.Purchasing.ReceivingReports
                 });
             }
         }
+
+
+        [HttpGet("final-rr/pending")]
+        public async Task<IActionResult> GetPendingFinalRr()
+        {
+            try
+            {
+                var data =
+                    await _service.GetPendingFinalRrAsync();
+
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        ex.GetBaseException().Message
+                });
+            }
+        }
+
+
+        [HttpGet("final-rr/{processingId:int}/details")]
+        public async Task<IActionResult> GetFinalRrDetails(
+            int processingId)
+        {
+            try
+            {
+                var data =
+                    await _service.GetFinalRrDetailsAsync(
+                        processingId
+                    );
+
+                if (data == null)
+                {
+                    return NotFound(new
+                    {
+                        message =
+                            "Raw material processing record was not found."
+                    });
+                }
+
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        ex.GetBaseException().Message
+                });
+            }
+        }
+
+
     }
 }

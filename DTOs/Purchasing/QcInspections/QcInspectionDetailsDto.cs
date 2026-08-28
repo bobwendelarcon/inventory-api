@@ -5,8 +5,11 @@
         public int QcId { get; set; }
         public string QcNo { get; set; } = string.Empty;
 
-        public int RrId { get; set; }
-        public string RrNo { get; set; } = string.Empty;
+        public int? RrId { get; set; }
+        public string? RrNo { get; set; }
+
+        public int? IncomingReceivingId { get; set; }
+        public string? IncomingNo { get; set; }
 
         public int PoId { get; set; }
         public string PoNo { get; set; } = string.Empty;
@@ -28,6 +31,18 @@
         public string CreatedBy { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
 
+        public int? QuarantineId { get; set; }
+
+        public string? QuarantineNo { get; set; }
+
+        public string? QuarantineStatus { get; set; }
+
+        public string? QuarantineDecision { get; set; }
+
+        public string? ReleasedBy { get; set; }
+
+        public DateTime? ReleasedAt { get; set; }
+
         public string? CommittedBy { get; set; }
         public DateTime? CommittedAt { get; set; }
 
@@ -37,7 +52,9 @@
     public class QcInspectionLineDetailsDto
     {
         public int QcLineId { get; set; }
-        public int RrLineId { get; set; }
+        public int? RrLineId { get; set; }
+
+        public int? IncomingReceivingLineId { get; set; }
         public int PoLineId { get; set; }
         public int MaterialId { get; set; }
 

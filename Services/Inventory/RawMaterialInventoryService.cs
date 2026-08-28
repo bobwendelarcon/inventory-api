@@ -1573,6 +1573,145 @@ x.SupplierName
         }
 
 
+        public async Task<RawMaterialTransactionDetailsDto>
+    GetTransactionByIdAsync(
+        int transactionId)
+        {
+            var result =
+                await (
+                    from transaction in
+                        _context.MaterialInventoryTransactions
+                            .AsNoTracking()
+
+                    join material in
+                        _context.Materials.AsNoTracking()
+                        on transaction.material_id
+                        equals material.material_id
+
+                    join branch in
+                        _context.Branches.AsNoTracking()
+                        on transaction.branch_id
+                        equals branch.branch_id
+                        into branchJoin
+
+                    from branch in
+                        branchJoin.DefaultIfEmpty()
+
+                    join supplier in
+                        _context.Suppliers.AsNoTracking()
+                        on transaction.supplier_id
+                        equals supplier.SupplierId
+                        into supplierJoin
+
+                    from supplier in
+                        supplierJoin.DefaultIfEmpty()
+
+                    join user in
+                        _context.Users.AsNoTracking()
+                        on transaction.encoded_by
+                        equals user.user_id
+                        into userJoin
+
+                    from user in
+                        userJoin.DefaultIfEmpty()
+
+                    where
+                        transaction.transaction_id ==
+                        transactionId
+
+                    select new
+                        RawMaterialTransactionDetailsDto
+                    {
+                        TransactionId =
+                                transaction.transaction_id,
+
+                        MaterialId =
+                                transaction.material_id,
+
+                        MaterialCode =
+                                material.material_code,
+
+                        MaterialName =
+                                material.material_name,
+
+                        BranchId =
+                                transaction.branch_id,
+
+                        BranchName =
+                                branch != null
+                                    ? branch.branch_name
+                                    : transaction.branch_id,
+
+                        LotNo =
+                                transaction.lot_no
+                                ?? string.Empty,
+
+                        TransactionType =
+                                transaction.transaction_type,
+
+                        Movement =
+                                IsOutboundTransaction(
+                                    transaction.transaction_type
+                                )
+                                    ? "OUT"
+                                    : "IN",
+
+                        Quantity =
+                                transaction.quantity,
+
+                        Uom =
+                                transaction.uom,
+
+                        SupplierId =
+                                transaction.supplier_id,
+
+                        SupplierName =
+                                supplier != null
+                                    ? supplier.SupplierName
+                                    : "Not Specified",
+
+                        ReferenceType =
+                                transaction.reference_type
+                                ?? string.Empty,
+
+                        ReferenceId =
+                                transaction.reference_id,
+
+                        ReferenceNo =
+                                transaction.reference_no
+                                ?? string.Empty,
+
+                        Remarks =
+                                transaction.remarks
+                                ?? string.Empty,
+
+                        EncodedBy =
+                                transaction.encoded_by
+                                ?? string.Empty,
+
+                        EncodedByName =
+                                user != null
+                                    ? user.full_name
+                                    : transaction.encoded_by
+                                      ?? string.Empty,
+
+                        TransactionDate =
+                                transaction.transaction_date
+                    }
+                )
+                .FirstOrDefaultAsync();
+
+            if (result == null)
+            {
+                throw new KeyNotFoundException(
+                    $"Inventory transaction ID {transactionId} was not found."
+                );
+            }
+
+            return result;
+        }
+
+
 
     }
 }

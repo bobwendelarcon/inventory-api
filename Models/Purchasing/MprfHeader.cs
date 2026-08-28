@@ -21,6 +21,9 @@ namespace inventory_api.Models.Purchasing
         public DateTime created_at { get; set; }
         public DateTime? updated_at { get; set; }
 
+        public string? submitted_by { get; set; }
+        public DateTime? submitted_at { get; set; }
+
         public string? review_decision { get; set; }
         public string? review_remarks { get; set; }
         public DateTime? reviewed_at { get; set; }

@@ -94,5 +94,54 @@ namespace inventory_api.Controllers.Purchasing.QcInspections
                 });
             }
         }
+
+        [HttpPost("quarantine/{id:int}/release")]
+        public async Task<IActionResult> ReleaseQuarantine(
+    int id)
+        {
+            try
+            {
+                var userId =
+                    Request.Headers["X-User-Id"]
+                        .FirstOrDefault();
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message = "User ID is required."
+                    });
+                }
+
+                await _service.ReleaseQuarantineAsync(
+                    id,
+                    userId);
+
+                return Ok(new
+                {
+                    message =
+                        "Material released successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpGet("rmw-material-processing")]
+        public async Task<IActionResult>
+    GetRmwMaterialProcessing()
+        {
+            var data =
+                await _service
+                    .GetRmwMaterialProcessingAsync();
+
+            return Ok(data);
+        }
+
     }
 }

@@ -24,6 +24,16 @@
         public decimal TotalReceivedQty { get; set; }
         public decimal TotalRemainingQty { get; set; }
 
+
+        public string WorkflowStatus { get; set; } = string.Empty;
+
+        public int? IncomingReceivingId { get; set; }
+        public string? IncomingNo { get; set; }
+        public string? IncomingStatus { get; set; }
+
+        public decimal TotalDeliveredQty { get; set; }
+        public decimal TotalFinalReceivedQty { get; set; }
+
         public int? RrId { get; set; }
         public string? RrNo { get; set; }
         public string? RrStatus { get; set; }
@@ -48,6 +58,10 @@
         public string MaterialName { get; set; } = string.Empty;
 
         public decimal PoQty { get; set; }
+
+        public decimal DeliveredQty { get; set; }
+
+        public decimal FinalReceivedQty { get; set; }
 
         public decimal ScheduledQty { get; set; }
         public decimal ReceivedQty { get; set; }

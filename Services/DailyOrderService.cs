@@ -158,9 +158,10 @@ namespace inventory_api.Services
         out var fullName)
     ? fullName
     : h.created_by,
+              CreatedAt = h.created_at,
 
-            // 🔥 ADD THESE
-            Uom = p?.uom ?? "",
+              // 🔥 ADD THESE
+              Uom = p?.uom ?? "",
             PackQty = p?.pack_qty ?? 0,
             PackUom = p?.pack_uom ?? "",
 
@@ -234,9 +235,9 @@ namespace inventory_api.Services
             }
             else
             {
-                result = result.Where(x =>
-                    (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
-                );
+                //result = result.Where(x =>
+                //    (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
+                //);
             }
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -250,13 +251,19 @@ namespace inventory_api.Services
             var filteredList = result.ToList();
 
             var isDesc = (sortDir ?? "asc").Trim().ToLower() == "desc";
-            var sortKey = (sortBy ?? "deliveryDate").Trim();
+            var sortKey = (sortBy ?? "dateOrdered").Trim();
 
             filteredList = sortKey switch
             {
                 "dateOrdered" => isDesc
-                    ? filteredList.OrderByDescending(x => x.DateOrdered).ToList()
-                    : filteredList.OrderBy(x => x.DateOrdered).ToList(),
+    ? filteredList
+        .OrderByDescending(x => x.DateOrdered)
+        .ThenByDescending(x => x.CreatedAt)
+        .ToList()
+    : filteredList
+        .OrderBy(x => x.DateOrdered)
+        .ThenBy(x => x.CreatedAt)
+        .ToList(),
 
                 "customer" => isDesc
                     ? filteredList.OrderByDescending(x => x.CustomerName).ToList()

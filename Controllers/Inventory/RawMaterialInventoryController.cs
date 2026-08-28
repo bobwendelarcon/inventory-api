@@ -58,6 +58,38 @@ namespace inventory_api.Controllers.Inventory
         }
 
 
+        [HttpGet("transactions/{transactionId:int}")]
+        public async Task<IActionResult> GetTransactionById(
+    int transactionId)
+        {
+            try
+            {
+                var result =
+                    await _service.GetTransactionByIdAsync(
+                        transactionId
+                    );
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
         [HttpPost("manual-stock-in")]
         public async Task<IActionResult> ManualStockIn(
     [FromBody] ManualStockInDto dto)

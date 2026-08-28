@@ -1,7 +1,10 @@
 ﻿using inventory_api.Data;
 using inventory_api.DTOs.Purchasing.QcInspections;
+using inventory_api.DTOs.Purchasing.Quarantine;
 using inventory_api.Models.Manufacturing.Materials;
 using inventory_api.Models.Purchasing.QcInspections;
+using inventory_api.Models.Purchasing.Quarantine;
+using inventory_api.Models.Purchasing.RawMaterialProcessing;
 using inventory_api.Models.Purchasing.ReceivingReports;
 using inventory_api.Services.Purchasing.SupplierEvaluations;
 using Microsoft.EntityFrameworkCore;
@@ -25,37 +28,86 @@ namespace inventory_api.Services.Purchasing.QcInspections
         public async Task<List<QcInspectionListDto>> GetAllAsync()
         {
             return await _context.QcInspectionHeaders
-                .OrderByDescending(x => x.QcId)
-                .Select(x => new QcInspectionListDto
-                {
-                    QcId = x.QcId,
-                    QcNo = x.QcNo,
-                    RrId = x.RrId,
-                    RrNo = x.RrNo,
-                    PoNo = x.PoNo,
+     .OrderByDescending(x => x.QcId)
+     .Select(x => new QcInspectionListDto
+     {
+         QcId = x.QcId,
+         QcNo = x.QcNo,
 
-                    SupplierName = _context.Suppliers
-                        .Where(s => s.SupplierId == x.SupplierId)
-                        .Select(s => s.SupplierName)
-                        .FirstOrDefault() ?? "",
+         IncomingReceivingId =
+             x.IncomingReceivingId,
 
-                    InspectionDate = x.InspectionDate,
+         IncomingNo =
+             x.IncomingNo,
 
-                    InspectorId = x.InspectorId,
+         RrId =
+             x.RrId,
 
-                    InspectorName =
-    _context.Users
-        .Where(u =>
-            u.user_id == x.InspectorId)
-        .Select(u => u.full_name)
-        .FirstOrDefault()
-    ?? x.InspectorId,
+         RrNo =
+             x.RrNo,
 
-                    Status = x.Status,
-                    Decision = x.Decision,
-                    CreatedAt = x.CreatedAt
-                })
-                .ToListAsync();
+         PoNo =
+             x.PoNo,
+
+         SupplierName =
+             _context.Suppliers
+                 .Where(s =>
+                     s.SupplierId == x.SupplierId)
+                 .Select(s =>
+                     s.SupplierName)
+                 .FirstOrDefault() ?? "",
+
+         InspectionDate =
+             x.InspectionDate,
+
+         InspectorId =
+             x.InspectorId,
+
+         InspectorName =
+             _context.Users
+                 .Where(u =>
+                     u.user_id == x.InspectorId)
+                 .Select(u =>
+                     u.full_name)
+                 .FirstOrDefault()
+             ?? x.InspectorId,
+
+         Status =
+             x.Status,
+
+         Decision =
+             x.Decision,
+
+         CreatedAt =
+             x.CreatedAt,
+
+
+         // QUARANTINE
+         QuarantineId =
+             _context.QuarantineHeaders
+                 .Where(q =>
+                     q.QcId == x.QcId)
+                 .Select(q =>
+                     (int?)q.QuarantineId)
+                 .FirstOrDefault(),
+
+         QuarantineNo =
+             _context.QuarantineHeaders
+                 .Where(q =>
+                     q.QcId == x.QcId)
+                 .Select(q =>
+                     q.QuarantineNo)
+                 .FirstOrDefault(),
+
+         QuarantineStatus =
+             _context.QuarantineHeaders
+                 .Where(q =>
+                     q.QcId == x.QcId)
+                 .Select(q =>
+                     q.Status)
+                 .FirstOrDefault()
+     })
+     .ToListAsync();
         }
 
         public async Task<QcInspectionDetailsDto?> GetByIdAsync(int qcId)
@@ -66,93 +118,240 @@ namespace inventory_api.Services.Purchasing.QcInspections
                 {
                     QcId = x.QcId,
                     QcNo = x.QcNo,
-                    RrId = x.RrId,
-                    RrNo = x.RrNo,
-                    PoId = x.PoId,
-                    PoNo = x.PoNo,
-                    SupplierId = x.SupplierId,
 
-                    SupplierName = _context.Suppliers
-                        .Where(s => s.SupplierId == x.SupplierId)
-                        .Select(s => s.SupplierName)
-                        .FirstOrDefault() ?? "",
+                    IncomingReceivingId =
+                        x.IncomingReceivingId,
 
-                    InspectionDate = x.InspectionDate,
+                    IncomingNo =
+                        x.IncomingNo,
 
-                    InspectorId = x.InspectorId,
+                    RrId =
+                        x.RrId,
+
+                    RrNo =
+                        x.RrNo,
+
+                    PoId =
+                        x.PoId,
+
+                    PoNo =
+                        x.PoNo,
+
+                    SupplierId =
+                        x.SupplierId,
+
+                    SupplierName =
+                        _context.Suppliers
+                            .Where(s =>
+                                s.SupplierId == x.SupplierId)
+                            .Select(s =>
+                                s.SupplierName)
+                            .FirstOrDefault() ?? "",
+
+                    InspectionDate =
+                        x.InspectionDate,
+
+                    InspectorId =
+                        x.InspectorId,
 
                     InspectorName =
-    _context.Users
-        .Where(u =>
-            u.user_id == x.InspectorId)
-        .Select(u => u.full_name)
-        .FirstOrDefault()
-    ?? x.InspectorId,
+                        _context.Users
+                            .Where(u =>
+                                u.user_id == x.InspectorId)
+                            .Select(u =>
+                                u.full_name)
+                            .FirstOrDefault()
+                        ?? x.InspectorId,
 
-                    Status = x.Status,
-                    Decision = x.Decision,
-                    Remarks = x.Remarks,
-                    CreatedBy = x.CreatedBy,
-                    CreatedAt = x.CreatedAt,
-                    CommittedBy = x.CommittedBy,
-                    CommittedAt = x.CommittedAt,
+                    Status =
+                        x.Status,
+
+                    Decision =
+                        x.Decision,
+
+                    Remarks =
+                        x.Remarks,
+
+                    CreatedBy =
+                        x.CreatedBy,
+
+                    CreatedAt =
+                        x.CreatedAt,
+
+                    CommittedBy =
+                        x.CommittedBy,
+
+                    CommittedAt =
+                        x.CommittedAt,
+
+
+                    // ============================================================
+                    // QUARANTINE / RELEASE INFORMATION
+                    // ============================================================
+
+                    QuarantineId =
+                        _context.QuarantineHeaders
+                            .Where(q =>
+                                q.QcId == x.QcId)
+                            .Select(q =>
+                                (int?)q.QuarantineId)
+                            .FirstOrDefault(),
+
+                    QuarantineNo =
+                        _context.QuarantineHeaders
+                            .Where(q =>
+                                q.QcId == x.QcId)
+                            .Select(q =>
+                                q.QuarantineNo)
+                            .FirstOrDefault(),
+
+                    QuarantineStatus =
+                        _context.QuarantineHeaders
+                            .Where(q =>
+                                q.QcId == x.QcId)
+                            .Select(q =>
+                                q.Status)
+                            .FirstOrDefault(),
+
+                    QuarantineDecision =
+                        _context.QuarantineHeaders
+                            .Where(q =>
+                                q.QcId == x.QcId)
+                            .Select(q =>
+                                q.Decision)
+                            .FirstOrDefault(),
+
+                    ReleasedBy =
+                        _context.QuarantineHeaders
+                            .Where(q =>
+                                q.QcId == x.QcId)
+                            .Select(q =>
+                                q.ReleasedBy)
+                            .FirstOrDefault(),
+
+                    ReleasedAt =
+                        _context.QuarantineHeaders
+                            .Where(q =>
+                                q.QcId == x.QcId)
+                            .Select(q =>
+                                q.ReleasedAt)
+                            .FirstOrDefault(),
+
+
+                    // ============================================================
+                    // QC LINES
+                    // ============================================================
 
                     Lines = x.Lines
-    .OrderBy(l => l.QcLineId)
-    .Select(l => new QcInspectionLineDetailsDto
-    {
-        QcLineId = l.QcLineId,
-        RrLineId = l.RrLineId,
-        PoLineId = l.PoLineId,
-        MaterialId = l.MaterialId,
+                        .OrderBy(l =>
+                            l.QcLineId)
+                        .Select(l =>
+                            new QcInspectionLineDetailsDto
+                            {
+                                QcLineId =
+                                    l.QcLineId,
 
-        MaterialCode = _context.Materials
-            .Where(m => m.material_id == l.MaterialId)
-            .Select(m => m.material_code)
-            .FirstOrDefault() ?? "",
+                                IncomingReceivingLineId =
+                                    l.IncomingReceivingLineId,
 
-        MaterialName = _context.Materials
-            .Where(m => m.material_id == l.MaterialId)
-            .Select(m => m.material_name)
-            .FirstOrDefault() ?? "",
+                                RrLineId =
+                                    l.RrLineId,
 
-        IsLotTracked = _context.Materials
-    .Where(m => m.material_id == l.MaterialId)
-    .Select(m => m.is_lot_tracked)
-    .FirstOrDefault(),
+                                PoLineId =
+                                    l.PoLineId,
 
-        ReceivedQty = l.ReceivedQty,
-        AcceptedQty = l.AcceptedQty,
-        RejectedQty = l.RejectedQty,
-        Remarks = l.Remarks,
-        Status = l.Status,
+                                MaterialId =
+                                    l.MaterialId,
 
-        Lots = l.Lots
-            .OrderBy(lot => lot.QcLineLotId)
-            .Select(lot => new QcInspectionLineLotDetailsDto
-            {
-                QcLineLotId = lot.QcLineLotId,
-                LotNo = lot.LotNo,
-                ManufacturingDate = lot.ManufacturingDate,
-                ExpirationDate = lot.ExpirationDate,
-                ReceivedQty = lot.ReceivedQty,
-                AcceptedQty = lot.AcceptedQty,
-                RejectedQty = lot.RejectedQty,
-                RejectionReason = lot.RejectionReason,
-                Remarks = lot.Remarks,
-                Status = lot.Status
-            })
-            .ToList()
-    })
-    .ToList()
+                                MaterialCode =
+                                    _context.Materials
+                                        .Where(m =>
+                                            m.material_id ==
+                                            l.MaterialId)
+                                        .Select(m =>
+                                            m.material_code)
+                                        .FirstOrDefault() ?? "",
+
+                                MaterialName =
+                                    _context.Materials
+                                        .Where(m =>
+                                            m.material_id ==
+                                            l.MaterialId)
+                                        .Select(m =>
+                                            m.material_name)
+                                        .FirstOrDefault() ?? "",
+
+                                IsLotTracked =
+                                    _context.Materials
+                                        .Where(m =>
+                                            m.material_id ==
+                                            l.MaterialId)
+                                        .Select(m =>
+                                            m.is_lot_tracked)
+                                        .FirstOrDefault(),
+
+                                ReceivedQty =
+                                    l.ReceivedQty,
+
+                                AcceptedQty =
+                                    l.AcceptedQty,
+
+                                RejectedQty =
+                                    l.RejectedQty,
+
+                                Remarks =
+                                    l.Remarks,
+
+                                Status =
+                                    l.Status,
+
+                                Lots = l.Lots
+                                    .OrderBy(lot =>
+                                        lot.QcLineLotId)
+                                    .Select(lot =>
+                                        new QcInspectionLineLotDetailsDto
+                                        {
+                                            QcLineLotId =
+                                                lot.QcLineLotId,
+
+                                            LotNo =
+                                                lot.LotNo,
+
+                                            ManufacturingDate =
+                                                lot.ManufacturingDate,
+
+                                            ExpirationDate =
+                                                lot.ExpirationDate,
+
+                                            ReceivedQty =
+                                                lot.ReceivedQty,
+
+                                            AcceptedQty =
+                                                lot.AcceptedQty,
+
+                                            RejectedQty =
+                                                lot.RejectedQty,
+
+                                            RejectionReason =
+                                                lot.RejectionReason,
+
+                                            Remarks =
+                                                lot.Remarks,
+
+                                            Status =
+                                                lot.Status
+                                        })
+                                    .ToList()
+                            })
+                        .ToList()
                 })
                 .FirstOrDefaultAsync();
         }
 
         public async Task SaveInspectionAsync(
-     int qcId,
-     SaveQcInspectionDto dto,
-     string userId)
+       int qcId,
+       SaveQcInspectionDto dto,
+       string userId)
         {
             var strategy = _context.Database.CreateExecutionStrategy();
 
@@ -163,250 +362,633 @@ namespace inventory_api.Services.Purchasing.QcInspections
 
                 try
                 {
+                    // ============================================================
+                    // LOAD QC
+                    // ============================================================
+
                     var qc = await _context.QcInspectionHeaders
-     .Include(x => x.Lines)
-         .ThenInclude(x => x.Lots)
-     .FirstOrDefaultAsync(x => x.QcId == qcId);
+                        .Include(x => x.Lines)
+                            .ThenInclude(x => x.Lots)
+                        .FirstOrDefaultAsync(x => x.QcId == qcId);
 
-                if (qc == null)
-                    throw new Exception("QC inspection not found.");
+                    if (qc == null)
+                        throw new Exception("QC inspection not found.");
 
-                if (qc.Status != "FOR_INSPECTION")
-                    throw new Exception(
-                        "Only QC inspections with FOR_INSPECTION status can be processed."
-                    );
-
-                if (dto.Lines == null || !dto.Lines.Any())
-                    throw new Exception("QC inspection must have at least one line.");
-
-                var submittedQcLineIds = dto.Lines
-    .Select(x => x.QcLineId)
-    .ToHashSet();
-
-                var missingQcLines = qc.Lines
-                    .Where(x => !submittedQcLineIds.Contains(x.QcLineId))
-                    .Select(x => x.QcLineId)
-                    .ToList();
-
-                if (missingQcLines.Any())
-                {
-                    throw new InvalidOperationException(
-                        $"All QC lines must be inspected. Missing QC line IDs: " +
-                        string.Join(", ", missingQcLines));
-                }
-
-                var duplicateQcLineId = dto.Lines
-    .GroupBy(x => x.QcLineId)
-    .FirstOrDefault(x => x.Count() > 1);
-
-                if (duplicateQcLineId != null)
-                {
-                    throw new InvalidOperationException(
-                        $"QC line {duplicateQcLineId.Key} was submitted more than once.");
-                }
-
-
-
-                var rr = await _context.ReceivingReportHeaders
-                    .Include(x => x.Lines)
-                    .FirstOrDefaultAsync(x => x.RrId == qc.RrId);
-
-                if (rr == null)
-                    throw new Exception("Receiving Report not found.");
-
-                if (rr.Status != "FOR_QC")
-                    throw new Exception(
-                        "Only Receiving Reports submitted for QC can be inspected."
-                    );
-
-                var po = await _context.PurchaseOrderHeaders
-                    .Include(x => x.Lines)
-                    .FirstOrDefaultAsync(x => x.PoId == qc.PoId);
-
-                if (po == null)
-                    throw new Exception("Purchase Order not found.");
-
-                var now = DateTime.Now;
-                if (string.IsNullOrWhiteSpace(userId))
-                {
-                    throw new Exception("Inspector ID is required.");
-                }
-
-                var inspectorId = userId.Trim();
-
-                var materialIds = qc.Lines
-    .Select(x => x.MaterialId)
-    .Distinct()
-    .ToList();
-
-                var materialTracking = await _context.Materials
-                    .Where(x => materialIds.Contains(x.material_id))
-                    .Select(x => new
-                    {
-                        x.material_id,
-                        x.material_name,
-                        x.is_lot_tracked
-                    })
-                    .ToDictionaryAsync(
-                        x => x.material_id,
-                        x => x
-                    );
-
-                foreach (var lineDto in dto.Lines)
-                {
-                    var qcLine = qc.Lines.FirstOrDefault(
-                        x => x.QcLineId == lineDto.QcLineId
-                    );
-
-                    if (qcLine == null)
+                    if (qc.Status != "FOR_INSPECTION")
                     {
                         throw new Exception(
-                            $"QC line {lineDto.QcLineId} was not found."
-                        );
+                            "Only QC inspections with FOR_INSPECTION status can be processed.");
                     }
 
+                    if (dto.Lines == null || !dto.Lines.Any())
+                    {
+                        throw new Exception(
+                            "QC inspection must have at least one line.");
+                    }
 
-                    if (!materialTracking.TryGetValue(
-        qcLine.MaterialId,
-        out var material))
+                    // ============================================================
+                    // NEW WORKFLOW REQUIRES INCOMING RECEIVING
+                    // ============================================================
+
+                    if (!qc.IncomingReceivingId.HasValue)
                     {
                         throw new InvalidOperationException(
-                            $"Material ID {qcLine.MaterialId} was not found.");
+                            "QC inspection is not linked to an Incoming Receiving record.");
                     }
 
-                    ValidateLots(
-                        qcLine,
-                        lineDto.Lots,
-                        material.is_lot_tracked,
-                        material.material_name
-                    );
-                    SyncQcLineLots(
-     qcLine,
-     lineDto,
-     inspectorId,
-     now
- );
+                    var incoming = await _context.IncomingReceivings
+                        .Include(x => x.Lines)
+                        .FirstOrDefaultAsync(x =>
+                            x.IncomingReceivingId ==
+                            qc.IncomingReceivingId.Value);
 
-
-                    var rrLine = rr.Lines.FirstOrDefault(
-                        x => x.RrLineId == qcLine.RrLineId
-                    );
-
-                    if (rrLine == null)
+                    if (incoming == null)
                     {
                         throw new Exception(
-                            $"Receiving Report line {qcLine.RrLineId} was not found."
-                        );
+                            "Incoming Receiving record was not found.");
                     }
 
-                    var poLine = po.Lines.FirstOrDefault(
-                        x => x.PoLineId == qcLine.PoLineId
-                    );
+                    // ============================================================
+                    // VALIDATE ALL QC LINES WERE SUBMITTED
+                    // ============================================================
 
-                    if (poLine == null)
+                    var submittedQcLineIds = dto.Lines
+                        .Select(x => x.QcLineId)
+                        .ToHashSet();
+
+                    var missingQcLines = qc.Lines
+                        .Where(x =>
+                            !submittedQcLineIds.Contains(x.QcLineId))
+                        .Select(x => x.QcLineId)
+                        .ToList();
+
+                    if (missingQcLines.Any())
+                    {
+                        throw new InvalidOperationException(
+                            "All QC lines must be inspected. Missing QC line IDs: " +
+                            string.Join(", ", missingQcLines));
+                    }
+
+                    // ============================================================
+                    // PREVENT DUPLICATE SUBMITTED QC LINES
+                    // ============================================================
+
+                    var duplicateQcLineId = dto.Lines
+                        .GroupBy(x => x.QcLineId)
+                        .FirstOrDefault(x => x.Count() > 1);
+
+                    if (duplicateQcLineId != null)
+                    {
+                        throw new InvalidOperationException(
+                            $"QC line {duplicateQcLineId.Key} was submitted more than once.");
+                    }
+
+                    // ============================================================
+                    // INSPECTOR
+                    // ============================================================
+
+                    if (string.IsNullOrWhiteSpace(userId))
                     {
                         throw new Exception(
-                            $"Purchase Order line {qcLine.PoLineId} was not found."
-                        );
+                            "Inspector ID is required.");
                     }
 
-                    qcLine.AcceptedQty = lineDto.Lots.Sum(x => x.AcceptedQty);
-                    qcLine.RejectedQty = lineDto.Lots.Sum(x => x.RejectedQty);
-                    qcLine.Remarks = lineDto.Remarks;
-                    qcLine.Status = GetInspectionLineStatus(
-     qcLine.ReceivedQty,
-     qcLine.AcceptedQty,
-     qcLine.RejectedQty
- );
+                    var inspectorId = userId.Trim();
+                    var now = DateTime.Now;
 
-                    qcLine.UpdatedAt = now;
+                    // ============================================================
+                    // LOAD MATERIAL TRACKING INFORMATION
+                    // ============================================================
 
-                    rrLine.AcceptedQty = qcLine.AcceptedQty;
-                    rrLine.RejectedQty = qcLine.RejectedQty;
-                    rrLine.Status = qcLine.Status;
-                    rrLine.UpdatedAt = now;
+                    var materialIds = qc.Lines
+                        .Select(x => x.MaterialId)
+                        .Distinct()
+                        .ToList();
 
-                    // Physical received quantity was already posted during RR creation.
-                    // Rejected quantity must be returned to the PO balance.
+                    var materialTracking = await _context.Materials
+                        .Where(x =>
+                            materialIds.Contains(x.material_id))
+                        .Select(x => new
+                        {
+                            x.material_id,
+                            x.material_name,
+                            x.is_lot_tracked
+                        })
+                        .ToDictionaryAsync(
+                            x => x.material_id,
+                            x => x);
 
+                    // ============================================================
+                    // PROCESS EACH QC LINE
+                    // ============================================================
 
-                    // Accepted quantity will be posted to inventory next.
-                    if (qcLine.AcceptedQty > 0)
+                    foreach (var lineDto in dto.Lines)
                     {
-                        await AddAcceptedQtyToInventoryAsync(
-                            qc,
-                            rr,
+                        var qcLine = qc.Lines
+                            .FirstOrDefault(x =>
+                                x.QcLineId == lineDto.QcLineId);
+
+                        if (qcLine == null)
+                        {
+                            throw new Exception(
+                                $"QC line {lineDto.QcLineId} was not found.");
+                        }
+
+                        // --------------------------------------------------------
+                        // QC line must belong to an Incoming Receiving line
+                        // --------------------------------------------------------
+
+                        if (!qcLine.IncomingReceivingLineId.HasValue)
+                        {
+                            throw new InvalidOperationException(
+                                $"QC line {qcLine.QcLineId} is not linked " +
+                                "to an Incoming Receiving line.");
+                        }
+
+                        var incomingLine = incoming.Lines
+                            .FirstOrDefault(x =>
+                                x.IncomingReceivingLineId ==
+                                qcLine.IncomingReceivingLineId.Value);
+
+                        if (incomingLine == null)
+                        {
+                            throw new InvalidOperationException(
+                                $"Incoming Receiving line " +
+                                $"{qcLine.IncomingReceivingLineId.Value} " +
+                                "was not found.");
+                        }
+
+                        // --------------------------------------------------------
+                        // Material
+                        // --------------------------------------------------------
+
+                        if (!materialTracking.TryGetValue(
+                            qcLine.MaterialId,
+                            out var material))
+                        {
+                            throw new InvalidOperationException(
+                                $"Material ID {qcLine.MaterialId} was not found.");
+                        }
+
+                        // --------------------------------------------------------
+                        // Validate inspection quantities / lots
+                        // --------------------------------------------------------
+
+                        ValidateLots(
                             qcLine,
-                            rrLine,
+                            lineDto.Lots,
+                            material.is_lot_tracked,
+                            material.material_name);
+
+                        // --------------------------------------------------------
+                        // Save/update QC lots
+                        // --------------------------------------------------------
+
+                        SyncQcLineLots(
+                            qcLine,
+                            lineDto,
                             inspectorId,
                             now);
+
+                        // --------------------------------------------------------
+                        // Calculate QC result
+                        // --------------------------------------------------------
+
+                        qcLine.AcceptedQty =
+                            lineDto.Lots.Sum(x => x.AcceptedQty);
+
+                        qcLine.RejectedQty =
+                            lineDto.Lots.Sum(x => x.RejectedQty);
+
+                        qcLine.Remarks =
+                            lineDto.Remarks;
+
+                        qcLine.Status =
+                            GetInspectionLineStatus(
+                                qcLine.ReceivedQty,
+                                qcLine.AcceptedQty,
+                                qcLine.RejectedQty);
+
+                        qcLine.UpdatedAt = now;
+
+                        // --------------------------------------------------------
+                        // IMPORTANT
+                        //
+                        // DO NOT:
+                        // - update PO received quantity
+                        // - update PO balance
+                        // - create RR
+                        // - post inventory
+                        //
+                        // Those happen AFTER QA/QC approval in the next stage.
+                        // --------------------------------------------------------
                     }
-                }
 
-                var totalReceived = qc.Lines.Sum(x => x.ReceivedQty);
-                var totalAccepted = qc.Lines.Sum(x => x.AcceptedQty);
-                var totalRejected = qc.Lines.Sum(x => x.RejectedQty);
+                    // ============================================================
+                    // CALCULATE HEADER RESULT
+                    // ============================================================
 
-                qc.Decision = GetHeaderDecision(
-                    totalReceived,
-                    totalAccepted,
-                    totalRejected
-                );
+                    var totalReceived =
+                        qc.Lines.Sum(x => x.ReceivedQty);
 
-                qc.Status = "COMMITTED";
-                qc.CommittedBy = inspectorId;
-                qc.CommittedAt = now;
-                qc.InspectionDate = dto.InspectionDate ?? now;
-                qc.InspectorId = inspectorId;
-                qc.Remarks = dto.Remarks;
-               
-                qc.UpdatedAt = now;
-               
+                    var totalAccepted =
+                        qc.Lines.Sum(x => x.AcceptedQty);
 
-                rr.Status = "COMMITTED";
-                rr.CommittedBy = inspectorId;
-                rr.CommittedAt = now;
-                rr.QcBy = inspectorId;
-                rr.QcAt = now;
-              
-                rr.UpdatedAt = now;
+                    var totalRejected =
+                        qc.Lines.Sum(x => x.RejectedQty);
 
-                var allPoLinesClosed = po.Lines.All(x => x.BalanceQty <= 0);
-                var hasReceivedQty = po.Lines.Any(x => x.ReceivedQty > 0);
+                    qc.Decision =
+                        GetHeaderDecision(
+                            totalReceived,
+                            totalAccepted,
+                            totalRejected);
 
-                    po.Status = allPoLinesClosed
-         ? "FULLY_RECEIVED"
-         : hasReceivedQty
-             ? "PARTIALLY_RECEIVED"
-             : "APPROVED";
+                    // ============================================================
+                    // COMPLETE QC INSPECTION
+                    // ============================================================
 
-                    po.UpdatedAt = now;
+                    qc.Status = "INSPECTED";
 
+                    qc.InspectionDate =
+                        dto.InspectionDate ?? now;
 
-                    // ---------------------------------------------------------
-                    // AUTO CREATE SUPPLIER PERFORMANCE EVALUATION
-                    // ---------------------------------------------------------
-                    // QC, RR, inventory posting and supplier evaluation are
-                    // saved inside the SAME database transaction.
+                    qc.InspectorId =
+                        inspectorId;
+
+                    qc.Remarks =
+                        dto.Remarks;
+
+                    qc.UpdatedAt =
+                        now;
+
+                    // ============================================================
+                    // UPDATE INCOMING RECEIVING STATUS
                     //
-                    // If evaluation creation fails, the whole QC commit rolls
-                    // back so the records cannot become inconsistent.
+                    // Physical material remains in quarantine.
+                    // Nothing enters inventory yet.
+                    // ============================================================
+
+                    incoming.ReceivingStatus =
+                        "QC_INSPECTED";
+
+                    // ============================================================
+                    // SAVE
+                    // ============================================================
+
+                    await _context.SaveChangesAsync();
+
+
+                    // ============================================================
+                    // CREATE QUARANTINE RECORD
+                    // ============================================================
+
+                    var existingQuarantine =
+                        await _context.QuarantineHeaders
+                            .AnyAsync(x =>
+                                x.QcId == qc.QcId);
+
+                    if (!existingQuarantine)
+                    {
+                        var quarantineNo =
+                            await GenerateQuarantineNoAsync();
+
+                        var quarantine =
+                            new QuarantineHeader
+                            {
+                                QuarantineNo = quarantineNo,
+
+                                IncomingReceivingId =
+                                    incoming.IncomingReceivingId,
+
+                                QcId =
+                                    qc.QcId,
+
+                                PoId =
+                                    qc.PoId,
+
+                                SupplierId =
+                                    qc.SupplierId,
+
+                                Status =
+                                    "WAITING_FOR_QA_RELEASE",
+
+                                Decision =
+                                    null,
+
+                                Remarks =
+                                    null,
+
+                                CreatedBy =
+                                    inspectorId,
+
+                                CreatedAt =
+                                    now
+                            };
+
+                        // --------------------------------------------------------
+                        // CREATE QUARANTINE LINES PER QC LOT
+                        // --------------------------------------------------------
+
+                        foreach (var qcLine in qc.Lines)
+                        {
+                            foreach (var lot in qcLine.Lots)
+                            {
+                                // Only quantities accepted by QA/QC
+                                // should enter quarantine/release workflow.
+                                if (lot.AcceptedQty <= 0)
+                                    continue;
+
+                                quarantine.Lines.Add(
+                                    new QuarantineLine
+                                    {
+                                        QcLineId =
+                                            qcLine.QcLineId,
+
+                                        QcLineLotId =
+                                            lot.QcLineLotId,
+
+                                        IncomingReceivingLineId =
+                                            qcLine.IncomingReceivingLineId,
+
+                                        PoLineId =
+                                            qcLine.PoLineId,
+
+                                        MaterialId =
+                                            qcLine.MaterialId,
+
+                                        LotNo =
+                                            lot.LotNo,
+
+                                        ManufacturingDate =
+                                            lot.ManufacturingDate,
+
+                                        ExpirationDate =
+                                            lot.ExpirationDate,
+
+                                        QcReceivedQty =
+                                            lot.ReceivedQty,
+
+                                        QcAcceptedQty =
+                                            lot.AcceptedQty,
+
+                                        QcRejectedQty =
+                                            lot.RejectedQty,
+
+                                        Status =
+                                            "WAITING_FOR_QA_RELEASE",
+
+                                        Remarks =
+                                            lot.Remarks,
+
+                                        CreatedAt =
+                                            now
+                                    }
+                                );
+                            }
+                        }
+
+                        _context.QuarantineHeaders.Add(
+                            quarantine);
+                    }
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
+        }
+
+
+        public async Task ReleaseQuarantineAsync(
+      int quarantineId,
+      string userId)
+        {
+            var strategy =
+                _context.Database.CreateExecutionStrategy();
+
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction =
+                    await _context.Database.BeginTransactionAsync();
+
+                try
+                {
+                    var quarantine =
+                        await _context.QuarantineHeaders
+                            .Include(x => x.Lines)
+                            .FirstOrDefaultAsync(x =>
+                                x.QuarantineId == quarantineId);
+
+                    if (quarantine == null)
+                    {
+                        throw new InvalidOperationException(
+                            "Quarantine record not found."
+                        );
+                    }
+
+                    if (string.IsNullOrWhiteSpace(userId))
+                    {
+                        throw new InvalidOperationException(
+                            "Released By user is required."
+                        );
+                    }
+
+                    if (quarantine.Status == "RELEASED")
+                    {
+                        throw new InvalidOperationException(
+                            "This material has already been released."
+                        );
+                    }
+
+                    if (
+                        quarantine.Status !=
+                        "WAITING_FOR_QA_RELEASE"
+                    )
+                    {
+                        throw new InvalidOperationException(
+                            $"Material cannot be released. Current status: {quarantine.Status}"
+                        );
+                    }
+
+                    var acceptedLines =
+                        quarantine.Lines
+                            .Where(x =>
+                                x.QcAcceptedQty > 0)
+                            .ToList();
+
+                    if (!acceptedLines.Any())
+                    {
+                        throw new InvalidOperationException(
+                            "No accepted quarantine lines are available for processing."
+                        );
+                    }
+
+                    // ---------------------------------------------------------
+                    // Prevent duplicate RMW processing
                     // ---------------------------------------------------------
 
-                    await _supplierEvaluationGenerationService
-                        .CreateFromCommittedQcAsync(
-                            qc,
-                            rr,
-                            po,
-                            inspectorId,
-                            now);
+                    var processingExists =
+                        await _context.RmwProcessingHeaders
+                            .AnyAsync(x =>
+                                x.QuarantineId ==
+                                quarantine.QuarantineId);
 
+                    if (processingExists)
+                    {
+                        throw new InvalidOperationException(
+                            "An RMW processing record already exists for this quarantine."
+                        );
+                    }
 
-                    // Save everything together:
-                    // QC
-                    // RR
-                    // Inventory
-                    // Supplier Evaluation
+                    var now = DateTime.Now;
+                    var cleanUserId = userId.Trim();
+
+                    // ---------------------------------------------------------
+                    // Generate RMP number
+                    // ---------------------------------------------------------
+
+                    var processingNo =
+                        await GenerateRmwProcessingNoAsync();
+
+                    // ---------------------------------------------------------
+                    // Create RMW processing header
+                    // ---------------------------------------------------------
+
+                    var processing =
+                        new RmwProcessingHeader
+                        {
+                            ProcessingNo =
+                                processingNo,
+
+                            QuarantineId =
+                                quarantine.QuarantineId,
+
+                            QcId =
+                                quarantine.QcId,
+
+                            IncomingReceivingId =
+                                quarantine.IncomingReceivingId,
+
+                            PoId =
+                                quarantine.PoId,
+
+                            SupplierId =
+                                quarantine.SupplierId,
+
+                            Status =
+                                "READY_FOR_WEIGHING",
+
+                            CreatedBy =
+                                cleanUserId,
+
+                            CreatedAt =
+                                now
+                        };
+
+                    // ---------------------------------------------------------
+                    // Create one processing line per accepted quarantine lot
+                    // ---------------------------------------------------------
+
+                    foreach (var quarantineLine in acceptedLines)
+                    {
+                        var uom =
+                            await _context.PurchaseOrderLines
+                                .Where(x =>
+                                    x.PoLineId ==
+                                    quarantineLine.PoLineId)
+                                .Select(x => x.Uom)
+                                .FirstOrDefaultAsync();
+
+                        processing.Lines.Add(
+                            new RmwProcessingLine
+                            {
+                                QuarantineLineId =
+                                    quarantineLine.QuarantineLineId,
+
+                                QcLineId =
+                                    quarantineLine.QcLineId,
+
+                                QcLineLotId =
+                                    quarantineLine.QcLineLotId,
+
+                                IncomingReceivingLineId =
+                                    quarantineLine
+                                        .IncomingReceivingLineId,
+
+                                PoLineId =
+                                    quarantineLine.PoLineId,
+
+                                MaterialId =
+                                    quarantineLine.MaterialId,
+
+                                LotNo =
+                                    quarantineLine.LotNo,
+
+                                ManufacturingDate =
+                                    quarantineLine
+                                        .ManufacturingDate,
+
+                                ExpirationDate =
+                                    quarantineLine
+                                        .ExpirationDate,
+
+                                QaAcceptedQty =
+                                    quarantineLine
+                                        .QcAcceptedQty,
+
+                                ActualQty =
+                                    null,
+
+                                VarianceQty =
+                                    null,
+
+                                Uom =
+                                    uom,
+
+                                Status =
+                                    "READY_FOR_WEIGHING",
+
+                                CreatedAt =
+                                    now
+                            }
+                        );
+                    }
+
+                    _context.RmwProcessingHeaders.Add(
+                        processing
+                    );
+
+                    // ---------------------------------------------------------
+                    // Release quarantine
+                    // ---------------------------------------------------------
+
+                    quarantine.Status =
+                        "RELEASED";
+
+                    quarantine.Decision =
+                        "RELEASED";
+
+                    quarantine.ReleasedBy =
+                        cleanUserId;
+
+                    quarantine.ReleasedAt =
+                        now;
+
+                    quarantine.UpdatedBy =
+                        cleanUserId;
+
+                    quarantine.UpdatedAt =
+                        now;
+
+                    foreach (var line in acceptedLines)
+                    {
+                        line.Status =
+                            "RELEASED";
+                    }
+
                     await _context.SaveChangesAsync();
 
                     await transaction.CommitAsync();
@@ -417,6 +999,93 @@ namespace inventory_api.Services.Purchasing.QcInspections
                     throw;
                 }
             });
+        }
+
+
+        private async Task<string>
+    GenerateRmwProcessingNoAsync()
+        {
+            var year =
+                DateTime.Now.Year;
+
+            var prefix =
+                $"RMP-{year}-";
+
+            var lastNo =
+                await _context.RmwProcessingHeaders
+                    .Where(x =>
+                        x.ProcessingNo
+                            .StartsWith(prefix))
+                    .OrderByDescending(x =>
+                        x.ProcessingId)
+                    .Select(x =>
+                        x.ProcessingNo)
+                    .FirstOrDefaultAsync();
+
+            var nextNo = 1;
+
+            if (!string.IsNullOrWhiteSpace(lastNo))
+            {
+                var numberPart =
+                    lastNo.Replace(
+                        prefix,
+                        ""
+                    );
+
+                if (
+                    int.TryParse(
+                        numberPart,
+                        out var lastNumber
+                    )
+                )
+                {
+                    nextNo =
+                        lastNumber + 1;
+                }
+            }
+
+            return
+                $"{prefix}{nextNo:0000}";
+        }
+
+        private async Task<string> GenerateQuarantineNoAsync()
+        {
+            var year =
+                DateTime.Now.Year;
+
+            var prefix =
+                $"QT-{year}-";
+
+            var lastNo =
+                await _context.QuarantineHeaders
+                    .Where(x =>
+                        x.QuarantineNo.StartsWith(prefix))
+                    .OrderByDescending(x =>
+                        x.QuarantineId)
+                    .Select(x =>
+                        x.QuarantineNo)
+                    .FirstOrDefaultAsync();
+
+            var nextNo = 1;
+
+            if (!string.IsNullOrWhiteSpace(lastNo))
+            {
+                var numberPart =
+                    lastNo.Replace(prefix, "");
+
+                if (
+                    int.TryParse(
+                        numberPart,
+                        out var lastNumber)
+                )
+                {
+                    nextNo =
+                        lastNumber + 1;
+                }
+            }
+
+            return
+                $"{prefix}{nextNo:0000}";
         }
 
 
@@ -953,6 +1622,93 @@ namespace inventory_api.Services.Purchasing.QcInspections
 
             return "PARTIALLY_ACCEPTED";
         }
-      
+
+
+
+        public async Task<List<RmwMaterialProcessingDto>>
+    GetRmwMaterialProcessingAsync()
+        {
+            return await _context.QuarantineHeaders
+                .OrderByDescending(x => x.QuarantineId)
+                .Select(x => new RmwMaterialProcessingDto
+                {
+                    QuarantineId = x.QuarantineId,
+                    QuarantineNo = x.QuarantineNo,
+
+                    QcId = x.QcId,
+
+                    QcNo = _context.QcInspectionHeaders
+                        .Where(q => q.QcId == x.QcId)
+                        .Select(q => q.QcNo)
+                        .FirstOrDefault() ?? "",
+
+                    IncomingReceivingId =
+                        x.IncomingReceivingId,
+
+                    IncomingNo = _context.IncomingReceivings
+                        .Where(i =>
+                            i.IncomingReceivingId ==
+                            x.IncomingReceivingId)
+                        .Select(i => i.IncomingNo)
+                        .FirstOrDefault(),
+
+                    SupplierName = _context.Suppliers
+                        .Where(s =>
+                            s.SupplierId == x.SupplierId)
+                        .Select(s => s.SupplierName)
+                        .FirstOrDefault() ?? "",
+
+                    Status = x.Status,
+                    CreatedAt = x.CreatedAt,
+
+                    Lines = x.Lines
+                        .OrderBy(l => l.QuarantineLineId)
+                        .Select(l =>
+                            new RmwMaterialProcessingLineDto
+                            {
+                                QuarantineLineId =
+                                    l.QuarantineLineId,
+
+                                MaterialId =
+                                    l.MaterialId,
+
+                                MaterialCode =
+                                    _context.Materials
+                                        .Where(m =>
+                                            m.material_id ==
+                                            l.MaterialId)
+                                        .Select(m =>
+                                            m.material_code)
+                                        .FirstOrDefault() ?? "",
+
+                                MaterialName =
+                                    _context.Materials
+                                        .Where(m =>
+                                            m.material_id ==
+                                            l.MaterialId)
+                                        .Select(m =>
+                                            m.material_name)
+                                        .FirstOrDefault() ?? "",
+
+                                LotNo =
+                                    l.LotNo,
+
+                                ManufacturingDate =
+                                    l.ManufacturingDate,
+
+                                ExpirationDate =
+                                    l.ExpirationDate,
+
+                                AcceptedQty =
+                                    l.QcAcceptedQty,
+
+                                Status =
+                                    l.Status
+                            })
+                        .ToList()
+                })
+                .ToListAsync();
+        }
+
     }
 }

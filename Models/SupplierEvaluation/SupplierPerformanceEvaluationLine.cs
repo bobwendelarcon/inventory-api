@@ -17,7 +17,7 @@ namespace inventory_api.Models.SupplierEvaluation
         public int QcLineId { get; set; }
 
         [Column("rr_line_id")]
-        public int RrLineId { get; set; }
+        public int? RrLineId { get; set; }
 
         [Column("po_line_id")]
         public int PoLineId { get; set; }

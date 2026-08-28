@@ -1,7 +1,7 @@
 ﻿using inventory_api.Data;
 using inventory_api.DTOs.Purchasing.PurchaseOrders;
 using inventory_api.Models.Purchasing.PurchaseOrders;
-
+using inventory_api.Services.Purchasing.SupplierEvaluations;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Purchasing.PurchaseOrders
@@ -10,9 +10,18 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
     {
         private readonly AppDbContext _context;
 
-        public PurchaseOrderService(AppDbContext context)
+        private readonly SupplierEvaluationGenerationService
+            _supplierEvaluationGenerationService;
+
+        public PurchaseOrderService(
+            AppDbContext context,
+            SupplierEvaluationGenerationService
+                supplierEvaluationGenerationService)
         {
             _context = context;
+
+            _supplierEvaluationGenerationService =
+                supplierEvaluationGenerationService;
         }
 
         public async Task<string> GeneratePoNoAsync()
@@ -585,23 +594,104 @@ namespace inventory_api.Services.Purchasing.PurchaseOrders
             await _context.SaveChangesAsync();
         }
 
-        public async Task ApproveAsync(int poId, string userId)
+        //public async Task ApproveAsync(int poId, string userId)
+        //{
+        //    var po = await _context.PurchaseOrderHeaders
+        //        .FirstOrDefaultAsync(x => x.PoId == poId);
+
+        //    if (po == null)
+        //        throw new Exception("Purchase Order not found.");
+
+        //    if (po.Status != "FOR_APPROVAL")
+        //        throw new Exception("Only PO for approval can be approved.");
+
+        //    po.Status = "APPROVED";
+        //    po.ApprovedBy = userId;
+        //    po.ApprovedAt = DateTime.Now;
+        //    po.UpdatedAt = DateTime.Now;
+
+        //    await _context.SaveChangesAsync();
+        //}
+
+
+        public async Task ApproveAsync(
+    int poId,
+    string userId)
         {
-            var po = await _context.PurchaseOrderHeaders
-                .FirstOrDefaultAsync(x => x.PoId == poId);
+            var strategy =
+                _context.Database
+                    .CreateExecutionStrategy();
 
-            if (po == null)
-                throw new Exception("Purchase Order not found.");
+            await strategy.ExecuteAsync(
+                async () =>
+                {
+                    await using var transaction =
+                        await _context.Database
+                            .BeginTransactionAsync();
 
-            if (po.Status != "FOR_APPROVAL")
-                throw new Exception("Only PO for approval can be approved.");
+                    try
+                    {
+                        var po =
+                            await _context
+                                .PurchaseOrderHeaders
+                                .FirstOrDefaultAsync(
+                                    x => x.PoId == poId);
 
-            po.Status = "APPROVED";
-            po.ApprovedBy = userId;
-            po.ApprovedAt = DateTime.Now;
-            po.UpdatedAt = DateTime.Now;
+                        if (po == null)
+                        {
+                            throw new Exception(
+                                "Purchase Order not found.");
+                        }
 
-            await _context.SaveChangesAsync();
+                        if (po.Status != "FOR_APPROVAL")
+                        {
+                            throw new Exception(
+                                "Only PO for approval can be approved.");
+                        }
+
+                        var now = DateTime.Now;
+
+                        // ---------------------------------------------
+                        // APPROVE PO
+                        // ---------------------------------------------
+
+                        po.Status = "APPROVED";
+                        po.ApprovedBy = userId;
+                        po.ApprovedAt = now;
+                        po.UpdatedAt = now;
+
+
+                        // ---------------------------------------------
+                        // CREATE INITIAL SUPPLIER EVALUATION
+                        // ---------------------------------------------
+
+                        await _supplierEvaluationGenerationService
+                            .CreateFromApprovedPoAsync(
+                                po,
+                                userId,
+                                now
+                            );
+
+
+                        // ---------------------------------------------
+                        // SAVE EVERYTHING
+                        // ---------------------------------------------
+
+                        await _context
+                            .SaveChangesAsync();
+
+
+                        await transaction
+                            .CommitAsync();
+                    }
+                    catch
+                    {
+                        await transaction
+                            .RollbackAsync();
+
+                        throw;
+                    }
+                });
         }
 
         public async Task CancelAsync(int poId)

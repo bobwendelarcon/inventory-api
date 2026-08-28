@@ -2,6 +2,7 @@
 using inventory_api.Services.Purchasing.PurchaseOrders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace inventory_api.Controllers.Purchasing.PurchaseOrders
 {
@@ -22,6 +23,20 @@ namespace inventory_api.Controllers.Purchasing.PurchaseOrders
         {
             var data = await _service.GetAllAsync();
             return Ok(data);
+        }
+
+        private string? GetUserId()
+        {
+            return
+                Request.Headers["X-User-Id"]
+                    .FirstOrDefault()
+                ?? User.FindFirstValue("user_id")
+                ?? User.FindFirstValue("UserId")
+                ?? User.FindFirstValue("userId")
+                ?? User.FindFirstValue("id")
+                ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub")
+                ?? User.Identity?.Name;
         }
 
         [HttpGet("{id}")]
@@ -47,21 +62,34 @@ namespace inventory_api.Controllers.Purchasing.PurchaseOrders
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreatePurchaseOrderDto dto)
+        public async Task<IActionResult> Create(
+     [FromBody] CreatePurchaseOrderDto dto)
         {
             try
             {
-                var userId = !string.IsNullOrWhiteSpace(dto.CreatedBy)
-     ? dto.CreatedBy
-     : User.FindFirst("user_id")?.Value
-       ?? User.FindFirst("UserId")?.Value
-       ?? "";
+                var userId =
+                    !string.IsNullOrWhiteSpace(dto.CreatedBy)
+                        ? dto.CreatedBy.Trim()
+                        : GetUserId();
 
-                var poId = await _service.CreateAsync(dto, userId);
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message = "User ID is required."
+                    });
+                }
+
+                var poId =
+                    await _service.CreateAsync(
+                        dto,
+                        userId.Trim()
+                    );
 
                 return Ok(new
                 {
-                    message = "Purchase Order created successfully.",
+                    message =
+                        "Purchase Order created successfully.",
                     po_id = poId
                 });
             }
@@ -106,27 +134,45 @@ namespace inventory_api.Controllers.Purchasing.PurchaseOrders
             }
         }
 
-        [HttpPost("{id}/approve")]
+        [HttpPost("{id:int}/approve")]
         public async Task<IActionResult> Approve(int id)
         {
             try
             {
-                var userId = User.FindFirst("user_id")?.Value
-                             ?? User.FindFirst("UserId")?.Value
-                             ?? "";
+                var userId =
+                    GetUserId();
 
-                await _service.ApproveAsync(id, userId);
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message = "User ID is required."
+                    });
+                }
+
+                await _service.ApproveAsync(
+                    id,
+                    userId.Trim()
+                );
 
                 return Ok(new
                 {
-                    message = "Purchase Order approved successfully."
+                    message =
+                        "Purchase Order approved successfully."
                 });
             }
             catch (Exception ex)
             {
+                var deepestException = ex;
+
+                while (deepestException.InnerException != null)
+                {
+                    deepestException = deepestException.InnerException;
+                }
+
                 return BadRequest(new
                 {
-                    message = ex.Message
+                    message = deepestException.Message
                 });
             }
         }

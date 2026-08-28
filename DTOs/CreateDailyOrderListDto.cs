@@ -18,7 +18,7 @@
         public decimal DispatchedQty { get; set; }
 
         public string CreatedBy { get; set; } = "";
-
+        public DateTime CreatedAt { get; set; }
         public decimal TotalOnHandStock { get; set; }
         public decimal TotalReservedStock { get; set; }
         public decimal TotalAvailableStock { get; set; }

@@ -4,12 +4,16 @@ using inventory_api.Services.Inventory;
 using inventory_api.Services.Manufacturing.Materials;
 using inventory_api.Services.Purchasing;
 using inventory_api.Services.Purchasing.Canvassing;
+using inventory_api.Services.Purchasing.FinalReceiving;
+using inventory_api.Services.Purchasing.IncomingReceiving;
 using inventory_api.Services.Purchasing.PurchaseOrders;
 using inventory_api.Services.Purchasing.QcInspections;
+using inventory_api.Services.Purchasing.RawMaterialProcessing;
 using inventory_api.Services.Purchasing.ReceivingReports;
 using inventory_api.Services.Purchasing.SupplierEvaluations;
 using inventory_api.Services.Purchasing.Suppliers;
-
+using inventory_api.Services.Reports.PurchasingLeadTime;
+using inventory_api.Services.Reports.TimeInMotion;
 using Microsoft.EntityFrameworkCore;
 using System;
 
@@ -71,6 +75,7 @@ builder.Services.AddScoped<MaterialSubCategoryService>();
 
 // Purchasing
 builder.Services.AddScoped<MprfService>();
+builder.Services.AddScoped<IncomingReceivingService>();
 
 // Suppliers
 builder.Services.AddScoped<SupplierService>();
@@ -99,6 +104,18 @@ builder.Services.AddScoped<SupplierEvaluationService>();
 //raw mats out
 builder.Services.AddScoped<
     MaterialRequisitionService>();
+
+//rmw processing
+builder.Services.AddScoped<RmwProcessingService>();
+//RR final commit
+builder.Services.AddScoped<FinalReceivingService>();
+
+//report raw material
+builder.Services.AddScoped<TimeInMotionService>();
+
+//Purchasing report
+builder.Services
+    .AddScoped<PurchasingLeadTimeService>();
 
 var app = builder.Build();
 

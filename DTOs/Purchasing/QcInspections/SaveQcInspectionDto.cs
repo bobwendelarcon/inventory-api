@@ -30,6 +30,9 @@
 
         public DateTime? ExpirationDate { get; set; }
 
+
+
+
         public decimal ReceivedQty { get; set; }
 
         public decimal AcceptedQty { get; set; }

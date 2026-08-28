@@ -75,6 +75,18 @@ namespace inventory_api.Services.Purchasing
                                 ? u.username
                                 : u.full_name)
                         .FirstOrDefault(),
+                    h.submitted_by,
+
+                    submitted_by_name = _context.Users
+    .Where(u => u.user_id == h.submitted_by)
+    .Select(u =>
+        string.IsNullOrWhiteSpace(u.full_name)
+            ? u.username
+            : u.full_name)
+    .FirstOrDefault(),
+
+                    h.submitted_at,
+
 
                     h.status,
 
@@ -245,24 +257,44 @@ namespace inventory_api.Services.Purchasing
             return header.mprf_id;
         }
 
-        public async Task<bool> SubmitAsync(int id)
+        public async Task<bool> SubmitAsync(
+      int id,
+      string userId)
         {
-            var header = await _context.PurchasingMprfHeaders
-                .FirstOrDefaultAsync(x => x.mprf_id == id);
+            var header =
+                await _context.PurchasingMprfHeaders
+                    .FirstOrDefaultAsync(x =>
+                        x.mprf_id == id);
 
             if (header == null)
                 return false;
 
             if (header.status != "DRAFT"
-      && header.status != "RETURNED")
+                && header.status != "RETURNED")
             {
-                throw new Exception("Only DRAFT or RETURNED MPRF can be submitted.");
+                throw new Exception(
+                    "Only DRAFT or RETURNED MPRF can be submitted.");
             }
 
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                throw new Exception(
+                    "Submitting user is required.");
+            }
+
+            var now = DateTime.UtcNow;
+
             header.status = "SUBMITTED";
-            header.updated_at = DateTime.UtcNow;
+
+            // Keep the latest valid submission.
+            // Important when a RETURNED MPRF is resubmitted.
+            header.submitted_by = userId.Trim();
+            header.submitted_at = now;
+
+            header.updated_at = now;
 
             await _context.SaveChangesAsync();
+
             return true;
         }
 

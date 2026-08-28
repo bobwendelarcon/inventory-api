@@ -8,7 +8,7 @@ public class SupplierEvaluationLineDto
 
     public int QcLineId { get; set; }
 
-    public int RrLineId { get; set; }
+    public int? RrLineId { get; set; }
 
     public int PoLineId { get; set; }
 

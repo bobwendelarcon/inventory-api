@@ -53,14 +53,52 @@ namespace inventory_api.Controllers.Purchasing
         [HttpPost("{id}/submit")]
         public async Task<IActionResult> Submit(int id)
         {
-            var result = await _service.SubmitAsync(id);
+            try
+            {
+                var userId =
+                    Request.Headers["X-User-Id"]
+                        .FirstOrDefault()
+                    ?? User.FindFirst("user_id")?.Value
+                    ?? User.FindFirst("UserId")?.Value
+                    ?? User.Identity?.Name
+                    ?? "";
 
-            if (!result)
-                return NotFound(new { message = "MPRF not found." });
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message = "User ID is required."
+                    });
+                }
 
-            return Ok(new { message = "MPRF submitted successfully." });
+                var result =
+                    await _service.SubmitAsync(
+                        id,
+                        userId.Trim()
+                    );
+
+                if (!result)
+                {
+                    return NotFound(new
+                    {
+                        message = "MPRF not found."
+                    });
+                }
+
+                return Ok(new
+                {
+                    message =
+                        "MPRF submitted successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.GetBaseException().Message
+                });
+            }
         }
-
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
