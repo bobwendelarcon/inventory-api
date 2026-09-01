@@ -201,5 +201,181 @@ namespace inventory_api.Services
 
             await _context.SaveChangesAsync();
         }
+
+
+        public async Task<List<UserAccessPointDto>>
+    GetUserAccessPointsAsync(string userId)
+        {
+            var user = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.user_id == userId &&
+                    !x.is_deleted);
+
+            if (user == null)
+                throw new Exception("User not found.");
+
+            var assignedIds =
+                await _context.SystemUserAccessPoints
+                    .AsNoTracking()
+                    .Where(x => x.user_id == userId)
+                    .Select(x => x.access_point_id)
+                    .ToListAsync();
+
+            return await _context.SystemAccessPoints
+                .AsNoTracking()
+                .Where(x => x.is_active)
+                .OrderBy(x => x.module_name)
+                .ThenBy(x => x.sort_order)
+                .Select(x => new UserAccessPointDto
+                {
+                    access_point_id = x.access_point_id,
+                    access_code = x.access_code,
+                    access_name = x.access_name,
+                    module_name = x.module_name,
+                    sort_order = x.sort_order,
+                    has_access =
+                        assignedIds.Contains(x.access_point_id)
+                })
+                .ToListAsync();
+        }
+
+        public async Task SaveUserAccessPointsAsync(
+    string userId,
+    SaveUserAccessDto dto)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(x =>
+                    x.user_id == userId &&
+                    !x.is_deleted);
+
+            if (user == null)
+                throw new Exception("User not found.");
+
+            // ADMIN automatically has full access.
+            if (string.Equals(
+                user.role_name,
+                "ADMIN",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var validIds =
+                await _context.SystemAccessPoints
+                    .Where(x =>
+                        x.is_active &&
+                        dto.access_point_ids.Contains(
+                            x.access_point_id))
+                    .Select(x => x.access_point_id)
+                    .ToListAsync();
+
+            var existing =
+                await _context.SystemUserAccessPoints
+                    .Where(x => x.user_id == userId)
+                    .ToListAsync();
+
+            _context.SystemUserAccessPoints
+                .RemoveRange(existing);
+
+            foreach (var accessPointId
+                     in validIds.Distinct())
+            {
+                _context.SystemUserAccessPoints.Add(
+                    new SystemUserAccessPoint
+                    {
+                        user_id = userId,
+                        access_point_id = accessPointId
+                    });
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<string>>
+    GetUserAccessCodesAsync(string userId)
+        {
+            var user = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.user_id == userId &&
+                    !x.is_deleted);
+
+            if (user == null)
+                return new List<string>();
+
+            // ADMIN gets every active access point.
+            if (string.Equals(
+                user.role_name,
+                "ADMIN",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return await _context.SystemAccessPoints
+                    .AsNoTracking()
+                    .Where(x => x.is_active)
+                    .OrderBy(x => x.module_name)
+                    .ThenBy(x => x.sort_order)
+                    .Select(x => x.access_code)
+                    .ToListAsync();
+            }
+
+            return await (
+                from ua in _context.SystemUserAccessPoints
+                    .AsNoTracking()
+
+                join ap in _context.SystemAccessPoints
+                    .AsNoTracking()
+
+                on ua.access_point_id
+                    equals ap.access_point_id
+
+                where
+                    ua.user_id == userId &&
+                    ap.is_active
+
+                orderby
+                    ap.module_name,
+                    ap.sort_order
+
+                select ap.access_code
+            ).ToListAsync();
+        }
+
+        public async Task<bool> DeleteUserAsync(string userId)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(x => x.user_id == userId);
+
+            if (user == null)
+                return false;
+
+            user.is_deleted = true;
+            user.updated_at = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+
+        public async Task<List<UserAccessPointDto>>
+    GetAllAccessPointsAsync()
+        {
+            return await _context.SystemAccessPoints
+                .AsNoTracking()
+                .Where(x => x.is_active)
+                .OrderBy(x => x.module_name)
+                .ThenBy(x => x.sort_order)
+                .Select(x => new UserAccessPointDto
+                {
+                    access_point_id = x.access_point_id,
+                    access_code = x.access_code,
+                    access_name = x.access_name,
+                    module_name = x.module_name,
+                    sort_order = x.sort_order,
+                    has_access = false
+                })
+                .ToListAsync();
+        }
     }
 }

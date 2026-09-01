@@ -39,6 +39,52 @@ namespace inventory_api.Services
             if (transactionType != "IN" && transactionType != "OUT")
                 throw new Exception("transaction_type must be IN or OUT.");
 
+            // ============================================================
+            // NORMALIZE VALUES
+            // ============================================================
+            dto.product_id = dto.product_id.Trim();
+            dto.branch_id = dto.branch_id.Trim();
+            dto.lot_no = dto.lot_no.Trim();
+
+            dto.tr_no = string.IsNullOrWhiteSpace(dto.tr_no)
+                ? null
+                : dto.tr_no.Trim();
+
+
+            // ============================================================
+            // IDEMPOTENCY CHECK FOR FINISHED GOODS TRANSMITTAL STOCK IN
+            // ============================================================
+            if (transactionType == "IN" &&
+                !string.IsNullOrWhiteSpace(dto.tr_no))
+            {
+                var normalizedTrNo =
+                    dto.tr_no.Trim();
+
+                var normalizedProductId =
+                    dto.product_id.Trim();
+
+                var normalizedBranchId =
+                    dto.branch_id.Trim();
+
+                var normalizedLotNo =
+                    dto.lot_no.Trim();
+
+                var alreadyReceived =
+                    await _context.InventoryTransactions
+                        .AnyAsync(x =>
+                            !x.is_deleted &&
+                            x.transaction_type == "IN" &&
+                            x.tr_no == normalizedTrNo &&
+                            x.product_id == normalizedProductId &&
+                            x.branch_id == normalizedBranchId &&
+                            x.lot_no == normalizedLotNo);
+
+                if (alreadyReceived)
+                {
+                    return;
+                }
+            }
+
             // ✅ BUSINESS RULE:
             // same lot + same product = allowed
             // same lot + different product = reject

@@ -35,17 +35,40 @@ namespace inventory_api.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
+        public async Task<IActionResult> Login(
+      [FromBody] LoginRequestDto dto)
         {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.username) || string.IsNullOrWhiteSpace(dto.password))
+            if (dto == null ||
+                string.IsNullOrWhiteSpace(dto.username) ||
+                string.IsNullOrWhiteSpace(dto.password))
             {
-                return BadRequest(new { message = "Username and password are required." });
+                return BadRequest(new
+                {
+                    message =
+                        "Username and password are required."
+                });
             }
 
-            var user = await _userService.LoginAsync(dto.username, dto.password);
+            var user =
+                await _userService.LoginAsync(
+                    dto.username,
+                    dto.password
+                );
 
             if (user == null)
-                return Unauthorized(new { message = "Invalid username or password" });
+            {
+                return Unauthorized(new
+                {
+                    message =
+                        "Invalid username or password"
+                });
+            }
+
+            var accessCodes =
+                await _userService
+                    .GetUserAccessCodesAsync(
+                        user.user_id
+                    );
 
             return Ok(new
             {
@@ -53,7 +76,10 @@ namespace inventory_api.Controllers
                 user.full_name,
                 user.username,
                 user.role_name,
-                user.profile_image
+                user.profile_image,
+
+                access_points =
+                    accessCodes
             });
         }
 
@@ -81,20 +107,6 @@ namespace inventory_api.Controllers
             return Ok(new { message = "Account updated successfully." });
         }
 
-        //[HttpPost("UploadProfileImage/{id}")]
-        //public async Task<IActionResult> UploadProfileImage(string id, IFormFile file)
-        //{
-        //    if (file == null || file.Length == 0)
-        //        return BadRequest(new { message = "No file uploaded." });
-
-        //    var imagePath = await _userService.UploadProfileImageAsync(id, file);
-
-        //    return Ok(new
-        //    {
-        //        message = "Profile image uploaded successfully.",
-        //        profile_image = imagePath
-        //    });
-        //}
 
         [HttpPost("UploadProfileImage/{id}")]
         public async Task<IActionResult> UploadProfileImage(string id, IFormFile file)
@@ -137,6 +149,89 @@ namespace inventory_api.Controllers
             {
                 return BadRequest(new { message = ex.Message });
             }
+        }
+
+        [HttpGet("{id}/access-points")]
+        public async Task<IActionResult> GetUserAccessPoints(string id)
+        {
+            try
+            {
+                var result =
+                    await _userService.GetUserAccessPointsAsync(id);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.GetBaseException().Message
+                });
+            }
+        }
+
+        [HttpPut("{id}/access-points")]
+        public async Task<IActionResult> SaveUserAccessPoints(
+    string id,
+    [FromBody] SaveUserAccessDto dto)
+        {
+            try
+            {
+                await _userService.SaveUserAccessPointsAsync(
+                    id,
+                    dto
+                );
+
+                return Ok(new
+                {
+                    message = "User access points updated successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.GetBaseException().Message
+                });
+            }
+        }
+
+        [HttpGet("{id}/access-codes")]
+        public async Task<IActionResult> GetUserAccessCodes(string id)
+        {
+            var result =
+                await _userService.GetUserAccessCodesAsync(id);
+
+            return Ok(result);
+        }
+
+        [HttpGet("available-access-points")]
+        public async Task<IActionResult> GetAvailableAccessPoints()
+        {
+            var result =
+                await _userService.GetAllAccessPointsAsync();
+
+            return Ok(result);
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            var deleted =
+                await _userService.DeleteUserAsync(id);
+
+            if (!deleted)
+            {
+                return NotFound(new
+                {
+                    message = "User account not found."
+                });
+            }
+
+            return Ok(new
+            {
+                message = "User account deleted successfully."
+            });
         }
     }
 }

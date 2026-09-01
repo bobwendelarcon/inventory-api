@@ -167,6 +167,15 @@ namespace inventory_api.Data
         public DbSet<FinalReceivingLine> FinalReceivingLines { get; set; }
 
 
+        public DbSet<SystemAccessPoint>
+    SystemAccessPoints
+        { get; set; }
+
+        public DbSet<SystemUserAccessPoint>
+            SystemUserAccessPoints
+        { get; set; }
+
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -1771,6 +1780,44 @@ namespace inventory_api.Data
                 entity.HasIndex(e => e.FinalRrId);
 
                 entity.HasIndex(e => e.MaterialId);
+            });
+
+
+            modelBuilder.Entity<SystemAccessPoint>(entity =>
+            {
+                entity.ToTable("system_access_point");
+
+                entity.HasKey(x =>
+                    x.access_point_id);
+
+                entity.Property(x =>
+                    x.access_code)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(x =>
+                    x.access_name)
+                    .HasMaxLength(150)
+                    .IsRequired();
+
+                entity.Property(x =>
+                    x.module_name)
+                    .HasMaxLength(100)
+                    .IsRequired();
+            });
+            modelBuilder.Entity<SystemUserAccessPoint>(entity =>
+            {
+                entity.ToTable("system_user_access_point");
+
+                entity.HasKey(x =>
+                    x.user_access_id);
+
+                entity.HasOne(x =>
+                        x.AccessPoint)
+                    .WithMany()
+                    .HasForeignKey(x =>
+                        x.access_point_id)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
 
