@@ -13,11 +13,18 @@ namespace inventory_api.Models.Purchasing.Quarantine
         [Column("quarantine_id")]
         public int QuarantineId { get; set; }
 
+        [Column("qa_receiving_line_id")]
+        public int QaReceivingLineId { get; set; }
+
+        [Column("incoming_receiving_line_lot_id")]
+        public int? IncomingReceivingLineLotId { get; set; }
+
         [Column("qc_line_id")]
-        public int QcLineId { get; set; }
+        public int? QcLineId { get; set; }
 
         [Column("qc_line_lot_id")]
         public int? QcLineLotId { get; set; }
+
 
         [Column("incoming_receiving_line_id")]
         public int? IncomingReceivingLineId { get; set; }

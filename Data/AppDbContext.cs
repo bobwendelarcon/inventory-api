@@ -6,6 +6,7 @@ using inventory_api.Models.Purchasing;
 using inventory_api.Models.Purchasing.Canvassing;
 using inventory_api.Models.Purchasing.FinalReceiving;
 using inventory_api.Models.Purchasing.PurchaseOrders;
+using inventory_api.Models.Purchasing.QaQcReceiving;
 using inventory_api.Models.Purchasing.QcInspections;
 using inventory_api.Models.Purchasing.Quarantine;
 using inventory_api.Models.Purchasing.RawMaterialProcessing;
@@ -83,6 +84,15 @@ namespace inventory_api.Data
         public DbSet<Manufacturer> Manufacturers { get; set; }
         public DbSet<SupplierMaterial> SupplierMaterials { get; set; }
 
+
+        public DbSet<QaQcReceivingInspection>
+    QaQcReceivingInspections
+        { get; set; }
+
+        public DbSet<QaQcReceivingInspectionLine>
+            QaQcReceivingInspectionLines
+        { get; set; }
+
         //supplier manufacturer
 
         public DbSet<SupplierManufacturer> SupplierManufacturers { get; set; }
@@ -108,6 +118,8 @@ namespace inventory_api.Data
 
         public DbSet<ReceivingReportHeader> ReceivingReportHeaders { get; set; }
         public DbSet<ReceivingReportLine> ReceivingReportLines { get; set; }
+
+        public DbSet<IncomingReceivingLineLot> IncomingReceivingLineLots { get; set; }
 
         //qc inspection
 
@@ -343,6 +355,10 @@ namespace inventory_api.Data
                     .HasColumnName("receiving_remarks")
                     .HasMaxLength(1000);
 
+                entity.Property(e => e.VerifiedBy)
+    .HasColumnName("verified_by")
+    .HasMaxLength(100);
+
                 entity.Property(e => e.CreatedBy)
                     .HasColumnName("created_by")
                     .HasMaxLength(100);
@@ -403,6 +419,10 @@ namespace inventory_api.Data
                     .HasColumnName("delivered_qty")
                     .HasPrecision(18, 4);
 
+                entity.Property(e => e.TareWeight)
+    .HasColumnName("tare_weight")
+    .HasPrecision(18, 4);
+
                 entity.Property(e => e.Uom)
                     .HasColumnName("uom")
                     .HasMaxLength(50);
@@ -429,6 +449,108 @@ namespace inventory_api.Data
             });
 
 
+            // ============================================================
+            // INCOMING RECEIVING LINE LOTS
+            // Material Receiving Form lot / manufacturer information
+            // ============================================================
+
+            modelBuilder.Entity<IncomingReceivingLineLot>(entity =>
+            {
+                entity.ToTable(
+                    "purchasing_incoming_receiving_line_lot");
+
+                entity.HasKey(e =>
+                    e.IncomingReceivingLineLotId);
+
+                entity.Property(e =>
+                        e.IncomingReceivingLineLotId)
+                    .HasColumnName(
+                        "incoming_receiving_line_lot_id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e =>
+                        e.IncomingReceivingLineId)
+                    .HasColumnName(
+                        "incoming_receiving_line_id");
+
+                entity.Property(e =>
+                        e.ManufacturerId)
+                    .HasColumnName(
+                        "manufacturer_id");
+
+                entity.Property(e =>
+                        e.LotNo)
+                    .HasColumnName("lot_no")
+                    .HasMaxLength(100);
+
+                entity.Property(e =>
+                        e.ManufacturingDate)
+                    .HasColumnName(
+                        "manufacturing_date");
+
+                entity.Property(e =>
+                        e.ExpirationDate)
+                    .HasColumnName(
+                        "expiration_date");
+
+                entity.Property(e =>
+                        e.ItemCount)
+                    .HasColumnName("item_count")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e =>
+                        e.Weight)
+                    .HasColumnName("weight")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e =>
+                        e.Remarks)
+                    .HasColumnName("remarks")
+                    .HasMaxLength(1000);
+
+                entity.Property(e =>
+                        e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e =>
+                        e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+
+                // --------------------------------------------------------
+                // INDEXES
+                // --------------------------------------------------------
+
+                entity.HasIndex(e =>
+                    e.IncomingReceivingLineId);
+
+                entity.HasIndex(e =>
+                    e.ManufacturerId);
+
+                entity.HasIndex(e =>
+                    e.LotNo);
+
+
+                // --------------------------------------------------------
+                // RELATIONSHIP
+                // IncomingReceivingLine -> Lots
+                // --------------------------------------------------------
+
+                entity.HasOne(e =>
+                        e.IncomingReceivingLine)
+                    .WithMany(e =>
+                        e.Lots)
+                    .HasForeignKey(e =>
+                        e.IncomingReceivingLineId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+
+
+            // ============================================================
+            // QUARANTINE HEADER
+            // ============================================================
+
             modelBuilder.Entity<QuarantineHeader>(entity =>
             {
                 entity.ToTable("purchasing_quarantine_header");
@@ -438,7 +560,62 @@ namespace inventory_api.Data
                 entity.Property(e => e.QuarantineId)
                     .HasColumnName("quarantine_id")
                     .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.QuarantineNo)
+                    .HasColumnName("quarantine_no");
+
+                entity.Property(e => e.IncomingReceivingId)
+                    .HasColumnName("incoming_receiving_id");
+
+                entity.Property(e => e.QaReceivingId)
+                    .HasColumnName("qa_receiving_id");
+
+                entity.Property(e => e.QcId)
+                    .HasColumnName("qc_id");
+
+                entity.Property(e => e.PoId)
+                    .HasColumnName("po_id");
+
+                entity.Property(e => e.SupplierId)
+                    .HasColumnName("supplier_id");
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status");
+
+                entity.Property(e => e.Decision)
+                    .HasColumnName("decision");
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks");
+
+                entity.Property(e => e.CreatedBy)
+                    .HasColumnName("created_by");
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.ReleasedBy)
+                    .HasColumnName("released_by");
+
+                entity.Property(e => e.ReleasedAt)
+                    .HasColumnName("released_at");
+
+                entity.Property(e => e.UpdatedBy)
+                    .HasColumnName("updated_by");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasMany(e => e.Lines)
+                    .WithOne(e => e.Header)
+                    .HasForeignKey(e => e.QuarantineId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
+
+
+            // ============================================================
+            // QUARANTINE LINE
+            // ============================================================
 
             modelBuilder.Entity<QuarantineLine>(entity =>
             {
@@ -449,78 +626,207 @@ namespace inventory_api.Data
                 entity.Property(e => e.QuarantineLineId)
                     .HasColumnName("quarantine_line_id")
                     .ValueGeneratedOnAdd();
-            });
 
+                entity.Property(e => e.QuarantineId)
+                    .HasColumnName("quarantine_id");
+
+                entity.Property(e => e.QaReceivingLineId)
+                    .HasColumnName("qa_receiving_line_id");
+
+                entity.Property(e => e.IncomingReceivingLineId)
+                    .HasColumnName("incoming_receiving_line_id");
+
+                entity.Property(e => e.IncomingReceivingLineLotId)
+                    .HasColumnName("incoming_receiving_line_lot_id");
+
+                entity.Property(e => e.QcLineId)
+                    .HasColumnName("qc_line_id");
+
+                entity.Property(e => e.QcLineLotId)
+                    .HasColumnName("qc_line_lot_id");
+
+                entity.Property(e => e.PoLineId)
+                    .HasColumnName("po_line_id");
+
+                entity.Property(e => e.MaterialId)
+                    .HasColumnName("material_id");
+
+                entity.Property(e => e.LotNo)
+                    .HasColumnName("lot_no");
+
+                entity.Property(e => e.ManufacturingDate)
+                    .HasColumnName("manufacturing_date");
+
+                entity.Property(e => e.ExpirationDate)
+                    .HasColumnName("expiration_date");
+
+                entity.Property(e => e.QcReceivedQty)
+                    .HasColumnName("qc_received_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.QcAcceptedQty)
+                    .HasColumnName("qc_accepted_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.QcRejectedQty)
+                    .HasColumnName("qc_rejected_qty")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status");
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks");
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.HasIndex(e => e.QuarantineId);
+
+                entity.HasIndex(e => e.QaReceivingLineId);
+
+                entity.HasIndex(e => e.IncomingReceivingLineId);
+
+                entity.HasIndex(e => e.IncomingReceivingLineLotId);
+            });
 
             // ============================================================
             // WAREHOUSE ANDROID RECEIVING INSPECTION / CHECKLIST
             // ============================================================
 
+            // ============================================================
+            // RMW MATERIAL RECEIVING FORM / CHECKLIST
+            // ============================================================
+
             modelBuilder.Entity<IncomingReceivingInspection>(entity =>
             {
-                entity.ToTable("purchasing_incoming_receiving_inspection");
+                entity.ToTable(
+                    "purchasing_incoming_receiving_inspection");
 
-                entity.HasKey(e => e.InspectionId);
+                entity.HasKey(e =>
+                    e.InspectionId);
 
-                entity.Property(e => e.InspectionId)
+                entity.Property(e =>
+                        e.InspectionId)
                     .HasColumnName("inspection_id");
 
-                entity.Property(e => e.IncomingReceivingId)
+                entity.Property(e =>
+                        e.IncomingReceivingId)
                     .HasColumnName("incoming_receiving_id");
 
-                // PO / Supplier
-                entity.Property(e => e.PoMatched)
+
+                // ========================================================
+                // PO / SUPPLIER
+                // ========================================================
+
+                entity.Property(e =>
+                        e.PoMatched)
                     .HasColumnName("po_matched");
 
-                entity.Property(e => e.DeliveryScheduled)
+                entity.Property(e =>
+                        e.DeliveryScheduled)
                     .HasColumnName("delivery_scheduled");
 
-                entity.Property(e => e.ApprovedSupplier)
+                entity.Property(e =>
+                        e.ApprovedSupplier)
                     .HasColumnName("approved_supplier");
 
-                // Documents
-                entity.Property(e => e.SalesInvoiceAvailable)
-                    .HasColumnName("sales_invoice_available");
 
-                entity.Property(e => e.DeliveryReceiptAvailable)
-                    .HasColumnName("delivery_receipt_available");
+                // ========================================================
+                // DOCUMENTS
+                // ========================================================
 
-                entity.Property(e => e.CoaAvailable)
+                entity.Property(e =>
+                        e.SalesInvoiceAvailable)
+                    .HasColumnName(
+                        "sales_invoice_available");
+
+                entity.Property(e =>
+                        e.DeliveryReceiptAvailable)
+                    .HasColumnName(
+                        "delivery_receipt_available");
+
+                entity.Property(e =>
+                        e.CoaAvailable)
                     .HasColumnName("coa_available");
 
-                // Vehicle
-                entity.Property(e => e.VehicleClean)
+
+                // ========================================================
+                // OFFICIAL MATERIAL RECEIVING FORM
+                // ========================================================
+
+                entity.Property(e =>
+                        e.CorrectQuantityDelivered)
+                    .HasColumnName(
+                        "correct_quantity_delivered");
+
+                entity.Property(e =>
+                        e.TruckDoorLockInPlace)
+                    .HasColumnName(
+                        "truck_door_lock_in_place");
+
+                entity.Property(e =>
+                        e.VehicleClean)
                     .HasColumnName("vehicle_clean");
 
-                entity.Property(e => e.VehicleDry)
-                    .HasColumnName("vehicle_dry");
+                entity.Property(e =>
+                        e.ContainersCleanAndSealed)
+                    .HasColumnName(
+                        "containers_clean_and_sealed");
 
-                entity.Property(e => e.VehicleOdorFree)
-                    .HasColumnName("vehicle_odor_free");
+                entity.Property(e =>
+                        e.NoVisibleContaminationOrSpoilage)
+                    .HasColumnName(
+                        "no_visible_contamination_or_spoilage");
 
-                entity.Property(e => e.VehicleResidueFree)
-                    .HasColumnName("vehicle_residue_free");
+                entity.Property(e =>
+                        e.LabelsPresentAndLegible)
+                    .HasColumnName(
+                        "labels_present_and_legible");
 
-                // Material
-                entity.Property(e => e.MaterialClean)
-                    .HasColumnName("material_clean");
+                entity.Property(e =>
+                        e.DriverIdentityVerified)
+                    .HasColumnName(
+                        "driver_identity_verified");
 
-                entity.Property(e => e.MaterialCoveredOrSealed)
-                    .HasColumnName("material_covered_or_sealed");
+                entity.Property(e =>
+                        e.NoUnauthorizedAccessDuringUnloading)
+                    .HasColumnName(
+                        "no_unauthorized_access_during_unloading");
 
-                entity.Property(e => e.Remarks)
+                entity.Property(e =>
+                        e.HiddenCompartmentChecked)
+                    .HasColumnName(
+                        "hidden_compartment_checked");
+
+                entity.Property(e =>
+                        e.ReceivedInAuthorizedZone)
+                    .HasColumnName(
+                        "received_in_authorized_zone");
+
+
+                // ========================================================
+                // INSPECTION INFORMATION
+                // ========================================================
+
+                entity.Property(e =>
+                        e.Remarks)
                     .HasColumnName("remarks")
                     .HasMaxLength(1000);
 
-                entity.Property(e => e.CheckedBy)
+                entity.Property(e =>
+                        e.CheckedBy)
                     .HasColumnName("checked_by")
                     .HasMaxLength(100);
 
-                entity.Property(e => e.CheckedAt)
+                entity.Property(e =>
+                        e.CheckedAt)
                     .HasColumnName("checked_at");
 
-                // One checklist per Incoming Receiving
-                entity.HasIndex(e => e.IncomingReceivingId)
+
+                // One RMW checklist per Incoming Receiving
+                entity.HasIndex(e =>
+                        e.IncomingReceivingId)
                     .IsUnique();
             });
 
@@ -584,6 +890,199 @@ namespace inventory_api.Data
                     .WithMany()
                     .HasForeignKey(e => e.IncomingReceivingId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+
+            // ============================================================
+            // QA/QC RECEIVING INSPECTION
+            // ============================================================
+
+            modelBuilder.Entity<QaQcReceivingInspection>(entity =>
+            {
+                entity.ToTable(
+                    "purchasing_qa_qc_receiving_inspection");
+
+                entity.HasKey(e => e.QaReceivingId);
+
+                entity.Property(e => e.QaReceivingId)
+                    .HasColumnName("qa_receiving_id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.InspectionNo)
+                    .HasColumnName("inspection_no")
+                    .HasMaxLength(30);
+
+                entity.Property(e => e.IncomingReceivingId)
+                    .HasColumnName("incoming_receiving_id");
+
+                entity.Property(e => e.PoId)
+                    .HasColumnName("po_id");
+
+                entity.Property(e => e.SupplierId)
+                    .HasColumnName("supplier_id");
+
+                entity.Property(e => e.InspectionDate)
+                    .HasColumnName("inspection_date");
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status")
+                    .HasMaxLength(40);
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks")
+                    .HasMaxLength(1000);
+
+                entity.Property(e => e.InspectedBy)
+                    .HasColumnName("inspected_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.ReceivedBy)
+                    .HasColumnName("received_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.NotedBy)
+                    .HasColumnName("noted_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.CreatedBy)
+                    .HasColumnName("created_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedBy)
+                    .HasColumnName("updated_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasIndex(e => e.InspectionNo)
+                    .IsUnique();
+
+                entity.HasIndex(e => e.IncomingReceivingId)
+                    .IsUnique();
+
+                entity.HasMany(e => e.Lines)
+                    .WithOne(e => e.Header)
+                    .HasForeignKey(e => e.QaReceivingId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<QaQcReceivingInspectionLine>(entity =>
+            {
+                entity.ToTable(
+                    "purchasing_qa_qc_receiving_inspection_line");
+
+                entity.HasKey(e => e.QaReceivingLineId);
+
+                entity.Property(e => e.QaReceivingLineId)
+                    .HasColumnName("qa_receiving_line_id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.QaReceivingId)
+                    .HasColumnName("qa_receiving_id");
+
+                entity.Property(e => e.IncomingReceivingLineId)
+                    .HasColumnName("incoming_receiving_line_id");
+
+                entity.Property(e => e.IncomingReceivingLineLotId)
+                    .HasColumnName("incoming_receiving_line_lot_id");
+
+                entity.Property(e => e.MaterialId)
+                    .HasColumnName("material_id");
+
+                entity.Property(e => e.PackagingClean)
+                    .HasColumnName("packaging_clean");
+
+                entity.Property(e => e.ReadableLabel)
+                    .HasColumnName("readable_label");
+
+                entity.Property(e => e.ProperlySealed)
+                    .HasColumnName("properly_sealed");
+
+                entity.Property(e => e.NoDeterioration)
+                    .HasColumnName("no_deterioration");
+
+                entity.Property(e => e.NoForeignMatter)
+                    .HasColumnName("no_foreign_matter");
+
+                entity.Property(e => e.NoInfestation)
+                    .HasColumnName("no_infestation");
+
+                entity.Property(e => e.AppearanceNotApplicable)
+                    .HasColumnName("appearance_not_applicable");
+
+                entity.Property(e => e.PowderNoLump)
+                    .HasColumnName("powder_no_lump");
+
+                entity.Property(e => e.PowderGoodFlowability)
+                    .HasColumnName("powder_good_flowability");
+
+                entity.Property(e => e.LiquidNoSolidification)
+                    .HasColumnName("liquid_no_solidification");
+
+                entity.Property(e => e.LiquidNoPrecipitation)
+                    .HasColumnName("liquid_no_precipitation");
+
+                entity.Property(e => e.ColorResult)
+                    .HasColumnName("color_result")
+                    .HasMaxLength(20);
+
+                entity.Property(e => e.ActualColor)
+                    .HasColumnName("actual_color")
+                    .HasMaxLength(200);
+
+                entity.Property(e => e.OdorResult)
+                    .HasColumnName("odor_result")
+                    .HasMaxLength(20);
+
+                entity.Property(e => e.ActualOdor)
+                    .HasColumnName("actual_odor")
+                    .HasMaxLength(200);
+
+                entity.Property(e => e.AssayResultStatus)
+                    .HasColumnName("assay_result_status")
+                    .HasMaxLength(20);
+
+                entity.Property(e => e.CoaAssayResult)
+                    .HasColumnName("coa_assay_result")
+                    .HasMaxLength(200);
+
+                entity.Property(e => e.BnpiAssaySpecification)
+                    .HasColumnName("bnpi_assay_specification")
+                    .HasMaxLength(200);
+
+                entity.Property(e => e.SolubilityResult)
+                    .HasColumnName("solubility_result")
+                    .HasMaxLength(20);
+
+                entity.Property(e => e.SolubilityTest)
+                    .HasColumnName("solubility_test")
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("status")
+                    .HasMaxLength(30);
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks")
+                    .HasMaxLength(1000);
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasIndex(e => e.QaReceivingId);
+
+                entity.HasIndex(e => e.IncomingReceivingLineId);
+
+                entity.HasIndex(e => e.IncomingReceivingLineLotId);
+
+                entity.HasIndex(e => e.MaterialId);
             });
 
 

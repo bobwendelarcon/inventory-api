@@ -7,12 +7,14 @@ using inventory_api.Services.Purchasing.Canvassing;
 using inventory_api.Services.Purchasing.FinalReceiving;
 using inventory_api.Services.Purchasing.IncomingReceiving;
 using inventory_api.Services.Purchasing.PurchaseOrders;
+using inventory_api.Services.Purchasing.QaQcReceiving;
 using inventory_api.Services.Purchasing.QcInspections;
 using inventory_api.Services.Purchasing.RawMaterialProcessing;
 using inventory_api.Services.Purchasing.ReceivingReports;
 using inventory_api.Services.Purchasing.SupplierEvaluations;
 using inventory_api.Services.Purchasing.Suppliers;
 using inventory_api.Services.Reports.PurchasingLeadTime;
+using inventory_api.Services.Reports.RawMaterials;
 using inventory_api.Services.Reports.TimeInMotion;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -94,6 +96,8 @@ builder.Services.AddScoped<ReceivingReportService>();
 
 // QA/QC
 builder.Services.AddScoped<QcInspectionService>();
+builder.Services.AddScoped<
+    QaQcReceivingInspectionService>();
 
 
 // Supplier performance evaluation
@@ -112,6 +116,7 @@ builder.Services.AddScoped<FinalReceivingService>();
 
 //report raw material
 builder.Services.AddScoped<TimeInMotionService>();
+builder.Services.AddScoped<RawMaterialReportService>();
 
 //Purchasing report
 builder.Services

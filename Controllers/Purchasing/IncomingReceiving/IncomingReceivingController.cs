@@ -125,5 +125,29 @@ namespace inventory_api.Controllers.Purchasing.IncomingReceiving
                 });
             }
         }
+
+        [HttpGet("manufacturers")]
+        public async Task<IActionResult> GetManufacturers(
+    [FromQuery] int supplierId,
+    [FromQuery] int materialId)
+        {
+            try
+            {
+                var result =
+                    await _service.GetManufacturersAsync(
+                        supplierId,
+                        materialId);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
     }
 }

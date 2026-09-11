@@ -21,8 +21,20 @@ namespace inventory_api.Controllers
         {
             try
             {
-                var createdBy = User.Identity?.Name ?? "admin";
-                var result = await _deliveryChecklistService.CreateChecklistAsync(dto, createdBy);
+                var createdBy = Request.Headers["X-User-Id"].FirstOrDefault();
+
+                if (string.IsNullOrWhiteSpace(createdBy))
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Unable to determine the logged-in user."
+                    });
+                }
+
+                var result = await _deliveryChecklistService
+                    .CreateChecklistAsync(dto, createdBy);
+
                 return Ok(result);
             }
             catch (Exception ex)

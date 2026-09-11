@@ -800,14 +800,18 @@ namespace inventory_api.Services.Purchasing.SupplierEvaluations
                     evaluation);
             }
 
-            SupplierEvaluationGenerationService
-                .RecalculateHeader(evaluation);
-
             var now = DateTime.UtcNow;
             var oldStatus = evaluation.Status;
 
             evaluation.Status =
                 "FINALIZED";
+
+            // Recalculate AFTER setting FINALIZED so the
+            // final performance rating is generated here.
+            SupplierEvaluationGenerationService
+                .RecalculateHeader(evaluation);
+
+
 
             evaluation.FinalizedBy =
                 request.ActionBy;

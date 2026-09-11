@@ -41,6 +41,82 @@ namespace inventory_api.Controllers.Purchasing.QcInspections
             return Ok(data);
         }
 
+        [HttpGet("pending-evaluation")]
+        public async Task<IActionResult> GetPendingEvaluation()
+        {
+            try
+            {
+                var result =
+                    await _service.GetPendingRawMaterialEvaluationsAsync();
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpPost("quarantine/{quarantineId:int}/start-evaluation")]
+        public async Task<IActionResult> StartEvaluation(
+    int quarantineId)
+        {
+            try
+            {
+                var userId =
+                    Request.Headers["X-User-Id"].FirstOrDefault()
+                    ?? User.FindFirstValue("user_id")
+                    ?? User.FindFirstValue("UserId")
+                    ?? User.FindFirstValue("userId")
+                    ?? User.FindFirstValue("id")
+                    ?? User.FindFirstValue(
+                        ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue("sub")
+                    ?? User.Identity?.Name;
+
+                //if (string.IsNullOrWhiteSpace(userId))
+                //{
+                //    return Unauthorized(new
+                //    {
+                //        message =
+                //            "The logged-in user does not have a valid user ID."
+                //    });
+                //}
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    userId = "user001"; // TEMPORARY: Swagger testing only
+                }
+
+                var result =
+                    await _service
+                        .StartRawMaterialEvaluationAsync(
+                            quarantineId,
+                            userId.Trim()
+                        );
+
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
         [HttpPost("{id}/save-inspection")]
         public async Task<IActionResult> SaveInspection(
             int id,
@@ -58,13 +134,18 @@ namespace inventory_api.Controllers.Purchasing.QcInspections
                     ?? User.FindFirstValue("sub")
                     ?? User.Identity?.Name;
 
+                //if (string.IsNullOrWhiteSpace(userId))
+                //{
+                //    return Unauthorized(new
+                //    {
+                //        message =
+                //            "The logged-in user does not have a valid user ID."
+                //    });
+                //}
+
                 if (string.IsNullOrWhiteSpace(userId))
                 {
-                    return Unauthorized(new
-                    {
-                        message =
-                            "The logged-in user does not have a valid user ID."
-                    });
+                    userId = "user001"; // TEMPORARY: Swagger testing only
                 }
 
                 await _service.SaveInspectionAsync(

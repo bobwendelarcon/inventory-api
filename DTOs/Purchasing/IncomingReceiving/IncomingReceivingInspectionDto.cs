@@ -2,7 +2,10 @@
 {
     public class IncomingReceivingInspectionDto
     {
-        // PO / Supplier
+        // ============================================================
+        // PO / SUPPLIER VALIDATION
+        // ============================================================
+
         public bool PoMatched { get; set; }
 
         public bool DeliveryScheduled { get; set; }
@@ -10,7 +13,10 @@
         public bool ApprovedSupplier { get; set; }
 
 
-        // Documents
+        // ============================================================
+        // DOCUMENTS
+        // ============================================================
+
         public bool SalesInvoiceAvailable { get; set; }
 
         public bool DeliveryReceiptAvailable { get; set; }
@@ -18,21 +24,44 @@
         public bool CoaAvailable { get; set; }
 
 
-        // Vehicle
+        // ============================================================
+        // MATERIAL RECEIVING FORM CHECKLIST
+        // ============================================================
+
+        // Correct quantity was delivered
+        public bool CorrectQuantityDelivered { get; set; }
+
+        // Truck / vehicle security
+        public bool TruckDoorLockInPlace { get; set; }
+
+        // Vehicle cleanliness
         public bool VehicleClean { get; set; }
 
-        public bool VehicleDry { get; set; }
+        // Bags / drums / boxes / containers are clean and sealed
+        public bool ContainersCleanAndSealed { get; set; }
 
-        public bool VehicleOdorFree { get; set; }
+        // No visible contamination / spoilage
+        public bool NoVisibleContaminationOrSpoilage { get; set; }
 
-        public bool VehicleResidueFree { get; set; }
+        // Labels are present and readable
+        public bool LabelsPresentAndLegible { get; set; }
+
+        // Driver identity was verified
+        public bool DriverIdentityVerified { get; set; }
+
+        // No unauthorized access during unloading
+        public bool NoUnauthorizedAccessDuringUnloading { get; set; }
+
+        // Vehicle checked for hidden compartments
+        public bool HiddenCompartmentChecked { get; set; }
+
+        // Receiving happened only in authorized receiving area
+        public bool ReceivedInAuthorizedZone { get; set; }
 
 
-        // Material
-        public bool MaterialClean { get; set; }
-
-        public bool MaterialCoveredOrSealed { get; set; }
-
+        // ============================================================
+        // REMARKS
+        // ============================================================
 
         public string? Remarks { get; set; }
     }

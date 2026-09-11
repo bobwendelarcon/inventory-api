@@ -15,7 +15,9 @@ namespace inventory_api.Models.Purchasing.Receiving
         public int IncomingReceivingId { get; set; }
 
 
-        // PO / Supplier checks
+        // ============================================================
+        // PO / SUPPLIER VALIDATION
+        // ============================================================
 
         [Column("po_matched")]
         public bool PoMatched { get; set; }
@@ -27,7 +29,9 @@ namespace inventory_api.Models.Purchasing.Receiving
         public bool ApprovedSupplier { get; set; }
 
 
-        // Document checks
+        // ============================================================
+        // DOCUMENTS
+        // ============================================================
 
         [Column("sales_invoice_available")]
         public bool SalesInvoiceAvailable { get; set; }
@@ -39,31 +43,44 @@ namespace inventory_api.Models.Purchasing.Receiving
         public bool CoaAvailable { get; set; }
 
 
-        // Vehicle checks
+        // ============================================================
+        // MATERIAL RECEIVING FORM
+        // ============================================================
+
+        [Column("correct_quantity_delivered")]
+        public bool CorrectQuantityDelivered { get; set; }
+
+        [Column("truck_door_lock_in_place")]
+        public bool TruckDoorLockInPlace { get; set; }
 
         [Column("vehicle_clean")]
         public bool VehicleClean { get; set; }
 
-        [Column("vehicle_dry")]
-        public bool VehicleDry { get; set; }
+        [Column("containers_clean_and_sealed")]
+        public bool ContainersCleanAndSealed { get; set; }
 
-        [Column("vehicle_odor_free")]
-        public bool VehicleOdorFree { get; set; }
+        [Column("no_visible_contamination_or_spoilage")]
+        public bool NoVisibleContaminationOrSpoilage { get; set; }
 
-        [Column("vehicle_residue_free")]
-        public bool VehicleResidueFree { get; set; }
+        [Column("labels_present_and_legible")]
+        public bool LabelsPresentAndLegible { get; set; }
+
+        [Column("driver_identity_verified")]
+        public bool DriverIdentityVerified { get; set; }
+
+        [Column("no_unauthorized_access_during_unloading")]
+        public bool NoUnauthorizedAccessDuringUnloading { get; set; }
+
+        [Column("hidden_compartment_checked")]
+        public bool HiddenCompartmentChecked { get; set; }
+
+        [Column("received_in_authorized_zone")]
+        public bool ReceivedInAuthorizedZone { get; set; }
 
 
-        // Material checks
-
-        [Column("material_clean")]
-        public bool MaterialClean { get; set; }
-
-        [Column("material_covered_or_sealed")]
-        public bool MaterialCoveredOrSealed { get; set; }
-
-
-        // Inspection information
+        // ============================================================
+        // INSPECTION INFORMATION
+        // ============================================================
 
         [Column("remarks")]
         [MaxLength(1000)]

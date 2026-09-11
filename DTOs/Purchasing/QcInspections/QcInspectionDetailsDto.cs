@@ -61,6 +61,24 @@
         public string MaterialCode { get; set; } = string.Empty;
         public string MaterialName { get; set; } = string.Empty;
         public bool IsLotTracked { get; set; }
+        public int? IncomingReceivingLineLotId { get; set; }
+
+        public int? ManufacturerId { get; set; }
+
+        public string? ManufacturerName { get; set; }
+
+        public string? ReceivingLotNo { get; set; }
+
+        public DateTime? ReceivingManufacturingDate { get; set; }
+
+        public DateTime? ReceivingExpirationDate { get; set; }
+
+        public decimal? ReceivingItemCount { get; set; }
+
+        public decimal? ReceivingWeight { get; set; }
+
+        public string? ReceivingRemarks { get; set; }
+
 
         public decimal ReceivedQty { get; set; }
         public decimal AcceptedQty { get; set; }

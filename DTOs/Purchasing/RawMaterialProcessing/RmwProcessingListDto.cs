@@ -8,7 +8,7 @@
         public int QuarantineId { get; set; }
         public string QuarantineNo { get; set; } = string.Empty;
 
-        public int QcId { get; set; }
+        public int? QcId { get; set; }
         public string QcNo { get; set; } = string.Empty;
 
         public int? IncomingReceivingId { get; set; }

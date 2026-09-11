@@ -6,6 +6,9 @@
 
         public decimal DeliveredQty { get; set; }
 
+        // Material Receiving Form
+        public decimal? TareWeight { get; set; }
+
         public bool PackagingOk { get; set; } = true;
 
         public bool ContaminationOk { get; set; } = true;
@@ -13,5 +16,8 @@
         public bool LabelingOk { get; set; } = true;
 
         public string? Remarks { get; set; }
+
+        public List<IncomingReceivingLotDto> Lots { get; set; }
+            = new();
     }
 }

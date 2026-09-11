@@ -8,7 +8,7 @@
 
         public int QuarantineId { get; set; }
 
-        public int QcId { get; set; }
+        public int? QcId { get; set; }
 
         public int? IncomingReceivingId { get; set; }
 

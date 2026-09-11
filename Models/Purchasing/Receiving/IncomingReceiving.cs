@@ -51,6 +51,10 @@ namespace inventory_api.Models.Purchasing.Receiving
         [MaxLength(1000)]
         public string? ReceivingRemarks { get; set; }
 
+        [Column("verified_by")]
+        [MaxLength(100)]
+        public string? VerifiedBy { get; set; }
+
         [Column("created_by")]
         [MaxLength(100)]
         public string? CreatedBy { get; set; }

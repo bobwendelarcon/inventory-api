@@ -1,4 +1,6 @@
-﻿using System;
+﻿using inventory_api.DTOs.Purchasing.IncomingReceiving;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -26,6 +28,9 @@ namespace inventory_api.Models.Purchasing.Receiving
         [Column("delivered_qty")]
         public decimal DeliveredQty { get; set; }
 
+        [Column("tare_weight")]
+        public decimal? TareWeight { get; set; }
+
         [Column("uom")]
         [MaxLength(50)]
         public string? Uom { get; set; }
@@ -48,7 +53,11 @@ namespace inventory_api.Models.Purchasing.Receiving
 
 
         // Navigation
+
         [ForeignKey(nameof(IncomingReceivingId))]
         public IncomingReceiving? IncomingReceiving { get; set; }
+
+        public ICollection<IncomingReceivingLineLot> Lots { get; set; }
+            = new List<IncomingReceivingLineLot>();
     }
 }

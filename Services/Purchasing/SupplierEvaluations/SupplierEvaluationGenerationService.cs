@@ -691,9 +691,20 @@ namespace inventory_api.Services.Purchasing.SupplierEvaluations
              * Do not give the final rating yet because Purchasing
              * still needs to complete Reliability / After Sales.
              */
-            evaluation.PerformanceRating =
-                GetPerformanceRating(
-                    evaluation.TotalScore);
+            if (string.Equals(
+     evaluation.Status,
+     "FINALIZED",
+     StringComparison.OrdinalIgnoreCase))
+            {
+                evaluation.PerformanceRating =
+                    GetPerformanceRating(
+                        evaluation.TotalScore);
+            }
+            else
+            {
+                evaluation.PerformanceRating =
+                    "PENDING";
+            }
         }
 
         private async Task<string>
@@ -1030,6 +1041,356 @@ namespace inventory_api.Services.Purchasing.SupplierEvaluations
             return evaluation;
         }
 
+        public async Task<SupplierPerformanceEvaluation>
+    UpdateFromFinalReceivingAsync(
+        int processingId,
+        string updatedBy,
+        DateTime now)
+        {
+            if (processingId <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(processingId));
+            }
+
+            if (string.IsNullOrWhiteSpace(updatedBy))
+            {
+                throw new ArgumentException(
+                    "UpdatedBy is required.",
+                    nameof(updatedBy));
+            }
+
+            // ============================================================
+            // LOAD RMW PROCESSING
+            // ============================================================
+
+            var processing =
+                await _context.RmwProcessingHeaders
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x =>
+                        x.ProcessingId == processingId);
+
+            if (processing == null)
+            {
+                throw new InvalidOperationException(
+                    "RMW processing record was not found.");
+            }
+
+            if (processing.QcId <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Raw Material Evaluation reference is missing.");
+            }
+
+            var qc =
+                await _context.QcInspectionHeaders
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x =>
+                        x.QcId == processing.QcId);
+
+            if (qc == null)
+            {
+                throw new InvalidOperationException(
+                    "Raw Material Evaluation was not found.");
+            }
+
+            // ============================================================
+            // LOAD ORIGINAL INCOMING RECEIVING
+            // ============================================================
+            if (processing.IncomingReceivingId <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Incoming Receiving reference is missing.");
+            }
+
+            var incoming =
+                await _context.IncomingReceivings
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x =>
+                        x.IncomingReceivingId ==
+                        processing.IncomingReceivingId);
+
+
+            if (incoming == null)
+            {
+                throw new InvalidOperationException(
+                    "Incoming Receiving record was not found.");
+            }
+
+            // ============================================================
+            // LOAD PO
+            // ============================================================
+
+            var po =
+                await _context.PurchaseOrderHeaders
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x =>
+                        x.PoId == processing.PoId);
+
+            if (po == null)
+            {
+                throw new InvalidOperationException(
+                    "Purchase Order was not found.");
+            }
+
+            // ============================================================
+            // LOAD DELIVERY SCHEDULE
+            // ============================================================
+
+            PurchaseOrderDeliverySchedule? schedule = null;
+
+            if (incoming.ScheduleId > 0)
+            {
+                schedule =
+                    await _context.PurchaseOrderDeliverySchedules
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x =>
+                            x.ScheduleId ==
+                            incoming.ScheduleId);
+            }
+
+            // ============================================================
+            // LOAD EXISTING SUPPLIER EVALUATION
+            // ============================================================
+
+            var evaluation =
+                await _context.SupplierPerformanceEvaluations
+                    .Include(x => x.Lines)
+                    .Include(x => x.WorkflowHistory)
+                    .FirstOrDefaultAsync(x =>
+                        x.PoId == processing.PoId);
+
+            if (evaluation == null)
+            {
+                throw new InvalidOperationException(
+                    $"Supplier evaluation for PO {po.PoNo} was not found.");
+            }
+
+            if (string.Equals(
+                evaluation.Status,
+                "FINALIZED",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Finalized supplier evaluation cannot be changed.");
+            }
+
+            var oldStatus =
+                evaluation.Status;
+
+            // ============================================================
+            // UPDATE REFERENCES
+            // ============================================================
+
+            evaluation.SupplierId =
+                processing.SupplierId;
+
+            evaluation.ScheduleId =
+                incoming.ScheduleId;
+
+            evaluation.QcId =
+                qc.QcId;
+
+            evaluation.DeliveryDate =
+                incoming.DeliveryDate;
+
+            // ============================================================
+            // REBUILD AUTOMATIC SCORE LINES
+            // ============================================================
+
+            evaluation.Lines.Clear();
+
+            foreach (var qcLine in qc.Lines)
+            {
+                var poLine =
+                    po.Lines.FirstOrDefault(x =>
+                        x.PoLineId ==
+                        qcLine.PoLineId);
+
+                if (poLine == null)
+                {
+                    throw new InvalidOperationException(
+                        $"PO line {qcLine.PoLineId} was not found.");
+                }
+
+                var incomingLine =
+                    incoming.Lines.FirstOrDefault(x =>
+                        x.PoLineId ==
+                        qcLine.PoLineId);
+
+                if (incomingLine == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Incoming Receiving line for PO line " +
+                        $"{qcLine.PoLineId} was not found.");
+                }
+
+                PurchaseOrderDeliveryScheduleLine?
+                    scheduleLine = null;
+
+                if (incoming.ScheduleId > 0)
+                {
+                    scheduleLine =
+                        await _context
+                            .PurchaseOrderDeliveryScheduleLines
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(x =>
+                                x.ScheduleId ==
+                                    incoming.ScheduleId &&
+                                x.PoLineId ==
+                                    qcLine.PoLineId);
+                }
+
+                var previousUnitPrice =
+                    await GetPreviousUnitPriceAsync(
+                        currentPoId:
+                            po.PoId,
+
+                        supplierId:
+                            po.SupplierId,
+
+                        materialId:
+                            qcLine.MaterialId,
+
+                        currentPoDate:
+                            po.PoDate);
+
+                var line =
+                    new SupplierPerformanceEvaluationLine
+                    {
+                        QcLineId =
+                            qcLine.QcLineId,
+
+                        RrLineId =
+                            null,
+
+                        PoLineId =
+                            qcLine.PoLineId,
+
+                        ScheduleLineId =
+                            scheduleLine?.ScheduleLineId,
+
+                        MaterialId =
+                            qcLine.MaterialId,
+
+                        // QUALITY:
+                        // Final Raw Material Evaluation result
+                        ApprovedQty =
+                            qcLine.AcceptedQty,
+
+                        RejectedQty =
+                            qcLine.RejectedQty,
+
+                        TotalInspectedQty =
+                            qcLine.ReceivedQty,
+
+                        // DELIVERY:
+                        // Original supplier delivery against schedule
+                        ScheduledDate =
+                            schedule?.ScheduledDate,
+
+                        ActualDeliveryDate =
+                            incoming.DeliveryDate,
+
+                        ScheduledQty =
+                            scheduleLine?.ScheduledQty
+                            ?? incomingLine.DeliveredQty,
+
+                        DeliveredQty =
+                            incomingLine.DeliveredQty,
+
+                        // COST:
+                        // Current PO vs previous supplier/material PO
+                        NewUnitPrice =
+                            poLine.PoUnitPrice,
+
+                        PreviousUnitPrice =
+                            previousUnitPrice,
+
+                        // RELIABILITY:
+                        // Purchasing fills these later
+                        CoaPoints = 0m,
+                        TermsPoints = 0m,
+                        OtherPoints = 0m,
+
+                        ReliabilityScore = 0m,
+                        ReliabilityGrade = 0m,
+
+                        CreatedBy =
+                            updatedBy.Trim(),
+
+                        CreatedAt =
+                            now
+                    };
+
+                CalculateQuality(line);
+                CalculateDelivery(line);
+                CalculateCost(line);
+
+                line.TotalGrade =
+                    RoundScore(
+                        line.QualityGrade +
+                        line.DeliveryGrade +
+                        line.CostGrade +
+                        line.ReliabilityGrade);
+
+                evaluation.Lines.Add(line);
+            }
+
+            // ============================================================
+            // RECALCULATE HEADER
+            // ============================================================
+
+            RecalculateHeader(evaluation);
+
+            evaluation.Status =
+                "PENDING_PURCHASING";
+
+            // Do not give final performance rating yet.
+            evaluation.PerformanceRating =
+                "PENDING";
+
+            evaluation.UpdatedBy =
+                updatedBy.Trim();
+
+            evaluation.UpdatedAt =
+                now;
+
+            // ============================================================
+            // WORKFLOW HISTORY
+            // ============================================================
+
+            evaluation.WorkflowHistory.Add(
+                new SupplierEvaluationWorkflowHistory
+                {
+                    EvaluationId =
+                        evaluation.EvaluationId,
+
+                    FromStatus =
+                        oldStatus,
+
+                    ToStatus =
+                        "PENDING_PURCHASING",
+
+                    Action =
+                        "FINAL_RR_COMMITTED",
+
+                    ActionBy =
+                        updatedBy.Trim(),
+
+                    ActionAt =
+                        now,
+
+                    Remarks =
+                        "Final Receiving Report committed. " +
+                        "Automatic Quality, Delivery and Cost " +
+                        "scores were calculated. " +
+                        "Waiting for Purchasing reliability assessment."
+                });
+
+            return evaluation;
+        }
+
         private static string GetPerformanceRating(
             decimal totalScore)
         {
@@ -1065,6 +1426,103 @@ namespace inventory_api.Services.Purchasing.SupplierEvaluations
                 value,
                 2,
                 MidpointRounding.AwayFromZero);
+        }
+
+        public async Task<SupplierPerformanceEvaluation>
+    UpdateWorkflowStageAsync(
+        int poId,
+        string newStatus,
+        string action,
+        string actionBy,
+        DateTime now,
+        string? remarks = null)
+        {
+            if (poId <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(poId));
+            }
+
+            if (string.IsNullOrWhiteSpace(newStatus))
+            {
+                throw new ArgumentException(
+                    "New status is required.",
+                    nameof(newStatus));
+            }
+
+            if (string.IsNullOrWhiteSpace(action))
+            {
+                throw new ArgumentException(
+                    "Action is required.",
+                    nameof(action));
+            }
+
+            if (string.IsNullOrWhiteSpace(actionBy))
+            {
+                throw new ArgumentException(
+                    "Action By is required.",
+                    nameof(actionBy));
+            }
+
+            var evaluation =
+                await _context.SupplierPerformanceEvaluations
+                    .Include(x => x.WorkflowHistory)
+                    .FirstOrDefaultAsync(x =>
+                        x.PoId == poId);
+
+            if (evaluation == null)
+            {
+                throw new InvalidOperationException(
+                    $"Supplier evaluation for PO ID {poId} was not found.");
+            }
+
+            if (string.Equals(
+                evaluation.Status,
+                "FINALIZED",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Finalized supplier evaluation cannot be changed.");
+            }
+
+            var oldStatus =
+                evaluation.Status;
+
+            evaluation.Status =
+                newStatus.Trim().ToUpperInvariant();
+
+            evaluation.UpdatedBy =
+                actionBy.Trim();
+
+            evaluation.UpdatedAt =
+                now;
+
+            evaluation.WorkflowHistory.Add(
+                new SupplierEvaluationWorkflowHistory
+                {
+                    EvaluationId =
+                        evaluation.EvaluationId,
+
+                    FromStatus =
+                        oldStatus,
+
+                    ToStatus =
+                        evaluation.Status,
+
+                    Action =
+                        action.Trim().ToUpperInvariant(),
+
+                    ActionBy =
+                        actionBy.Trim(),
+
+                    ActionAt =
+                        now,
+
+                    Remarks =
+                        remarks
+                });
+
+            return evaluation;
         }
     }
 }

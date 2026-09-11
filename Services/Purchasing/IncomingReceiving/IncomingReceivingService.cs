@@ -1,6 +1,5 @@
 ﻿using inventory_api.Data;
 using inventory_api.DTOs.Purchasing.IncomingReceiving;
-using inventory_api.Models.Purchasing.QcInspections;
 using inventory_api.Models.Purchasing.Receiving;
 using Microsoft.EntityFrameworkCore;
 
@@ -73,7 +72,8 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                 throw new Exception("Cancelled delivery schedule cannot be received.");
 
             if (schedule.Status == "COMPLETED" ||
-       schedule.Status == "FOR_QC")
+    schedule.Status == "FOR_QC" ||
+    schedule.Status == "RECEIVED")
             {
                 throw new Exception(
                     "Delivery schedule has already been fully received."
@@ -146,6 +146,10 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                     MissingDocuments = missingDocuments,
 
                     ReceivingRemarks = dto.Remarks,
+
+                    // Material Receiving Form
+                    // CreatedBy = Received By
+                    VerifiedBy = dto.VerifiedBy,
 
                     CreatedBy = userId,
                     CreatedAt = now
@@ -243,6 +247,14 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                     // SAVE INCOMING DELIVERY LINE
                     // ============================================================
 
+                    if (dtoLine.TareWeight.HasValue &&
+    dtoLine.TareWeight.Value < 0)
+                    {
+                        throw new Exception(
+                            $"Tare weight cannot be negative for PO Line " +
+                            $"{dtoLine.PoLineId}.");
+                    }
+
                     var line = new IncomingReceivingLine
                     {
                         IncomingReceivingId =
@@ -259,6 +271,9 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
 
                         DeliveredQty =
                             dtoLine.DeliveredQty,
+
+                        TareWeight =
+    dtoLine.TareWeight,
 
                         Uom =
                             poLine.Uom,
@@ -280,6 +295,121 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                     };
 
                     _db.IncomingReceivingLines.Add(line);
+
+                    await _db.SaveChangesAsync();
+
+
+                    // ============================================================
+                    // SAVE MATERIAL RECEIVING LOTS
+                    // ============================================================
+
+                    if (dtoLine.Lots != null &&
+                        dtoLine.Lots.Count > 0)
+                    {
+                        foreach (var dtoLot in dtoLine.Lots)
+                        {
+                            // ----------------------------------------------------
+                            // VALIDATE DATES
+                            // ----------------------------------------------------
+
+                            if (dtoLot.ManufacturingDate.HasValue &&
+                                dtoLot.ExpirationDate.HasValue &&
+                                dtoLot.ExpirationDate.Value.Date <
+                                dtoLot.ManufacturingDate.Value.Date)
+                            {
+                                throw new Exception(
+                                    $"Expiration date cannot be earlier than " +
+                                    $"manufacturing date for PO Line {dtoLine.PoLineId}.");
+                            }
+
+
+                            // ----------------------------------------------------
+                            // VALIDATE NUMERIC VALUES
+                            // ----------------------------------------------------
+
+                            if (dtoLot.ItemCount.HasValue &&
+                                dtoLot.ItemCount.Value < 0)
+                            {
+                                throw new Exception(
+                                    "Item/container count cannot be negative.");
+                            }
+
+                            if (dtoLot.Weight.HasValue &&
+                                dtoLot.Weight.Value < 0)
+                            {
+                                throw new Exception(
+                                    "Lot weight cannot be negative.");
+                            }
+
+
+                            // ----------------------------------------------------
+                            // VALIDATE MANUFACTURER
+                            // Manufacturer must belong to this supplier.
+                            // ----------------------------------------------------
+
+                            if (dtoLot.ManufacturerId.HasValue)
+                            {
+                                var manufacturerId =
+                                    dtoLot.ManufacturerId.Value;
+
+                                var manufacturerValid =
+     await _db.SupplierMaterials
+         .AnyAsync(x =>
+             x.SupplierId == po.SupplierId &&
+             x.MaterialId == poLine.MaterialId &&
+             x.ManufacturerId == manufacturerId &&
+             x.IsActive &&
+             !x.IsDeleted);
+
+                                if (!manufacturerValid)
+                                {
+                                    throw new Exception(
+                                        $"Manufacturer ID {manufacturerId} is not an " +
+                                        $"active manufacturer for this supplier/material.");
+                                }
+                            }
+
+
+                            // ----------------------------------------------------
+                            // SAVE LOT
+                            // ----------------------------------------------------
+
+                            var lot =
+                                new IncomingReceivingLineLot
+                                {
+                                    IncomingReceivingLineId =
+                                        line.IncomingReceivingLineId,
+
+                                    ManufacturerId =
+                                        dtoLot.ManufacturerId,
+
+                                    LotNo =
+                                        string.IsNullOrWhiteSpace(dtoLot.LotNo)
+                                            ? null
+                                            : dtoLot.LotNo.Trim(),
+
+                                    ManufacturingDate =
+                                        dtoLot.ManufacturingDate,
+
+                                    ExpirationDate =
+                                        dtoLot.ExpirationDate,
+
+                                    ItemCount =
+                                        dtoLot.ItemCount,
+
+                                    Weight =
+                                        dtoLot.Weight,
+
+                                    Remarks =
+                                        dtoLot.Remarks,
+
+                                    CreatedAt =
+                                        now
+                                };
+
+                            _db.IncomingReceivingLineLots.Add(lot);
+                        }
+                    }
 
                     // ============================================================
                     // UPDATE DELIVERY SCHEDULE QUANTITY
@@ -351,15 +481,7 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
 
                     if (allCompleted)
                     {
-                        if (result == "ACCEPTED_FOR_QC" ||
-                            result == "FOR_QC_ON_HOLD")
-                        {
-                            schedule.Status = "FOR_QC";
-                        }
-                        else
-                        {
-                            schedule.Status = "RECEIVED";
-                        }
+                        schedule.Status = "RECEIVED";
                     }
                     else if (hasReceived)
                     {
@@ -384,54 +506,87 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                 // ----------------------------------------------------
 
                 var inspection =
-                    new IncomingReceivingInspection
-                    {
-                        IncomingReceivingId =
-                            incoming.IncomingReceivingId,
+    new IncomingReceivingInspection
+    {
+        IncomingReceivingId =
+            incoming.IncomingReceivingId,
 
-                        PoMatched =
-                            dto.Inspection.PoMatched,
+        // ====================================================
+        // PO / SUPPLIER
+        // ====================================================
 
-                        DeliveryScheduled =
-                            dto.Inspection.DeliveryScheduled,
+        PoMatched =
+            dto.Inspection.PoMatched,
 
-                        ApprovedSupplier =
-                            dto.Inspection.ApprovedSupplier,
+        DeliveryScheduled =
+            dto.Inspection.DeliveryScheduled,
 
-                        SalesInvoiceAvailable =
-                            dto.Inspection.SalesInvoiceAvailable,
+        ApprovedSupplier =
+            dto.Inspection.ApprovedSupplier,
 
-                        DeliveryReceiptAvailable =
-                            dto.Inspection.DeliveryReceiptAvailable,
 
-                        CoaAvailable =
-                            dto.Inspection.CoaAvailable,
+        // ====================================================
+        // DOCUMENTS
+        // ====================================================
 
-                        VehicleClean =
-                            dto.Inspection.VehicleClean,
+        SalesInvoiceAvailable =
+            dto.Inspection.SalesInvoiceAvailable,
 
-                        VehicleDry =
-                            dto.Inspection.VehicleDry,
+        DeliveryReceiptAvailable =
+            dto.Inspection.DeliveryReceiptAvailable,
 
-                        VehicleOdorFree =
-                            dto.Inspection.VehicleOdorFree,
+        CoaAvailable =
+            dto.Inspection.CoaAvailable,
 
-                        VehicleResidueFree =
-                            dto.Inspection.VehicleResidueFree,
 
-                        MaterialClean =
-                            dto.Inspection.MaterialClean,
+        // ====================================================
+        // MATERIAL RECEIVING FORM
+        // ====================================================
 
-                        MaterialCoveredOrSealed =
-                            dto.Inspection.MaterialCoveredOrSealed,
+        CorrectQuantityDelivered =
+            dto.Inspection.CorrectQuantityDelivered,
 
-                        Remarks =
-                            dto.Inspection.Remarks,
+        TruckDoorLockInPlace =
+            dto.Inspection.TruckDoorLockInPlace,
 
-                        CheckedBy = userId,
+        VehicleClean =
+            dto.Inspection.VehicleClean,
 
-                        CheckedAt = now
-                    };
+        ContainersCleanAndSealed =
+            dto.Inspection.ContainersCleanAndSealed,
+
+        NoVisibleContaminationOrSpoilage =
+            dto.Inspection.NoVisibleContaminationOrSpoilage,
+
+        LabelsPresentAndLegible =
+            dto.Inspection.LabelsPresentAndLegible,
+
+        DriverIdentityVerified =
+            dto.Inspection.DriverIdentityVerified,
+
+        NoUnauthorizedAccessDuringUnloading =
+            dto.Inspection.NoUnauthorizedAccessDuringUnloading,
+
+        HiddenCompartmentChecked =
+            dto.Inspection.HiddenCompartmentChecked,
+
+        ReceivedInAuthorizedZone =
+            dto.Inspection.ReceivedInAuthorizedZone,
+
+
+        // ====================================================
+        // RECEIVING INFORMATION
+        // ====================================================
+
+        Remarks =
+            dto.Inspection.Remarks,
+
+        CheckedBy =
+            userId,
+
+        CheckedAt =
+            now
+    };
 
                 _db.IncomingReceivingInspections.Add(
                     inspection);
@@ -440,166 +595,7 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                 await _db.SaveChangesAsync();
 
 
-                // ============================================================
-                // CREATE QA/QC INSPECTION
-                // ============================================================
-
-                if (
-                    result == "ACCEPTED_FOR_QC" ||
-                    result == "FOR_QC_ON_HOLD"
-                )
-                {
-                    // Prevent accidental duplicate QC
-                    var existingQc =
-                        await _db.QcInspectionHeaders
-                            .AnyAsync(x =>
-                                x.IncomingReceivingId ==
-                                    incoming.IncomingReceivingId);
-
-                    if (!existingQc)
-                    {
-                        var qcNo =
-                            await GenerateQcNoAsync();
-
-                        var qcStatus =
-                            result == "FOR_QC_ON_HOLD"
-                                ? "ON_HOLD"
-                                : "FOR_INSPECTION";
-
-
-                        var qc =
-                            new QcInspectionHeader
-                            {
-                                QcNo =
-                                    qcNo,
-
-                                IncomingReceivingId =
-                                    incoming.IncomingReceivingId,
-
-                                IncomingNo =
-                                    incoming.IncomingNo,
-
-                                // Final RR does not exist yet
-                                RrId =
-                                    null,
-
-                                RrNo =
-                                    null,
-
-                                PoId =
-                                    po.PoId,
-
-                                PoNo =
-                                    po.PoNo,
-
-                                SupplierId =
-                                    po.SupplierId,
-
-                                InspectionDate =
-                                    null,
-
-                                InspectorId =
-                                    null,
-
-                                Status =
-                                    qcStatus,
-
-                                Decision =
-                                    null,
-
-                                Remarks =
-                                    result == "FOR_QC_ON_HOLD"
-                                        ? $"Incoming delivery on hold. Missing documents: {missingDocuments}"
-                                        : null,
-
-                                CreatedBy =
-                                    userId,
-
-                                CreatedAt =
-                                    now
-                            };
-
-
-                        // --------------------------------------------------------
-                        // CREATE QC LINES FROM INCOMING RECEIVING LINES
-                        // --------------------------------------------------------
-
-                        var incomingLines =
-                            await _db.IncomingReceivingLines
-                                .Where(x =>
-                                    x.IncomingReceivingId ==
-                                        incoming.IncomingReceivingId)
-                                .ToListAsync();
-
-
-                        foreach (var incomingLine in incomingLines)
-                        {
-                            qc.Lines.Add(
-                                new QcInspectionLine
-                                {
-                                    IncomingReceivingLineId =
-                                        incomingLine.IncomingReceivingLineId,
-
-                                    // Final RR does not exist yet
-                                    RrLineId =
-                                        null,
-
-                                    PoLineId =
-                                        incomingLine.PoLineId,
-
-                                    MaterialId =
-                                        incomingLine.MaterialId,
-
-                                    ReceivedQty =
-                                        incomingLine.DeliveredQty,
-
-                                    AcceptedQty =
-                                        0,
-
-                                    RejectedQty =
-                                        0,
-
-                                    Remarks =
-                                        incomingLine.Remarks,
-
-                                    Status =
-                                        qcStatus == "ON_HOLD"
-                                            ? "ON_HOLD"
-                                            : "PENDING",
-
-                                    CreatedAt =
-                                        now
-                                }
-                            );
-                        }
-
-
-                        _db.QcInspectionHeaders.Add(qc);
-
-
-                        await AddTrackingAsync(
-                            po.PoId,
-                            schedule.ScheduleId,
-                            incoming.IncomingReceivingId,
-
-                            qcStatus == "ON_HOLD"
-                                ? "QA_QC_ON_HOLD"
-                                : "FORWARDED_TO_QA_QC",
-
-                            qcStatus,
-
-                            qcStatus == "ON_HOLD"
-                                ? "Incoming delivery forwarded to QA/QC and placed on hold."
-                                : "Incoming delivery forwarded to QA/QC for inspection.",
-
-                            userId,
-                            userRole,
-                            now,
-                            missingDocuments
-                        );
-                    }
-                }
-
+              
 
 
                 // ----------------------------------------------------
@@ -637,17 +633,16 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
 
 
         // ============================================================
-        // DETERMINE RESULT
+        // DETERMINE RMW RECEIVING RESULT
         // ============================================================
         private static string DetermineReceivingStatus(
             IncomingReceivingInspectionDto inspection,
             List<IncomingReceivingLineDto> lines)
         {
-            /*
-             * SERIOUS RECEIVING FAILURES
-             *
-             * These should NOT proceed to QA/QC.
-             */
+            // --------------------------------------------------------
+            // CRITICAL RECEIVING FAILURES
+            // Delivery should not proceed to QA/QC.
+            // --------------------------------------------------------
 
             if (!inspection.PoMatched)
                 return "NOT_ACCEPTED";
@@ -658,22 +653,29 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
             if (!inspection.ApprovedSupplier)
                 return "NOT_ACCEPTED";
 
-            if (!inspection.VehicleClean ||
-                !inspection.VehicleDry ||
-                !inspection.VehicleOdorFree ||
-                !inspection.VehicleResidueFree)
-            {
+            if (!inspection.CorrectQuantityDelivered)
                 return "NOT_ACCEPTED";
-            }
 
-            if (!inspection.MaterialClean ||
-                !inspection.MaterialCoveredOrSealed)
-            {
+            if (!inspection.VehicleClean)
                 return "NOT_ACCEPTED";
-            }
+
+            if (!inspection.ContainersCleanAndSealed)
+                return "NOT_ACCEPTED";
+
+            if (!inspection.NoVisibleContaminationOrSpoilage)
+                return "NOT_ACCEPTED";
+
+            if (!inspection.LabelsPresentAndLegible)
+                return "NOT_ACCEPTED";
+
+            if (!inspection.ReceivedInAuthorizedZone)
+                return "NOT_ACCEPTED";
 
 
-            // Check individual materials
+            // --------------------------------------------------------
+            // LINE-LEVEL PHYSICAL CHECK
+            // --------------------------------------------------------
+
             var hasPhysicalProblem = lines.Any(x =>
                 !x.PackagingOk ||
                 !x.ContaminationOk ||
@@ -683,12 +685,12 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                 return "NOT_ACCEPTED";
 
 
-            /*
-             * DOCUMENT PROBLEM
-             *
-             * Physical delivery can proceed,
-             * but QA/QC receives it ON HOLD.
-             */
+            // --------------------------------------------------------
+            // DOCUMENT CHECK
+            //
+            // Delivery is physically received, but cannot proceed
+            // normally if required documents are incomplete.
+            // --------------------------------------------------------
 
             var documentsComplete =
                 inspection.SalesInvoiceAvailable &&
@@ -696,14 +698,18 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                 inspection.CoaAvailable;
 
             if (!documentsComplete)
-                return "FOR_QC_ON_HOLD";
+                return "RECEIVING_ON_HOLD";
 
 
-            /*
-             * EVERYTHING OK
-             */
+            // --------------------------------------------------------
+            // RMW RECEIVING COMPLETED
+            //
+            // IMPORTANT:
+            // This DOES NOT mean QA/QC already accepted the material.
+            // It is waiting for QA/QC receiving inspection.
+            // --------------------------------------------------------
 
-            return "ACCEPTED_FOR_QC";
+            return "FOR_QA_QC_RECEIVING_INSPECTION";
         }
 
 
@@ -786,21 +792,20 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
         {
             return status switch
             {
-                "ACCEPTED_FOR_QC" =>
-                    "Warehouse inspection completed. " +
-                    "Delivery accepted for QA/QC.",
+                "FOR_QA_QC_RECEIVING_INSPECTION" =>
+                    "RMW receiving completed. Material forwarded to QA/QC " +
+                    "for receiving inspection.",
 
-                "FOR_QC_ON_HOLD" =>
-                    "Warehouse inspection completed. " +
-                    "Delivery forwarded to QA/QC ON HOLD " +
-                    "due to incomplete documents.",
+                "RECEIVING_ON_HOLD" =>
+                    "RMW receiving completed but material is on hold " +
+                    "pending completion of receiving requirements.",
 
                 "NOT_ACCEPTED" =>
-                    "Warehouse inspection completed. " +
-                    "Delivery was not accepted.",
+                    "RMW receiving inspection completed. " +
+                    "Supplier delivery was not accepted.",
 
                 _ =>
-                    "Warehouse inspection completed."
+                    "RMW receiving inspection completed."
             };
         }
 
@@ -836,14 +841,15 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                 .ToList();
 
             var materials = await _db.Materials
-                .Where(x => materialIds.Contains(x.material_id))
-                .Select(x => new
-                {
-                    MaterialId = x.material_id,
-                    MaterialCode = x.material_code,
-                    MaterialName = x.material_name
-                })
-                .ToDictionaryAsync(x => x.MaterialId);
+         .Where(x => materialIds.Contains(x.material_id))
+         .Select(x => new
+         {
+             MaterialId = x.material_id,
+             MaterialCode = x.material_code,
+             MaterialName = x.material_name,
+             IsLotTracked = x.is_lot_tracked
+         })
+         .ToDictionaryAsync(x => x.MaterialId);
 
 
             // ============================================================
@@ -927,6 +933,9 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                         MaterialName =
                             material?.MaterialName ?? "",
 
+                        IsLotTracked =
+    material?.IsLotTracked ?? false,
+
                         PoQty =
                             poLine.PoQty,
 
@@ -946,6 +955,8 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
                             remaining <= 0
                                 ? "DELIVERED"
                                 : scheduleLine.Status
+
+
                     };
                 })
                 .Where(x => x != null)
@@ -1017,35 +1028,44 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
 
 
 
-        private async Task<string> GenerateQcNoAsync()
+        public async Task<object> GetManufacturersAsync(
+    int supplierId,
+    int materialId)
         {
-            var year = DateTime.Now.Year;
+            var manufacturers =
+                await (
+                    from sm in _db.SupplierMaterials
 
-            var prefix = $"QC-{year}-";
+                    join m in _db.Manufacturers
+                        on sm.ManufacturerId
+                        equals m.ManufacturerId
 
-            var lastNo = await _db.QcInspectionHeaders
-                .Where(x => x.QcNo.StartsWith(prefix))
-                .OrderByDescending(x => x.QcId)
-                .Select(x => x.QcNo)
-                .FirstOrDefaultAsync();
+                    where
+                        sm.SupplierId == supplierId &&
+                        sm.MaterialId == materialId &&
+                        sm.IsActive &&
+                        !sm.IsDeleted &&
+                        m.IsActive &&
+                        !m.IsDeleted
 
-            var nextNo = 1;
+                    orderby m.ManufacturerName
 
-            if (!string.IsNullOrWhiteSpace(lastNo))
-            {
-                var numberPart =
-                    lastNo.Replace(prefix, "");
+                    select new
+                    {
+                        manufacturerId =
+                            m.ManufacturerId,
 
-                if (int.TryParse(
-                    numberPart,
-                    out var lastNumber))
-                {
-                    nextNo =
-                        lastNumber + 1;
-                }
-            }
+                        manufacturerName =
+                            m.ManufacturerName
+                    }
+                )
+                .Distinct()
+                .ToListAsync();
 
-            return $"{prefix}{nextNo:0000}";
+            return manufacturers;
         }
+
+
+
     }
 }

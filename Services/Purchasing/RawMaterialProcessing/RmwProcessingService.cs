@@ -1,5 +1,6 @@
 ﻿using inventory_api.Data;
 using inventory_api.DTOs.Purchasing.RawMaterialProcessing;
+using inventory_api.Services.Purchasing.SupplierEvaluations;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Purchasing.RawMaterialProcessing
@@ -7,13 +8,18 @@ namespace inventory_api.Services.Purchasing.RawMaterialProcessing
     public class RmwProcessingService
     {
         private readonly AppDbContext _context;
+        private readonly SupplierEvaluationGenerationService
+            _supplierEvaluationGenerationService;
 
         public RmwProcessingService(
-            AppDbContext context)
+            AppDbContext context,
+            SupplierEvaluationGenerationService supplierEvaluationGenerationService)
         {
             _context = context;
-        }
 
+            _supplierEvaluationGenerationService =
+                supplierEvaluationGenerationService;
+        }
 
         // ============================================================
         // START WEIGHING
@@ -252,7 +258,6 @@ namespace inventory_api.Services.Purchasing.RawMaterialProcessing
                 header.Lines
                     .Select(x => x.Status)
                     .ToList();
-
             if (
                 statuses.All(x =>
                     x == "STICKER_COMPLETED")
@@ -263,7 +268,42 @@ namespace inventory_api.Services.Purchasing.RawMaterialProcessing
 
                 header.CompletedAt =
                     now;
+
+                // ============================================================
+                // SUPPLIER EVALUATION:
+                // RMW PROCESSING COMPLETED
+                // ============================================================
+
+                var actionBy =
+                    header.Lines
+                        .Where(x =>
+                            !string.IsNullOrWhiteSpace(
+                                x.StickerCompletedBy))
+                        .OrderByDescending(x =>
+                            x.StickerCompletedAt)
+                        .Select(x =>
+                            x.StickerCompletedBy)
+                        .FirstOrDefault();
+
+                if (string.IsNullOrWhiteSpace(actionBy))
+                {
+                    throw new InvalidOperationException(
+                        "RMW processing completed user could not be determined.");
+                }
+
+                await _supplierEvaluationGenerationService
+                    .UpdateWorkflowStageAsync(
+                        header.PoId,
+                        "PENDING_FINAL_RR",
+                        "RMW_PROCESSING_COMPLETED",
+                        actionBy,
+                        now,
+                        $"RMW Processing {header.ProcessingNo} completed. " +
+                        "Material is ready for Final Receiving Report."
+                    );
             }
+
+
             else if (
                 statuses.Any(x =>
                     x == "WEIGHING_IN_PROGRESS")

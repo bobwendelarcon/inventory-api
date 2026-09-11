@@ -2,6 +2,7 @@
 using inventory_api.DTOs.Purchasing.FinalReceiving;
 using inventory_api.Models.Manufacturing.Materials;
 using inventory_api.Models.Purchasing.FinalReceiving;
+using inventory_api.Services.Purchasing.SupplierEvaluations;
 using Microsoft.EntityFrameworkCore;
 
 namespace inventory_api.Services.Purchasing.FinalReceiving
@@ -10,10 +11,17 @@ namespace inventory_api.Services.Purchasing.FinalReceiving
     {
         private readonly AppDbContext _context;
 
+        private readonly SupplierEvaluationGenerationService
+            _supplierEvaluationGenerationService;
+
         public FinalReceivingService(
-            AppDbContext context)
+            AppDbContext context,
+            SupplierEvaluationGenerationService supplierEvaluationGenerationService)
         {
             _context = context;
+
+            _supplierEvaluationGenerationService =
+                supplierEvaluationGenerationService;
         }
 
 
@@ -122,6 +130,12 @@ namespace inventory_api.Services.Purchasing.FinalReceiving
             // --------------------------------------------------------
             // Create Final RR header
             // --------------------------------------------------------
+            if (!processing.QcId.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Raw Material Evaluation has not yet been completed.");
+            }
+
 
             var finalReceiving =
                 new FinalReceivingHeader
@@ -136,7 +150,7 @@ namespace inventory_api.Services.Purchasing.FinalReceiving
                         processing.QuarantineId,
 
                     QcId =
-                        processing.QcId,
+    processing.QcId.Value,
 
                     IncomingReceivingId =
                         processing.IncomingReceivingId,
@@ -446,6 +460,12 @@ namespace inventory_api.Services.Purchasing.FinalReceiving
                                 x.ProcessingId ==
                                 processingId);
 
+                    if (!processing.QcId.HasValue)
+                    {
+                        throw new InvalidOperationException(
+                            "Raw Material Evaluation has not yet been completed.");
+                    }
+
                     if (finalReceiving == null)
                     {
                         var finalRrNo =
@@ -464,7 +484,7 @@ namespace inventory_api.Services.Purchasing.FinalReceiving
                                     processing.QuarantineId,
 
                                 QcId =
-                                    processing.QcId,
+    processing.QcId.Value,
 
                                 IncomingReceivingId =
                                     processing.IncomingReceivingId,
@@ -845,6 +865,19 @@ namespace inventory_api.Services.Purchasing.FinalReceiving
                         processingLine.UpdatedAt =
                             now;
                     }
+
+                    // ============================================================
+                    // SUPPLIER EVALUATION:
+                    // FINAL RR / INVENTORY COMMIT COMPLETED
+                    // ============================================================
+
+              
+
+                    await _supplierEvaluationGenerationService
+                        .UpdateFromFinalReceivingAsync(
+                            processing.ProcessingId,
+                            cleanUserId,
+                            now);
 
                     await _context.SaveChangesAsync();
 
