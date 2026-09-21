@@ -149,5 +149,32 @@ namespace inventory_api.Controllers.Purchasing.IncomingReceiving
                 });
             }
         }
+
+        // ============================================================
+        // RMW RECEIVING CALENDAR
+        // ============================================================
+        [HttpGet("calendar")]
+        public async Task<IActionResult> GetReceivingCalendar(
+            [FromQuery] int year,
+            [FromQuery] int month)
+        {
+            try
+            {
+                var result =
+                    await _service.GetReceivingCalendarAsync(
+                        year,
+                        month);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        ex.GetBaseException().Message
+                });
+            }
+        }
     }
 }

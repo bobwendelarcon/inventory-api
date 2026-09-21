@@ -1065,6 +1065,62 @@ namespace inventory_api.Services.Purchasing.IncomingReceiving
             return manufacturers;
         }
 
+        public async Task<object> GetReceivingCalendarAsync(
+      int year,
+      int month)
+        {
+            if (year <= 0)
+                throw new Exception("Invalid year.");
+
+            if (month < 1 || month > 12)
+                throw new Exception("Invalid month.");
+
+            var startDate = new DateTime(year, month, 1);
+            var endDate = startDate.AddMonths(1);
+
+            var schedules =
+                await (
+                    from schedule in _db.PurchaseOrderDeliverySchedules
+
+                    join po in _db.PurchaseOrderHeaders
+                        on schedule.PoId equals po.PoId
+
+                    join supplier in _db.Suppliers
+                        on po.SupplierId equals supplier.SupplierId
+
+                    where
+                        schedule.ScheduledDate >= startDate &&
+                        schedule.ScheduledDate < endDate
+
+                    orderby schedule.ScheduledDate
+
+                    select new
+                    {
+                        scheduleId = schedule.ScheduleId,
+
+                        scheduleNo = schedule.ScheduleNo,
+
+                        scheduledDate = schedule.ScheduledDate,
+
+                        poId = po.PoId,
+
+                        poNo = po.PoNo,
+
+                        printedPoNo = po.PrintedPoNo,
+
+                        supplierId = po.SupplierId,
+
+                        supplierName = supplier.SupplierName,
+
+                        status = schedule.Status
+                    }
+                )
+                .AsNoTracking()
+                .ToListAsync();
+
+            return schedules;
+        }
+
 
 
     }

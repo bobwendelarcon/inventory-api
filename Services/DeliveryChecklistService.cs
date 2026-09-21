@@ -2659,23 +2659,108 @@ WHERE checklist_id = @checklist_id
 
                     await cmd.ExecuteNonQueryAsync();
                 }
+
                 else
                 {
-                    string updateHeaderSql = @"
-                UPDATE delivery_checklist_header
-                SET updated_at = @updated_at
-                WHERE checklist_id = @checklist_id;";
+                    string statusCountSql = @"
+SELECT
+    COUNT(*) AS total_lines,
 
-                    using var cmd =
-                        new MySqlCommand(
-                            updateHeaderSql,
-                            conn,
-                            transaction
+    SUM(
+        CASE
+            WHEN UPPER(TRIM(IFNULL(status, ''))) = 'COMPLETED'
+            THEN 1
+            ELSE 0
+        END
+    ) AS completed_lines,
+
+    SUM(
+        CASE
+            WHEN UPPER(TRIM(IFNULL(status, ''))) <> 'COMPLETED'
+            THEN 1
+            ELSE 0
+        END
+    ) AS pending_lines
+
+FROM delivery_checklist_line
+WHERE checklist_id = @checklist_id
+  AND IFNULL(is_deleted, 0) = 0;";
+
+                    long remainingTotalLines = 0;
+                    long remainingCompletedLines = 0;
+                    long remainingPendingLines = 0;
+
+                    using (var cmd2 = new MySqlCommand(
+                        statusCountSql,
+                        conn,
+                        transaction))
+                    {
+                        cmd2.Parameters.AddWithValue(
+                            "@checklist_id",
+                            dto.checklist_id
                         );
+
+                        using var reader =
+                            await cmd2.ExecuteReaderAsync();
+
+                        if (await reader.ReadAsync())
+                        {
+                            remainingTotalLines =
+      reader["total_lines"] == DBNull.Value
+          ? 0
+          : Convert.ToInt64(reader["total_lines"]);
+
+                            remainingCompletedLines =
+                                reader["completed_lines"] == DBNull.Value
+                                    ? 0
+                                    : Convert.ToInt64(reader["completed_lines"]);
+
+                            remainingPendingLines =
+                                reader["pending_lines"] == DBNull.Value
+                                    ? 0
+                                    : Convert.ToInt64(reader["pending_lines"]);
+                        }
+                    }
+
+                    string newHeaderStatus;
+
+                    if (remainingPendingLines == 0)
+                    {
+                        newHeaderStatus = "COMPLETED";
+                    }
+                    else if (remainingCompletedLines > 0)
+                    {
+                        newHeaderStatus = "PARTIALLY_COMPLETED";
+                    }
+                    else
+                    {
+                        newHeaderStatus =
+                            headerStatus == "LOADING"
+                                ? "LOADING"
+                                : "READY";
+                    }
+
+                    string updateHeaderSql = @"
+UPDATE delivery_checklist_header
+SET status = @status,
+    updated_at = @updated_at
+WHERE checklist_id = @checklist_id
+  AND IFNULL(is_deleted, 0) = 0;";
+
+                    using var cmd = new MySqlCommand(
+                        updateHeaderSql,
+                        conn,
+                        transaction
+                    );
 
                     cmd.Parameters.AddWithValue(
                         "@checklist_id",
                         dto.checklist_id
+                    );
+
+                    cmd.Parameters.AddWithValue(
+                        "@status",
+                        newHeaderStatus
                     );
 
                     cmd.Parameters.AddWithValue(
@@ -2685,6 +2770,8 @@ WHERE checklist_id = @checklist_id
 
                     await cmd.ExecuteNonQueryAsync();
                 }
+
+
 
                 await transaction.CommitAsync();
 
