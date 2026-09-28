@@ -116,13 +116,30 @@ namespace inventory_api.Services.Purchasing.QcInspections
             return await _context.QuarantineHeaders
                 .AsNoTracking()
                 .Where(q =>
-                    q.Status == "QUARANTINED" &&
-                    q.QcId == null)
+    q.Status == "QUARANTINED")
                 .OrderByDescending(q => q.QuarantineId)
                 .Select(q => new PendingRawMaterialEvaluationDto
                 {
                     QuarantineId = q.QuarantineId,
                     QuarantineNo = q.QuarantineNo,
+
+                    QcId = q.QcId,
+
+                    QcNo = q.QcId.HasValue
+    ? _context.QcInspectionHeaders
+        .Where(x => x.QcId == q.QcId.Value)
+        .Select(x => x.QcNo)
+        .FirstOrDefault()
+    : null,
+
+                    QcStatus = q.QcId.HasValue
+    ? _context.QcInspectionHeaders
+        .Where(x => x.QcId == q.QcId.Value)
+        .Select(x => x.Status)
+        .FirstOrDefault()
+    : null,
+
+                    AlreadyStarted = q.QcId.HasValue,
 
                     IncomingReceivingId =
                         q.IncomingReceivingId,

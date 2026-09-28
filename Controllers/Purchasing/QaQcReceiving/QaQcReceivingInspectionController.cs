@@ -1,6 +1,7 @@
 ﻿using inventory_api.DTOs.Purchasing.QaQcReceiving;
 using inventory_api.Services.Purchasing.QaQcReceiving;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace inventory_api.Controllers.Purchasing.QaQcReceiving
 {
@@ -107,20 +108,33 @@ namespace inventory_api.Controllers.Purchasing.QaQcReceiving
 
         [HttpPost("save")]
         public async Task<IActionResult> SaveInspection(
-    [FromBody] SaveQaQcReceivingInspectionDto dto)
+       [FromBody] SaveQaQcReceivingInspectionDto dto)
         {
             try
             {
                 var userId =
-                    User.FindFirst("user_id")?.Value ??
-                    User.FindFirst("UserId")?.Value ??
-                    User.Identity?.Name ??
-                    "system";
+                    Request.Headers["X-User-Id"].FirstOrDefault()
+                    ?? User.FindFirstValue("user_id")
+                    ?? User.FindFirstValue("UserId")
+                    ?? User.FindFirstValue("userId")
+                    ?? User.FindFirstValue("id")
+                    ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? User.FindFirstValue("sub")
+                    ?? User.Identity?.Name;
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        success = false,
+                        message = "QA/QC inspector user ID is required."
+                    });
+                }
 
                 var qaReceivingId =
                     await _service.SaveInspectionAsync(
                         dto,
-                        userId);
+                        userId.Trim());
 
                 return Ok(new
                 {
@@ -139,5 +153,8 @@ namespace inventory_api.Controllers.Purchasing.QaQcReceiving
                 });
             }
         }
+
+
+
     }
 }

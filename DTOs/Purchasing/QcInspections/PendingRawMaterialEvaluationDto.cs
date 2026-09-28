@@ -5,6 +5,12 @@
         public int QuarantineId { get; set; }
         public string QuarantineNo { get; set; } = "";
 
+        // QC evaluation information
+        public int? QcId { get; set; }
+        public string? QcNo { get; set; }
+        public string? QcStatus { get; set; }
+        public bool AlreadyStarted { get; set; }
+
         public int IncomingReceivingId { get; set; }
         public string IncomingNo { get; set; } = "";
 
