@@ -224,5 +224,25 @@ namespace inventory_api.Controllers.Purchasing.QcInspections
             return Ok(data);
         }
 
+
+        [HttpGet("pending-release")]
+        public async Task<IActionResult> GetPendingRelease()
+        {
+            try
+            {
+                var result = await _service.GetPendingReleaseAsync();
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
     }
 }

@@ -2355,5 +2355,95 @@ namespace inventory_api.Services.Purchasing.QcInspections
                 $"{prefix}{nextNo:0000}";
         }
 
+
+        public async Task<List<RmwMaterialProcessingDto>>
+    GetPendingReleaseAsync()
+        {
+            return await _context.QuarantineHeaders
+                .AsNoTracking()
+                .Where(x =>
+                    x.Status == "WAITING_FOR_QA_RELEASE")
+                .OrderByDescending(x => x.QuarantineId)
+                .Select(x => new RmwMaterialProcessingDto
+                {
+                    QuarantineId = x.QuarantineId,
+                    QuarantineNo = x.QuarantineNo,
+
+                    QcId = x.QcId,
+
+                    QcNo = _context.QcInspectionHeaders
+                        .Where(q => q.QcId == x.QcId)
+                        .Select(q => q.QcNo)
+                        .FirstOrDefault() ?? "",
+
+                    IncomingReceivingId =
+                        x.IncomingReceivingId,
+
+                    IncomingNo = _context.IncomingReceivings
+                        .Where(i =>
+                            i.IncomingReceivingId ==
+                            x.IncomingReceivingId)
+                        .Select(i => i.IncomingNo)
+                        .FirstOrDefault() ?? "",
+
+                    SupplierName = _context.Suppliers
+                        .Where(s =>
+                            s.SupplierId == x.SupplierId)
+                        .Select(s => s.SupplierName)
+                        .FirstOrDefault() ?? "",
+
+                    Status = x.Status,
+                    CreatedAt = x.CreatedAt,
+
+                    Lines = x.Lines
+                        .Where(l => l.QcAcceptedQty > 0)
+                        .OrderBy(l => l.QuarantineLineId)
+                        .Select(l =>
+                            new RmwMaterialProcessingLineDto
+                            {
+                                QuarantineLineId =
+                                    l.QuarantineLineId,
+
+                                MaterialId =
+                                    l.MaterialId,
+
+                                MaterialCode =
+                                    _context.Materials
+                                        .Where(m =>
+                                            m.material_id ==
+                                            l.MaterialId)
+                                        .Select(m =>
+                                            m.material_code)
+                                        .FirstOrDefault() ?? "",
+
+                                MaterialName =
+                                    _context.Materials
+                                        .Where(m =>
+                                            m.material_id ==
+                                            l.MaterialId)
+                                        .Select(m =>
+                                            m.material_name)
+                                        .FirstOrDefault() ?? "",
+
+                                LotNo =
+                                    l.LotNo,
+
+                                ManufacturingDate =
+                                    l.ManufacturingDate,
+
+                                ExpirationDate =
+                                    l.ExpirationDate,
+
+                                AcceptedQty =
+                                    l.QcAcceptedQty,
+
+                                Status =
+                                    l.Status
+                            })
+                        .ToList()
+                })
+                .ToListAsync();
+        }
+
     }
 }
