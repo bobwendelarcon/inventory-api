@@ -54,6 +54,12 @@ namespace inventory_api.Models.Manufacturing.Materials
         [Column("is_lot_tracked")]
         public bool is_lot_tracked { get; set; } = false;
 
+        [Column("processing_type")]
+        public string processing_type { get; set; } = "NONE";
+
+        [Column("requires_sticker")]
+        public bool requires_sticker { get; set; } = false;
+
         [Column("created_at")]
         public DateTime created_at { get; set; }
 

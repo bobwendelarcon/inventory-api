@@ -75,6 +75,98 @@ namespace inventory_api.Controllers.Purchasing.RawMaterialProcessing
         }
 
 
+        // ============================================================
+        // START COUNTING
+        // ============================================================
+
+        [HttpPost(
+            "lines/{id:int}/start-counting"
+        )]
+        public async Task<IActionResult>
+            StartCounting(int id)
+        {
+            try
+            {
+                var userId =
+                    GetUserId();
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message =
+                            "User ID is required."
+                    });
+                }
+
+                await _service.StartCountingAsync(
+                    id,
+                    userId.Trim()
+                );
+
+                return Ok(new
+                {
+                    message =
+                        "Counting started successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
+
+        // ============================================================
+        // COMPLETE COUNTING
+        // ============================================================
+
+        [HttpPost(
+            "lines/{id:int}/complete-counting"
+        )]
+        public async Task<IActionResult>
+            CompleteCounting(
+                int id,
+                [FromBody] CompleteWeighingDto dto)
+        {
+            try
+            {
+                var userId =
+                    GetUserId();
+
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return Unauthorized(new
+                    {
+                        message =
+                            "User ID is required."
+                    });
+                }
+
+                await _service.CompleteCountingAsync(
+                    id,
+                    dto,
+                    userId.Trim()
+                );
+
+                return Ok(new
+                {
+                    message =
+                        "Counting completed successfully."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
         [HttpPost(
             "lines/{id:int}/complete-weighing"
         )]

@@ -2120,11 +2120,39 @@ namespace inventory_api.Data
                     .HasMaxLength(100);
 
                 entity.Property(e => e.WeighingCompletedAt)
-                    .HasColumnName("weighing_completed_at");
+     .HasColumnName("weighing_completed_at");
+
+
+                // ============================================================
+                // COUNTING
+                // ============================================================
+
+                entity.Property(e => e.CountingStartedBy)
+                    .HasColumnName("counting_started_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.CountingStartedAt)
+                    .HasColumnName("counting_started_at");
+
+                entity.Property(e => e.CountingCompletedBy)
+                    .HasColumnName("counting_completed_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.CountingCompletedAt)
+                    .HasColumnName("counting_completed_at");
+
+
+                // ============================================================
+                // STICKER / IDENTIFICATION
+                // ============================================================
 
                 entity.Property(e => e.StickerCompletedBy)
                     .HasColumnName("sticker_completed_by")
                     .HasMaxLength(100);
+
+                entity.Property(e => e.StickerCompletedAt)
+                    .HasColumnName("sticker_completed_at");
+
 
                 entity.Property(e => e.StickerCompletedAt)
                     .HasColumnName("sticker_completed_at");

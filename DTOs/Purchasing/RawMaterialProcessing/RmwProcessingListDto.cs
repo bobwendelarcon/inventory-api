@@ -53,6 +53,14 @@
         public string? WeighingCompletedBy { get; set; }
         public DateTime? WeighingCompletedAt { get; set; }
 
+        public string? CountingStartedBy { get; set; }
+
+        public DateTime? CountingStartedAt { get; set; }
+
+        public string? CountingCompletedBy { get; set; }
+
+        public DateTime? CountingCompletedAt { get; set; }
+
         public string? StickerCompletedBy { get; set; }
         public DateTime? StickerCompletedAt { get; set; }
     }

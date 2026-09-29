@@ -83,6 +83,9 @@ namespace inventory_api.Services.Manufacturing.Materials
                     x.minimum_stock,
                     x.description,
                     x.is_lot_tracked,
+
+                    x.processing_type,
+                    x.requires_sticker,
                     x.is_active
                 })
                 .ToListAsync();
@@ -124,6 +127,8 @@ namespace inventory_api.Services.Manufacturing.Materials
                     x.minimum_stock,
                     x.description,
                     x.is_lot_tracked,
+                    x.processing_type,
+                    x.requires_sticker,
                     x.is_active,
                     x.created_at,
                     x.updated_at
@@ -141,6 +146,27 @@ namespace inventory_api.Services.Manufacturing.Materials
 
             if (string.IsNullOrWhiteSpace(dto.uom))
                 throw new Exception("UOM is required.");
+
+            var processingType =
+    string.IsNullOrWhiteSpace(dto.processing_type)
+        ? "NONE"
+        : dto.processing_type.Trim().ToUpperInvariant();
+
+            var allowedProcessingTypes =
+                new[]
+                {
+        "NONE",
+        "WEIGHING",
+        "COUNTING"
+                };
+
+            if (!allowedProcessingTypes.Contains(processingType))
+            {
+                throw new Exception(
+                    "Invalid processing type. " +
+                    "Allowed values are NONE, WEIGHING, or COUNTING."
+                );
+            }
 
             // =====================================================
             // VALIDATE CATEGORY
@@ -251,6 +277,12 @@ namespace inventory_api.Services.Manufacturing.Materials
                     is_lot_tracked =
                         dto.is_lot_tracked,
 
+                    processing_type =
+    processingType,
+
+                    requires_sticker =
+    dto.requires_sticker,
+
                     is_active =
                         true,
 
@@ -287,6 +319,27 @@ namespace inventory_api.Services.Manufacturing.Materials
 
             if (string.IsNullOrWhiteSpace(dto.uom))
                 throw new Exception("UOM is required.");
+
+            var processingType =
+    string.IsNullOrWhiteSpace(dto.processing_type)
+        ? "NONE"
+        : dto.processing_type.Trim().ToUpperInvariant();
+
+            var allowedProcessingTypes =
+                new[]
+                {
+        "NONE",
+        "WEIGHING",
+        "COUNTING"
+                };
+
+            if (!allowedProcessingTypes.Contains(processingType))
+            {
+                throw new Exception(
+                    "Invalid processing type. " +
+                    "Allowed values are NONE, WEIGHING, or COUNTING."
+                );
+            }
 
             var codeExists = await _context.Materials
                 .AnyAsync(x =>
@@ -327,8 +380,17 @@ namespace inventory_api.Services.Manufacturing.Materials
             material.pack_qty = dto.pack_qty;
             material.minimum_stock = dto.minimum_stock;
             material.description = dto.description;
-            material.is_lot_tracked = dto.is_lot_tracked;
-            material.updated_at = DateTime.UtcNow;
+            material.is_lot_tracked =
+     dto.is_lot_tracked;
+
+            material.processing_type =
+                processingType;
+
+            material.requires_sticker =
+                dto.requires_sticker;
+
+            material.updated_at =
+                DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }
@@ -403,7 +465,9 @@ namespace inventory_api.Services.Manufacturing.Materials
                         : null,
 
                     x.uom,
-                    x.is_lot_tracked
+                    x.is_lot_tracked,
+                    x.processing_type,
+                    x.requires_sticker
                 })
                 .ToListAsync();
 

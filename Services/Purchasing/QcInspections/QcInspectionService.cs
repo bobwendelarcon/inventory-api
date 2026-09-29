@@ -1456,8 +1456,10 @@ namespace inventory_api.Services.Purchasing.QcInspections
                             SupplierId =
                                 quarantine.SupplierId,
 
-                            Status =
-                                "READY_FOR_WEIGHING",
+                            //Status =
+                            //    "READY_FOR_WEIGHING",
+
+                            Status = "PROCESSING",
 
                             CreatedBy =
                                 cleanUserId,
@@ -1486,6 +1488,57 @@ namespace inventory_api.Services.Purchasing.QcInspections
                                     quarantineLine.PoLineId)
                                 .Select(x => x.Uom)
                                 .FirstOrDefaultAsync();
+
+
+                        var material =
+    await _context.Materials
+        .Where(x =>
+            x.material_id ==
+            quarantineLine.MaterialId)
+        .Select(x => new
+        {
+            x.processing_type,
+            x.requires_sticker
+        })
+        .FirstOrDefaultAsync();
+
+                        if (material == null)
+                        {
+                            throw new InvalidOperationException(
+                                $"Material ID {quarantineLine.MaterialId} was not found."
+                            );
+                        }
+
+                        var processingType =
+                            (material.processing_type ?? "NONE")
+                                .Trim()
+                                .ToUpperInvariant();
+
+                        string lineStatus;
+
+                        switch (processingType)
+                        {
+                            case "WEIGHING":
+                                lineStatus = "READY_FOR_WEIGHING";
+                                break;
+
+                            case "COUNTING":
+                                lineStatus = "READY_FOR_COUNTING";
+                                break;
+
+                            case "NONE":
+                                lineStatus =
+                                    material.requires_sticker
+                                        ? "READY_FOR_STICKER"
+                                        : "READY_FOR_FINAL_RR";
+                                break;
+
+                            default:
+                                throw new InvalidOperationException(
+                                    $"Invalid processing type '{material.processing_type}' " +
+                                    $"for Material ID {quarantineLine.MaterialId}."
+                                );
+                        }
 
                         processing.Lines.Add(
                             new RmwProcessingLine
@@ -1533,13 +1586,56 @@ namespace inventory_api.Services.Purchasing.QcInspections
                                 Uom =
                                     uom,
 
+                                //Status =
+                                //    "READY_FOR_WEIGHING",
                                 Status =
-                                    "READY_FOR_WEIGHING",
+    lineStatus,
 
                                 CreatedAt =
                                     now
                             }
                         );
+                    }
+
+                    var lineStatuses =
+    processing.Lines
+        .Select(x => x.Status)
+        .ToList();
+
+                    if (lineStatuses.All(x =>
+                            x == "READY_FOR_FINAL_RR"))
+                    {
+                        processing.Status =
+                            "READY_FOR_FINAL_RR";
+
+                        processing.CompletedBy =
+                            cleanUserId;
+
+                        processing.CompletedAt =
+                            now;
+                    }
+                    else if (lineStatuses.Any(x =>
+                                 x == "READY_FOR_WEIGHING"))
+                    {
+                        processing.Status =
+                            "READY_FOR_WEIGHING";
+                    }
+                    else if (lineStatuses.Any(x =>
+                                 x == "READY_FOR_COUNTING"))
+                    {
+                        processing.Status =
+                            "READY_FOR_COUNTING";
+                    }
+                    else if (lineStatuses.Any(x =>
+                                 x == "READY_FOR_STICKER"))
+                    {
+                        processing.Status =
+                            "READY_FOR_STICKER";
+                    }
+                    else
+                    {
+                        processing.Status =
+                            "PROCESSING";
                     }
 
                     _context.RmwProcessingHeaders.Add(
@@ -1592,6 +1688,35 @@ namespace inventory_api.Services.Purchasing.QcInspections
                         );
 
                     await _context.SaveChangesAsync();
+
+
+                    // ============================================================
+                    // DIRECT TO FINAL RR
+                    //
+                    // If every accepted material requires:
+                    // processing_type = NONE
+                    // requires_sticker = false
+                    //
+                    // there is no RMW action left to perform.
+                    // ============================================================
+
+                    if (processing.Status == "READY_FOR_FINAL_RR")
+                    {
+                        await _supplierEvaluationGenerationService
+                            .UpdateWorkflowStageAsync(
+                                quarantine.PoId,
+                                "PENDING_FINAL_RR",
+                                "RMW_PROCESSING_COMPLETED",
+                                cleanUserId,
+                                now,
+                                $"RMW Processing {processing.ProcessingNo} requires no " +
+                                $"additional weighing, counting, or sticker processing. " +
+                                $"Material is ready for Final Receiving Report."
+                            );
+
+                        await _context.SaveChangesAsync();
+                    }
+
 
                     await transaction.CommitAsync();
 

@@ -166,6 +166,21 @@ namespace inventory_api.Services.Reports.TimeInMotion
                         .FirstOrDefault();
 
 
+                DateTime? countingStartedAt =
+    processing?.Lines
+        .Where(x => x.CountingStartedAt.HasValue)
+        .Select(x => x.CountingStartedAt)
+        .OrderBy(x => x)
+        .FirstOrDefault();
+
+                DateTime? countingCompletedAt =
+                    processing?.Lines
+                        .Where(x => x.CountingCompletedAt.HasValue)
+                        .Select(x => x.CountingCompletedAt)
+                        .OrderByDescending(x => x)
+                        .FirstOrDefault();
+
+
                 // ========================================================
                 // USERS
                 // ========================================================
@@ -319,11 +334,35 @@ namespace inventory_api.Services.Reports.TimeInMotion
 
                 if (processing != null)
                 {
-                    // RMW waiting time starts immediately
-                    // after Quarantine releases the material.
                     var releasedToRmwStartAt =
                         quarantine?.ReleasedAt
                         ?? processing.CreatedAt;
+
+                    // Find the first actual RMW activity.
+                    // This may be weighing, counting, sticker,
+                    // or no RMW activity at all.
+                    var firstRmwActivityAt =
+                        new DateTime?[]
+                        {
+            weighingStartedAt,
+            countingStartedAt,
+            stickerCompletedAt
+                        }
+                        .Where(x => x.HasValue)
+                        .Select(x => x!.Value)
+                        .OrderBy(x => x)
+                        .Cast<DateTime?>()
+                        .FirstOrDefault();
+
+                    // If the material requires no RMW operation,
+                    // processing may already be READY_FOR_FINAL_RR.
+                    var releasedEndAt =
+                        firstRmwActivityAt
+                        ?? (
+                            processing.Status == "READY_FOR_FINAL_RR"
+                                ? processing.CompletedAt
+                                : null
+                        );
 
                     stages.Add(
                         new TimeInMotionStageDto
@@ -335,12 +374,12 @@ namespace inventory_api.Services.Reports.TimeInMotion
                                 releasedToRmwStartAt,
 
                             EndAt =
-                                weighingStartedAt,
+                                releasedEndAt,
 
                             DurationMinutes =
                                 GetDurationMinutes(
                                     releasedToRmwStartAt,
-                                    weighingStartedAt
+                                    releasedEndAt
                                 ),
 
                             ResponsibleUserId =
@@ -348,10 +387,11 @@ namespace inventory_api.Services.Reports.TimeInMotion
 
                             ResponsibleUserName =
                                 GetUserName(
-                                    processing.CreatedBy),
+                                    processing.CreatedBy
+                                ),
 
                             Status =
-                                weighingStartedAt.HasValue
+                                releasedEndAt.HasValue
                                     ? "COMPLETED"
                                     : processing.Status
                         }
@@ -360,7 +400,7 @@ namespace inventory_api.Services.Reports.TimeInMotion
 
 
                 // --------------------------------------------------------
-                // 5. WEIGHING / COUNTING
+                // 5A. WEIGHING
                 // --------------------------------------------------------
 
                 if (
@@ -389,12 +429,11 @@ namespace inventory_api.Services.Reports.TimeInMotion
                                 x.WeighingStartedBy)
                             .FirstOrDefault();
 
-
                     stages.Add(
                         new TimeInMotionStageDto
                         {
                             Stage =
-                                "Weighing / Counting",
+                                "Weighing",
 
                             StartAt =
                                 weighingStartedAt,
@@ -413,7 +452,8 @@ namespace inventory_api.Services.Reports.TimeInMotion
 
                             ResponsibleUserName =
                                 GetUserName(
-                                    weighingUserId),
+                                    weighingUserId
+                                ),
 
                             Status =
                                 weighingCompletedAt.HasValue
@@ -425,57 +465,146 @@ namespace inventory_api.Services.Reports.TimeInMotion
 
 
                 // --------------------------------------------------------
-                // 6. STICKER / IDENTIFICATION
+                // 5B. COUNTING
                 // --------------------------------------------------------
 
                 if (
-                    weighingCompletedAt.HasValue ||
-                    stickerCompletedAt.HasValue
+                    countingStartedAt.HasValue ||
+                    countingCompletedAt.HasValue
                 )
                 {
-                    var stickerUserId =
+                    var countingUserId =
                         processing?.Lines
                             .Where(x =>
                                 !string.IsNullOrWhiteSpace(
-                                    x.StickerCompletedBy))
+                                    x.CountingCompletedBy))
                             .OrderByDescending(x =>
-                                x.StickerCompletedAt)
+                                x.CountingCompletedAt)
                             .Select(x =>
-                                x.StickerCompletedBy)
-                            .FirstOrDefault();
+                                x.CountingCompletedBy)
+                            .FirstOrDefault()
 
+                        ?? processing?.Lines
+                            .Where(x =>
+                                !string.IsNullOrWhiteSpace(
+                                    x.CountingStartedBy))
+                            .OrderBy(x =>
+                                x.CountingStartedAt)
+                            .Select(x =>
+                                x.CountingStartedBy)
+                            .FirstOrDefault();
 
                     stages.Add(
                         new TimeInMotionStageDto
                         {
                             Stage =
-                                "Sticker / Identification",
+                                "Counting",
 
                             StartAt =
-                                weighingCompletedAt,
+                                countingStartedAt,
 
                             EndAt =
-                                stickerCompletedAt,
+                                countingCompletedAt,
 
                             DurationMinutes =
                                 GetDurationMinutes(
-                                    weighingCompletedAt,
-                                    stickerCompletedAt
+                                    countingStartedAt,
+                                    countingCompletedAt
                                 ),
 
                             ResponsibleUserId =
-                                stickerUserId,
+                                countingUserId,
 
                             ResponsibleUserName =
                                 GetUserName(
-                                    stickerUserId),
+                                    countingUserId
+                                ),
 
                             Status =
-                                stickerCompletedAt.HasValue
+                                countingCompletedAt.HasValue
                                     ? "COMPLETED"
-                                    : "PENDING"
+                                    : "IN_PROGRESS"
                         }
                     );
+                }
+
+
+                // --------------------------------------------------------
+                // 6. STICKER / IDENTIFICATION
+                // --------------------------------------------------------
+
+                if (processing != null)
+                {
+                    var stickerLines =
+                        processing.Lines
+                            .Where(x =>
+                                x.Status == "READY_FOR_STICKER" ||
+                                x.StickerCompletedAt.HasValue)
+                            .ToList();
+
+                    if (stickerLines.Any())
+                    {
+                        var stickerStartAt =
+                            new DateTime?[]
+                            {
+                weighingCompletedAt,
+                countingCompletedAt
+                            }
+                            .Where(x => x.HasValue)
+                            .Select(x => x!.Value)
+                            .OrderByDescending(x => x)
+                            .Cast<DateTime?>()
+                            .FirstOrDefault()
+
+                            // NONE + Sticker:
+                            // there is no weighing/counting.
+                            ?? quarantine?.ReleasedAt
+                            ?? processing.CreatedAt;
+
+                        var stickerUserId =
+                            stickerLines
+                                .Where(x =>
+                                    !string.IsNullOrWhiteSpace(
+                                        x.StickerCompletedBy))
+                                .OrderByDescending(x =>
+                                    x.StickerCompletedAt)
+                                .Select(x =>
+                                    x.StickerCompletedBy)
+                                .FirstOrDefault();
+
+                        stages.Add(
+                            new TimeInMotionStageDto
+                            {
+                                Stage =
+                                    "Sticker / Identification",
+
+                                StartAt =
+                                    stickerStartAt,
+
+                                EndAt =
+                                    stickerCompletedAt,
+
+                                DurationMinutes =
+                                    GetDurationMinutes(
+                                        stickerStartAt,
+                                        stickerCompletedAt
+                                    ),
+
+                                ResponsibleUserId =
+                                    stickerUserId,
+
+                                ResponsibleUserName =
+                                    GetUserName(
+                                        stickerUserId
+                                    ),
+
+                                Status =
+                                    stickerCompletedAt.HasValue
+                                        ? "COMPLETED"
+                                        : "PENDING"
+                            }
+                        );
+                    }
                 }
 
 
@@ -491,9 +620,45 @@ namespace inventory_api.Services.Reports.TimeInMotion
                 {
                     // Final RR starts as soon as Sticker / Identification
                     // has been completed.
-                    var finalRrStartAt =
-                        stickerCompletedAt
-                        ?? finalReceiving.CreatedAt;
+                    // Final RR can begin only after all required
+                    // RMW processing has finished.
+
+                    var rmwCompletedTimes =
+                        new List<DateTime>();
+
+                    if (stickerCompletedAt.HasValue)
+                    {
+                        rmwCompletedTimes.Add(
+                            stickerCompletedAt.Value
+                        );
+                    }
+
+                    if (weighingCompletedAt.HasValue)
+                    {
+                        rmwCompletedTimes.Add(
+                            weighingCompletedAt.Value
+                        );
+                    }
+
+                    if (countingCompletedAt.HasValue)
+                    {
+                        rmwCompletedTimes.Add(
+                            countingCompletedAt.Value
+                        );
+                    }
+
+                    if (processing?.CompletedAt.HasValue == true)
+                    {
+                        rmwCompletedTimes.Add(
+                            processing.CompletedAt.Value
+                        );
+                    }
+
+                    DateTime? finalRrStartAt =
+                        rmwCompletedTimes.Any()
+                            ? rmwCompletedTimes     .Max()
+                            : processing?.CreatedAt
+                              ?? finalReceiving.CreatedAt;
 
                     stages.Add(
                         new TimeInMotionStageDto
@@ -671,61 +836,85 @@ namespace inventory_api.Services.Reports.TimeInMotion
         // ============================================================
 
         private static string GetCurrentStage(
-        Models.Purchasing.QcInspections.QcInspectionHeader? qc,
-        Models.Purchasing.Quarantine.QuarantineHeader? quarantine,
-        Models.Purchasing.RawMaterialProcessing.RmwProcessingHeader? processing,
-        Models.Purchasing.ReceivingReports.ReceivingReportHeader? finalReceiving)
+      Models.Purchasing.QcInspections.QcInspectionHeader? qc,
+      Models.Purchasing.Quarantine.QuarantineHeader? quarantine,
+      Models.Purchasing.RawMaterialProcessing.RmwProcessingHeader? processing,
+      Models.Purchasing.ReceivingReports.ReceivingReportHeader? finalReceiving)
         {
-            if (
-                finalReceiving?.Status ==
-                "COMMITTED"
-            )
+            if (finalReceiving?.Status == "COMMITTED")
             {
                 return "Inventory Committed";
             }
-
 
             if (finalReceiving != null)
             {
                 return "Final Receiving";
             }
 
-
-            if (
-                processing?.Status ==
-                "READY_FOR_FINAL_RR"
-            )
-            {
-                return "Ready for Final RR";
-            }
-
-
             if (processing != null)
             {
+                var statuses =
+                    processing.Lines
+                        .Select(x =>
+                            (x.Status ?? "").Trim().ToUpper())
+                        .ToList();
+
+                if (statuses.Any(x =>
+                    x == "WEIGHING_IN_PROGRESS"))
+                {
+                    return "Weighing";
+                }
+
+                if (statuses.Any(x =>
+                    x == "READY_FOR_WEIGHING"))
+                {
+                    return "Ready for Weighing";
+                }
+
+                if (statuses.Any(x =>
+                    x == "COUNTING_IN_PROGRESS"))
+                {
+                    return "Counting";
+                }
+
+                if (statuses.Any(x =>
+                    x == "READY_FOR_COUNTING"))
+                {
+                    return "Ready for Counting";
+                }
+
+                if (statuses.Any(x =>
+                    x == "READY_FOR_STICKER"))
+                {
+                    return "Sticker / Identification";
+                }
+
+                if (
+                    statuses.Any() &&
+                    statuses.All(x =>
+                        x == "READY_FOR_FINAL_RR")
+                )
+                {
+                    return "Ready for Final RR";
+                }
+
                 return "Raw Material Processing";
             }
 
-
-            if (
-                quarantine?.Status ==
-                "RELEASED"
-            )
+            if (quarantine?.Status == "RELEASED")
             {
                 return "Released to RMW";
             }
-
 
             if (quarantine != null)
             {
                 return "Quarantine / Hold";
             }
 
-
             if (qc != null)
             {
                 return "QA/QC Inspection";
             }
-
 
             return "Incoming Receiving";
         }

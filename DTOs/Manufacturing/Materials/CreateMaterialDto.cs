@@ -17,5 +17,10 @@
         public string? description { get; set; }
 
         public bool is_lot_tracked { get; set; } = false;
+
+        // RMW PROCESSING
+        public string processing_type { get; set; } = "NONE";
+
+        public bool requires_sticker { get; set; } = false;
     }
 }
