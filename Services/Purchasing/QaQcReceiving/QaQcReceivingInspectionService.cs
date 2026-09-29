@@ -1022,6 +1022,148 @@ namespace inventory_api.Services.Purchasing.QaQcReceiving
 
             return result;
         }
+        public async Task<object> GetHistoryAsync()
+        {
+            var inspections =
+                await _db.QaQcReceivingInspections
+                    .AsNoTracking()
+                    .OrderByDescending(x => x.InspectionDate)
+                    .ThenByDescending(x => x.QaReceivingId)
+                    .ToListAsync();
+
+            if (inspections.Count == 0)
+            {
+                return new List<object>();
+            }
+
+            var incomingIds =
+                inspections
+                    .Select(x => x.IncomingReceivingId)
+                    .Distinct()
+                    .ToList();
+
+            var poIds =
+                inspections
+                    .Select(x => x.PoId)
+                    .Distinct()
+                    .ToList();
+
+            var supplierIds =
+                inspections
+                    .Select(x => x.SupplierId)
+                    .Distinct()
+                    .ToList();
+
+
+            var incoming =
+                await _db.IncomingReceivings
+                    .AsNoTracking()
+                    .Where(x =>
+                        incomingIds.Contains(
+                            x.IncomingReceivingId))
+                    .ToDictionaryAsync(
+                        x => x.IncomingReceivingId);
+
+
+            var pos =
+                await _db.PurchaseOrderHeaders
+                    .AsNoTracking()
+                    .Where(x =>
+                        poIds.Contains(x.PoId))
+                    .Select(x => new
+                    {
+                        x.PoId,
+                        x.PoNo
+                    })
+                    .ToDictionaryAsync(
+                        x => x.PoId);
+
+
+            var suppliers =
+                await _db.Suppliers
+                    .AsNoTracking()
+                    .Where(x =>
+                        supplierIds.Contains(
+                            x.SupplierId))
+                    .Select(x => new
+                    {
+                        x.SupplierId,
+                        x.SupplierName
+                    })
+                    .ToDictionaryAsync(
+                        x => x.SupplierId);
+
+
+            var result =
+                inspections.Select(x =>
+                {
+                    incoming.TryGetValue(
+                        x.IncomingReceivingId,
+                        out var incomingRecord);
+
+                    pos.TryGetValue(
+                        x.PoId,
+                        out var po);
+
+                    suppliers.TryGetValue(
+                        x.SupplierId,
+                        out var supplier);
+
+                    return new
+                    {
+                        qaReceivingId =
+                            x.QaReceivingId,
+
+                        inspectionNo =
+                            x.InspectionNo,
+
+                        incomingReceivingId =
+                            x.IncomingReceivingId,
+
+                        incomingNo =
+                            incomingRecord?.IncomingNo ?? "",
+
+                        poId =
+                            x.PoId,
+
+                        poNo =
+                            po?.PoNo ?? "",
+
+                        supplierId =
+                            x.SupplierId,
+
+                        supplierName =
+                            supplier?.SupplierName ?? "",
+
+                        deliveryDate =
+                            incomingRecord?.DeliveryDate,
+
+                        inspectionDate =
+                            x.InspectionDate,
+
+                        inspectedBy =
+                            x.InspectedBy,
+
+                        receivedBy =
+                            x.ReceivedBy,
+
+                        notedBy =
+                            x.NotedBy,
+
+                        status =
+                            x.Status,
+
+                        currentReceivingStatus =
+                            incomingRecord?.ReceivingStatus ?? "",
+
+                        remarks =
+                            x.Remarks
+                    };
+                })
+                .ToList();
+
+            return result;
+        }
 
         private static string DetermineQaReceivingLineStatus(
     SaveQaQcReceivingInspectionLineDto line)

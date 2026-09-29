@@ -106,6 +106,26 @@ namespace inventory_api.Controllers.Purchasing.QaQcReceiving
             }
         }
 
+        [HttpGet("history")]
+        public async Task<IActionResult> GetHistory()
+        {
+            try
+            {
+                var result =
+                    await _service.GetHistoryAsync();
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
         [HttpPost("save")]
         public async Task<IActionResult> SaveInspection(
        [FromBody] SaveQaQcReceivingInspectionDto dto)

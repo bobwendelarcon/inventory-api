@@ -7,6 +7,14 @@
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     },
     {
+      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\purchasing\\qaqcreceiving\\qaqcreceivinginspectioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\purchasing\\qaqcreceiving\\qaqcreceivinginspectioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\services\\purchasing\\qaqcreceiving\\qaqcreceivinginspectionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\purchasing\\qaqcreceiving\\qaqcreceivinginspectionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\services\\reports\\timeinmotionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\reports\\timeinmotionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -99,10 +107,6 @@
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\purchasing\\qaqcreceiving\\qaqcreceivinginspectioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\purchasing\\qaqcreceiving\\qaqcreceivinginspectioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\services\\purchasing\\incomingreceiving\\incomingreceivingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\purchasing\\incomingreceiving\\incomingreceivingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -141,10 +145,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\manufacturing\\materialscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\manufacturing\\materialscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\services\\purchasing\\qaqcreceiving\\qaqcreceivinginspectionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\purchasing\\qaqcreceiving\\qaqcreceivinginspectionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\dailyorderscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -1102,50 +1102,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "RmwProcessingLine.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
-              "RelativeDocumentMoniker": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
-              "RelativeToolTip": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
-              "ViewState": "AgIAABYAAAAAAAAAAAAwwEEAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-20T06:47:10.382Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "RmwProcessingHeader.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
-              "RelativeDocumentMoniker": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
-              "RelativeToolTip": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAACUAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-20T06:46:58.935Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
               "DocumentIndex": 4,
-              "Title": "RmwProcessingListDto.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
-              "RelativeDocumentMoniker": "DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
-              "RelativeToolTip": "DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
-              "ViewState": "AgIAABgAAAAAAAAAAAA9wD0AAAA6AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-20T07:33:22.856Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
               "Title": "QcInspectionService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\QcInspections\\QcInspectionService.cs",
               "RelativeDocumentMoniker": "Services\\Purchasing\\QcInspections\\QcInspectionService.cs",
@@ -1153,8 +1114,7 @@
               "RelativeToolTip": "Services\\Purchasing\\QcInspections\\QcInspectionService.cs",
               "ViewState": "AgIAACkFAAAAAAAAAAAowN0GAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:26:24.93Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-10T02:26:24.93Z"
             },
             {
               "$type": "Document",
@@ -1172,6 +1132,68 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "QaQcReceivingInspectionController.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
+              "RelativeDocumentMoniker": "Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
+              "RelativeToolTip": "Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
+              "ViewState": "AgIAAFwAAAAAAAAAAAAwwGcAAAAoAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-04T05:55:55.94Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "QaQcReceivingInspectionService.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
+              "RelativeDocumentMoniker": "Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
+              "RelativeToolTip": "Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
+              "ViewState": "AgIAAFMEAAAAAAAAAAAwwGcEAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-04T05:53:05.19Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "RmwProcessingListDto.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
+              "RelativeDocumentMoniker": "DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
+              "RelativeToolTip": "DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingListDto.cs",
+              "ViewState": "AgIAABgAAAAAAAAAAAA9wD0AAAA6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-20T07:33:22.856Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "RmwProcessingHeader.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
+              "RelativeDocumentMoniker": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
+              "RelativeToolTip": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingHeader.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACUAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-20T06:46:58.935Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "RmwProcessingLine.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
+              "RelativeDocumentMoniker": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
+              "RelativeToolTip": "Models\\Purchasing\\RawMaterialProcessing\\RmwProcessingLine.cs",
+              "ViewState": "AgIAABYAAAAAAAAAAAAwwEEAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-20T06:47:10.382Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
               "Title": "TimeInMotionService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Reports\\TimeInMotionService.cs",
               "RelativeDocumentMoniker": "Services\\Reports\\TimeInMotionService.cs",
@@ -1179,12 +1201,11 @@
               "RelativeToolTip": "Services\\Reports\\TimeInMotionService.cs",
               "ViewState": "AgIAAHcCAAAAAAAAAAAuwKoCAAA8AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-25T02:34:21.607Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-25T02:34:21.607Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 5,
               "Title": "RmwProcessingService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\RawMaterialProcessing\\RmwProcessingService.cs",
               "RelativeDocumentMoniker": "Services\\Purchasing\\RawMaterialProcessing\\RmwProcessingService.cs",
@@ -1192,12 +1213,11 @@
               "RelativeToolTip": "Services\\Purchasing\\RawMaterialProcessing\\RmwProcessingService.cs",
               "ViewState": "AgIAAKcCAAAAAAAAAAAuwLcCAAAlAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-20T07:28:06.944Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-20T07:28:06.944Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 10,
               "Title": "TimeInMotionController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Reports\\TimeInMotion\\TimeInMotionController.cs",
               "RelativeDocumentMoniker": "Controllers\\Reports\\TimeInMotion\\TimeInMotionController.cs",
@@ -1205,12 +1225,11 @@
               "RelativeToolTip": "Controllers\\Reports\\TimeInMotion\\TimeInMotionController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAC0AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-25T02:36:31.09Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-25T02:36:31.09Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 7,
               "Title": "AppDbContext.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Data\\AppDbContext.cs",
               "RelativeDocumentMoniker": "Data\\AppDbContext.cs",
@@ -1218,12 +1237,11 @@
               "RelativeToolTip": "Data\\AppDbContext.cs",
               "ViewState": "AgIAADoIAAAAAAAAAAAuwEgIAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T01:02:37.474Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-29T01:02:37.474Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 11,
               "Title": "MaterialService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Manufacturing\\Materials\\MaterialService.cs",
               "RelativeDocumentMoniker": "Services\\Manufacturing\\Materials\\MaterialService.cs",
@@ -1231,12 +1249,11 @@
               "RelativeToolTip": "Services\\Manufacturing\\Materials\\MaterialService.cs",
               "ViewState": "AgIAAKEBAAAAAAAAAAAuwMQBAAAiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T01:29:41.018Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-29T01:29:41.018Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 15,
               "Title": "RmwProcessingController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\RawMaterialProcessing\\RmwProcessingController.cs",
               "RelativeDocumentMoniker": "Controllers\\Purchasing\\RawMaterialProcessing\\RmwProcessingController.cs",
@@ -1244,12 +1261,11 @@
               "RelativeToolTip": "Controllers\\Purchasing\\RawMaterialProcessing\\RmwProcessingController.cs",
               "ViewState": "AgIAAHUAAAAAAAAAAAAuwJAAAAAyAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-20T07:29:23.107Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-20T07:29:23.107Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 14,
               "Title": "CreateMaterialSubCategory.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Manufacturing\\Materials\\CreateMaterialSubCategory.cs",
               "RelativeDocumentMoniker": "DTOs\\Manufacturing\\Materials\\CreateMaterialSubCategory.cs",
@@ -1257,12 +1273,11 @@
               "RelativeToolTip": "DTOs\\Manufacturing\\Materials\\CreateMaterialSubCategory.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T03:23:19.586Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-29T03:23:19.586Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 12,
               "Title": "CreateMaterialDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Manufacturing\\Materials\\CreateMaterialDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Manufacturing\\Materials\\CreateMaterialDto.cs",
@@ -1270,12 +1285,11 @@
               "RelativeToolTip": "DTOs\\Manufacturing\\Materials\\CreateMaterialDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-28T07:28:49.139Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-28T07:28:49.139Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 13,
               "Title": "Material.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Manufacturing\\Materials\\Material.cs",
               "RelativeDocumentMoniker": "Models\\Manufacturing\\Materials\\Material.cs",
@@ -1283,12 +1297,11 @@
               "RelativeToolTip": "Models\\Manufacturing\\Materials\\Material.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAD4AAAAeAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-28T07:11:12.747Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-28T07:11:12.747Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 16,
               "Title": "ReceivingReportController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\ReceivingReports\\ReceivingReportController.cs",
               "RelativeDocumentMoniker": "Controllers\\Purchasing\\ReceivingReports\\ReceivingReportController.cs",
@@ -1296,12 +1309,11 @@
               "RelativeToolTip": "Controllers\\Purchasing\\ReceivingReports\\ReceivingReportController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABsBAAAnAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T08:19:39.909Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T08:19:39.909Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 17,
               "Title": "RmwProcessingDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingDto.cs",
@@ -1309,12 +1321,11 @@
               "RelativeToolTip": "DTOs\\Purchasing\\RawMaterialProcessing\\RmwProcessingDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-20T07:26:52.179Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-20T07:26:52.179Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 18,
               "Title": "QcInspectionController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\QcInspections\\QcInspectionController.cs",
               "RelativeDocumentMoniker": "Controllers\\Purchasing\\QcInspections\\QcInspectionController.cs",
@@ -1326,7 +1337,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 19,
               "Title": "CategoryController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\CategoryController.cs",
               "RelativeDocumentMoniker": "Controllers\\CategoryController.cs",
@@ -1338,7 +1349,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 21,
               "Title": "SaveQaQcReceivingInspectionDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\QaQcReceiving\\SaveQaQcReceivingInspectionDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\QaQcReceiving\\SaveQaQcReceivingInspectionDto.cs",
@@ -1350,7 +1361,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 22,
               "Title": "SaveQcInspectionDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\QcInspections\\SaveQcInspectionDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\QcInspections\\SaveQcInspectionDto.cs",
@@ -1362,7 +1373,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 20,
               "Title": "PendingRawMaterialEvaluationDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\QcInspections\\PendingRawMaterialEvaluationDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\QcInspections\\PendingRawMaterialEvaluationDto.cs",
@@ -1374,7 +1385,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
+              "DocumentIndex": 23,
               "Title": "QcInspectionDetailsDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\QcInspections\\QcInspectionDetailsDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\QcInspections\\QcInspectionDetailsDto.cs",
@@ -1386,7 +1397,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 22,
+              "DocumentIndex": 24,
               "Title": "SaveQaQcReceivingInspectionLineDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\QaQcReceiving\\SaveQaQcReceivingInspectionLineDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\QaQcReceiving\\SaveQaQcReceivingInspectionLineDto.cs",
@@ -1398,7 +1409,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 23,
+              "DocumentIndex": 25,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Program.cs",
               "RelativeDocumentMoniker": "Program.cs",
@@ -1410,7 +1421,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 26,
+              "DocumentIndex": 27,
               "Title": "IncomingReceivingLotDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\IncomingReceiving\\IncomingReceivingLotDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\IncomingReceiving\\IncomingReceivingLotDto.cs",
@@ -1422,19 +1433,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 24,
-              "Title": "QaQcReceivingInspectionController.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
-              "RelativeDocumentMoniker": "Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
-              "RelativeToolTip": "Controllers\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionController.cs",
-              "ViewState": "AgIAAAoAAAAAAAAAAAAiwDMAAAAPAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-04T05:55:55.94Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 28,
+              "DocumentIndex": 29,
               "Title": "IncomingReceivingInspectionDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\IncomingReceiving\\IncomingReceivingInspectionDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\IncomingReceiving\\IncomingReceivingInspectionDto.cs",
@@ -1446,7 +1445,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 26,
               "Title": "IncomingReceivingService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\IncomingReceiving\\IncomingReceivingService.cs",
               "RelativeDocumentMoniker": "Services\\Purchasing\\IncomingReceiving\\IncomingReceivingService.cs",
@@ -1458,7 +1457,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 27,
+              "DocumentIndex": 28,
               "Title": "IncomingReceivingLineDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\IncomingReceiving\\IncomingReceivingLineDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\IncomingReceiving\\IncomingReceivingLineDto.cs",
@@ -1470,7 +1469,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 29,
+              "DocumentIndex": 30,
               "Title": "IncomingReceivingLineLot.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Purchasing\\Receiving\\IncomingReceivingLineLot.cs",
               "RelativeDocumentMoniker": "Models\\Purchasing\\Receiving\\IncomingReceivingLineLot.cs",
@@ -1482,7 +1481,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 30,
+              "DocumentIndex": 31,
               "Title": "CreateIncomingReceivingDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Purchasing\\IncomingReceiving\\CreateIncomingReceivingDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Purchasing\\IncomingReceiving\\CreateIncomingReceivingDto.cs",
@@ -1494,7 +1493,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 31,
+              "DocumentIndex": 32,
               "Title": "IncomingReceivingController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Purchasing\\IncomingReceiving\\IncomingReceivingController.cs",
               "RelativeDocumentMoniker": "Controllers\\Purchasing\\IncomingReceiving\\IncomingReceivingController.cs",
@@ -1518,7 +1517,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 32,
+              "DocumentIndex": 33,
               "Title": "DeliveryChecklistService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\DeliveryChecklistService.cs",
               "RelativeDocumentMoniker": "Services\\DeliveryChecklistService.cs",
@@ -1530,7 +1529,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 33,
+              "DocumentIndex": 34,
               "Title": "DeliveryChecklistController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\DeliveryChecklistController.cs",
               "RelativeDocumentMoniker": "Controllers\\DeliveryChecklistController.cs",
@@ -1542,7 +1541,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 34,
+              "DocumentIndex": 35,
               "Title": "MaterialsController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Manufacturing\\MaterialsController.cs",
               "RelativeDocumentMoniker": "Controllers\\Manufacturing\\MaterialsController.cs",
@@ -1551,18 +1550,6 @@
               "ViewState": "AgIAAC0AAAAAAAAAAAAuwDkAAAAeAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-05-28T07:33:49.496Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 35,
-              "Title": "QaQcReceivingInspectionService.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
-              "RelativeDocumentMoniker": "Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
-              "RelativeToolTip": "Services\\Purchasing\\QaQcReceiving\\QaQcReceivingInspectionService.cs",
-              "ViewState": "AgIAAIACAAAAAAAAAADgv4sCAAAuAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-04T05:53:05.19Z"
             },
             {
               "$type": "Document",
