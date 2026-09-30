@@ -1263,6 +1263,31 @@ namespace inventory_api.Services
                 })
                 .ToListAsync();
 
+
+            // If inventory-level filters are being used,
+            // only keep products that have a matching lot.
+            bool hasLotFilter =
+                !string.IsNullOrWhiteSpace(warehouse) ||
+                !string.IsNullOrWhiteSpace(from) ||
+                !string.IsNullOrWhiteSpace(to) ||
+                !string.IsNullOrWhiteSpace(expiryStatus) ||
+                !string.IsNullOrWhiteSpace(months);
+
+            if (hasLotFilter)
+            {
+                var matchingProductIds = lots
+                    .Select(x => (x.product_id ?? "").Trim())
+                    .Where(x => x != "")
+                    .Distinct()
+                    .ToHashSet();
+
+                products = products
+                    .Where(x =>
+                        matchingProductIds.Contains(
+                            (x.product_id ?? "").Trim()))
+                    .ToList();
+            }
+
             var allocationQuery =
                 from allocation in _context.DailyOrderAllocations
 
