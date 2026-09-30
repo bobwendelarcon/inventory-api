@@ -293,8 +293,15 @@ namespace inventory_api.Services.Reports.TimeInMotion
                 // 3. QUARANTINE / HOLD
                 // --------------------------------------------------------
 
+                DateTime? quarantineStartAt = null;
+
                 if (quarantine != null)
                 {
+                    quarantineStartAt =
+                        qc?.UpdatedAt
+                        ?? qc?.InspectionDate
+                        ?? quarantine.CreatedAt;
+
                     stages.Add(
                         new TimeInMotionStageDto
                         {
@@ -302,14 +309,14 @@ namespace inventory_api.Services.Reports.TimeInMotion
                                 "Quarantine / Hold",
 
                             StartAt =
-                                quarantine.CreatedAt,
+                                quarantineStartAt,
 
                             EndAt =
                                 quarantine.ReleasedAt,
 
                             DurationMinutes =
                                 GetDurationMinutes(
-                                    quarantine.CreatedAt,
+                                    quarantineStartAt,
                                     quarantine.ReleasedAt
                                 ),
 
@@ -332,21 +339,20 @@ namespace inventory_api.Services.Reports.TimeInMotion
                 // 4. RELEASED TO RMW
                 // --------------------------------------------------------
 
+                DateTime? rmwReadyForFinalRrAt = null;
+
                 if (processing != null)
                 {
                     var releasedToRmwStartAt =
                         quarantine?.ReleasedAt
                         ?? processing.CreatedAt;
 
-                    // Find the first actual RMW activity.
-                    // This may be weighing, counting, sticker,
-                    // or no RMW activity at all.
+                    // Find first actual RMW operation.
                     var firstRmwActivityAt =
                         new DateTime?[]
                         {
             weighingStartedAt,
-            countingStartedAt,
-            stickerCompletedAt
+            countingStartedAt
                         }
                         .Where(x => x.HasValue)
                         .Select(x => x!.Value)
@@ -354,15 +360,45 @@ namespace inventory_api.Services.Reports.TimeInMotion
                         .Cast<DateTime?>()
                         .FirstOrDefault();
 
-                    // If the material requires no RMW operation,
-                    // processing may already be READY_FOR_FINAL_RR.
-                    var releasedEndAt =
-                        firstRmwActivityAt
-                        ?? (
-                            processing.Status == "READY_FOR_FINAL_RR"
-                                ? processing.CompletedAt
-                                : null
+                    var allReadyForFinalRr =
+                        processing.Lines.Any() &&
+                        processing.Lines.All(x =>
+                            string.Equals(
+                                x.Status?.Trim(),
+                                "READY_FOR_FINAL_RR",
+                                StringComparison.OrdinalIgnoreCase
+                            )
                         );
+
+                    DateTime? releasedEndAt = null;
+
+                    if (firstRmwActivityAt.HasValue)
+                    {
+                        // Material requires actual RMW processing.
+                        releasedEndAt =
+                            firstRmwActivityAt;
+                    }
+                    else if (processing.CompletedAt.HasValue)
+                    {
+                        // Processing header explicitly completed.
+                        releasedEndAt =
+                            processing.CompletedAt;
+                    }
+                    else if (allReadyForFinalRr)
+                    {
+                        // No weighing/counting/sticker is required.
+                        // RMW is bypassed and material is immediately
+                        // ready for Final RR.
+                        releasedEndAt =
+                            releasedToRmwStartAt;
+                    }
+
+                    if (allReadyForFinalRr)
+                    {
+                        rmwReadyForFinalRrAt =
+                            releasedEndAt
+                            ?? releasedToRmwStartAt;
+                    }
 
                     stages.Add(
                         new TimeInMotionStageDto
@@ -655,10 +691,10 @@ namespace inventory_api.Services.Reports.TimeInMotion
                     }
 
                     DateTime? finalRrStartAt =
-                        rmwCompletedTimes.Any()
-                            ? rmwCompletedTimes     .Max()
-                            : processing?.CreatedAt
-                              ?? finalReceiving.CreatedAt;
+     rmwCompletedTimes.Any()
+         ? rmwCompletedTimes.Max()
+         : rmwReadyForFinalRrAt
+           ?? finalReceiving.CreatedAt; 
 
                     stages.Add(
                         new TimeInMotionStageDto
