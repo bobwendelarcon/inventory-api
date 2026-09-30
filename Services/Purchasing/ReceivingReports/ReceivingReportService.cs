@@ -2047,8 +2047,11 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                             line.QaAcceptedQty),
 
                     TotalActualQty =
-                        x.Lines.Sum(line =>
-                            line.ActualQty ?? 0m),
+    x.Lines.Sum(line =>
+        GetFinalQty(
+            line.QaAcceptedQty,
+            line.ActualQty
+        )),
 
                     x.Status,
                     x.CompletedAt
@@ -2184,13 +2187,17 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                             QaAcceptedQty =
                                 x.QaAcceptedQty,
 
-                            // Actual quantity verified by RMW
                             ActualQty =
-                                x.ActualQty ?? 0m,
+    GetFinalQty(
+        x.QaAcceptedQty,
+        x.ActualQty
+    ),
 
-                            // Difference between QA qty and actual qty
                             VarianceQty =
-                                x.VarianceQty ?? 0m,
+    GetFinalQty(
+        x.QaAcceptedQty,
+        x.ActualQty
+    ) - x.QaAcceptedQty,
 
                             Uom =
                                 x.Uom ?? "",
@@ -2311,19 +2318,22 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                     }
 
                     if (processing.Lines.Any(x =>
-                            x.Status != "STICKER_COMPLETED"))
+        x.Status != "STICKER_COMPLETED" &&
+        x.Status != "READY_FOR_FINAL_RR"))
                     {
                         throw new InvalidOperationException(
-                            "All material lines must complete sticker / identification first."
+                            "One or more material lines are not ready for Final RR."
                         );
                     }
 
                     if (processing.Lines.Any(x =>
-                            !x.ActualQty.HasValue ||
-                            x.ActualQty.Value <= 0))
+         GetFinalQty(
+             x.QaAcceptedQty,
+             x.ActualQty
+         ) <= 0))
                     {
                         throw new InvalidOperationException(
-                            "All material lines must have a valid actual quantity."
+                            "All material lines must have a valid final quantity."
                         );
                     }
 
@@ -2478,7 +2488,10 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                         }
 
                         var finalQty =
-                            rmwLine.ActualQty!.Value;
+     GetFinalQty(
+         rmwLine.QaAcceptedQty,
+         rmwLine.ActualQty
+     );
 
                         var previousReceived =
                             poLine.ReceivedQty;
@@ -2543,7 +2556,10 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                     foreach (var rmwLine in processing.Lines)
                     {
                         var finalQty =
-                            rmwLine.ActualQty!.Value;
+    GetFinalQty(
+        rmwLine.QaAcceptedQty,
+        rmwLine.ActualQty
+    );
 
                         var material =
                             await _context.Materials
@@ -2796,7 +2812,10 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
                                 rmwLine.PoLineId);
 
                         var finalQty =
-                            rmwLine.ActualQty!.Value;
+     GetFinalQty(
+         rmwLine.QaAcceptedQty,
+         rmwLine.ActualQty
+     );
 
                         poLine.ReceivedQty +=
                             finalQty;
@@ -2913,6 +2932,23 @@ namespace inventory_api.Services.Purchasing.ReceivingReports
             return !string.IsNullOrWhiteSpace(name)
                 ? name
                 : userId;
+        }
+
+
+        private static decimal GetFinalQty(
+    decimal qaAcceptedQty,
+    decimal? actualQty)
+        {
+            // If RMW weighing/counting was performed,
+            // use the warehouse verified quantity.
+            if (actualQty.HasValue)
+            {
+                return actualQty.Value;
+            }
+
+            // If processing was bypassed (processing_type = NONE),
+            // QA/QC accepted quantity becomes the final received quantity.
+            return qaAcceptedQty;
         }
 
     }
