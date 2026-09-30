@@ -33,6 +33,10 @@
 
         public DateTime? IncomingReceivedAt { get; set; }
 
+        public DateTime? IncomingReceivingCompletedAt { get; set; }
+
+        public double? IncomingReceivingMinutes { get; set; }
+
         public string? IncomingReceivedBy { get; set; }
 
         public string? IncomingReceivedByName { get; set; }

@@ -135,6 +135,9 @@ namespace inventory_api.Services.Reports.PurchasingLeadTime
                 var receivedAt =
                     incoming?.CreatedAt;
 
+                var receivingCompletedAt =
+    incoming?.UpdatedAt;
+
 
                 result.Add(
                     new PurchasingLeadTimeDto
@@ -196,12 +199,24 @@ namespace inventory_api.Services.Reports.PurchasingLeadTime
                             incoming?
                                 .IncomingReceivingId,
 
+
+
                         IncomingNo =
                             incoming?
                                 .IncomingNo,
 
+
+
                         IncomingReceivedAt =
-                            receivedAt,
+    receivedAt,
+
+                        IncomingReceivingCompletedAt =
+    receivingCompletedAt,
+
+                        IncomingReceivingMinutes =
+    GetDurationMinutes(
+        receivedAt,
+        receivingCompletedAt),
 
                         IncomingReceivedBy =
     incoming?.CreatedBy,
