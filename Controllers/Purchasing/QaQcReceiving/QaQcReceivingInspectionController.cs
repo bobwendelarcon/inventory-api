@@ -175,6 +175,46 @@ namespace inventory_api.Controllers.Purchasing.QaQcReceiving
         }
 
 
+        // ============================================================
+        // GET QA/QC RECEIVING INSPECTION HISTORY DETAILS
+        // ============================================================
+        [HttpGet("history/{qaReceivingId:int}")]
+        public async Task<IActionResult> GetHistoryDetails(
+            int qaReceivingId)
+        {
+            try
+            {
+                var result =
+                    await _service.GetHistoryDetailsAsync(
+                        qaReceivingId);
+
+                if (result == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message =
+                            "QA/QC Receiving Inspection not found."
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = result
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
 
     }
 }

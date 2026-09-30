@@ -1300,6 +1300,389 @@ namespace inventory_api.Services.Purchasing.QaQcReceiving
         }
 
 
+        public async Task<object?> GetHistoryDetailsAsync(
+    int qaReceivingId)
+        {
+            var inspection =
+                await _db.QaQcReceivingInspections
+                    .AsNoTracking()
+                    .Include(x => x.Lines)
+                    .FirstOrDefaultAsync(x =>
+                        x.QaReceivingId == qaReceivingId);
+
+            if (inspection == null)
+                return null;
+
+
+            // ============================================================
+            // INCOMING RECEIVING
+            // ============================================================
+
+            var incoming =
+                await _db.IncomingReceivings
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.IncomingReceivingId ==
+                        inspection.IncomingReceivingId);
+
+
+            // ============================================================
+            // PURCHASE ORDER
+            // ============================================================
+
+            var po =
+                await _db.PurchaseOrderHeaders
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.PoId == inspection.PoId);
+
+
+            // ============================================================
+            // SUPPLIER
+            // ============================================================
+
+            var supplier =
+                await _db.Suppliers
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.SupplierId == inspection.SupplierId);
+
+
+            // ============================================================
+            // BUILD INSPECTION LINES
+            // ============================================================
+
+            var detailLines = new List<object>();
+
+
+            foreach (var line in inspection.Lines
+                .OrderBy(x => x.QaReceivingLineId))
+            {
+                // --------------------------------------------------------
+                // RECEIVING LINE
+                // --------------------------------------------------------
+
+                var receivingLine =
+                    await _db.IncomingReceivingLines
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x =>
+                            x.IncomingReceivingLineId ==
+                            line.IncomingReceivingLineId);
+
+
+                // --------------------------------------------------------
+                // MATERIAL
+                // --------------------------------------------------------
+
+                var material =
+                    await _db.Materials
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x =>
+                            x.material_id ==
+                            line.MaterialId);
+
+
+                // --------------------------------------------------------
+                // LOT
+                // --------------------------------------------------------
+
+                var lot =
+                    line.IncomingReceivingLineLotId.HasValue
+                        ? await _db.IncomingReceivingLineLots
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(x =>
+                                x.IncomingReceivingLineLotId ==
+                                line.IncomingReceivingLineLotId.Value)
+                        : null;
+
+
+                // --------------------------------------------------------
+                // MANUFACTURER
+                // --------------------------------------------------------
+
+                string? manufacturerName = null;
+
+                if (lot?.ManufacturerId != null)
+                {
+                    manufacturerName =
+                        await _db.Manufacturers
+                            .AsNoTracking()
+                            .Where(x =>
+                                x.ManufacturerId ==
+                                lot.ManufacturerId.Value)
+                            .Select(x =>
+                                x.ManufacturerName)
+                            .FirstOrDefaultAsync();
+                }
+
+
+                detailLines.Add(new
+                {
+                    line.QaReceivingLineId,
+
+                    line.IncomingReceivingLineId,
+                    line.IncomingReceivingLineLotId,
+
+                    line.MaterialId,
+
+                    materialCode =
+                        material?.material_code ?? "",
+
+                    materialName =
+                        material?.material_name ?? "",
+
+
+
+
+
+
+
+
+                    // ====================================================
+                    // RECEIVING INFORMATION
+                    // ====================================================
+
+                    scheduledQty =
+                        receivingLine?.ScheduledQty ?? 0,
+
+                    deliveredQty =
+                        receivingLine?.DeliveredQty ?? 0,
+
+                    tareWeight =
+                        receivingLine?.TareWeight,
+
+                    uom =
+                        receivingLine?.Uom ?? "",
+
+
+                    // ====================================================
+                    // LOT INFORMATION
+                    // ====================================================
+
+                    manufacturerId =
+    lot?.ManufacturerId,
+
+                    manufacturerName =
+    manufacturerName,
+
+                    lotNo =
+    lot?.LotNo,
+
+                    manufacturingDate =
+                        lot?.ManufacturingDate,
+
+                    expirationDate =
+                        lot?.ExpirationDate,
+
+                    itemCount =
+                        lot?.ItemCount,
+
+                    weight =
+                        lot?.Weight,
+
+                    lotRemarks =
+                        lot?.Remarks,
+
+
+                    // ====================================================
+                    // PACKAGING
+                    // ====================================================
+
+                    packagingClean =
+                        line.PackagingClean,
+
+                    readableLabel =
+                        line.ReadableLabel,
+
+                    properlySealed =
+                        line.ProperlySealed,
+
+                    noDeterioration =
+                        line.NoDeterioration,
+
+
+                    // ====================================================
+                    // RAW MATERIAL APPEARANCE
+                    // ====================================================
+
+                    appearanceNotApplicable =
+                        line.AppearanceNotApplicable,
+
+                    noForeignMatter =
+                        line.NoForeignMatter,
+
+                    noInfestation =
+                        line.NoInfestation,
+
+                    powderNoLump =
+                        line.PowderNoLump,
+
+                    powderGoodFlowability =
+                        line.PowderGoodFlowability,
+
+                    liquidNoSolidification =
+                        line.LiquidNoSolidification,
+
+                    liquidNoPrecipitation =
+                        line.LiquidNoPrecipitation,
+
+
+                    // ====================================================
+                    // COLOR
+                    // ====================================================
+
+                    colorResult =
+                        line.ColorResult,
+
+                    actualColor =
+                        line.ActualColor,
+
+
+                    // ====================================================
+                    // ODOR
+                    // ====================================================
+
+                    odorResult =
+                        line.OdorResult,
+
+                    actualOdor =
+                        line.ActualOdor,
+
+
+                    // ====================================================
+                    // ASSAY
+                    // ====================================================
+
+                    assayResultStatus =
+                        line.AssayResultStatus,
+
+                    coaAssayResult =
+                        line.CoaAssayResult,
+
+                    bnpiAssaySpecification =
+                        line.BnpiAssaySpecification,
+
+
+                    // ====================================================
+                    // SOLUBILITY
+                    // ====================================================
+
+                    solubilityResult =
+                        line.SolubilityResult,
+
+                    solubilityTest =
+                        line.SolubilityTest,
+
+
+                    // ====================================================
+                    // RESULT
+                    // ====================================================
+
+                    status =
+                        line.Status,
+
+                    remarks =
+                        line.Remarks
+                });
+            }
+
+
+            // ============================================================
+            // FINAL RESPONSE
+            // ============================================================
+
+            return new
+            {
+                inspection.QaReceivingId,
+
+                inspectionNo =
+                    inspection.InspectionNo,
+
+                inspectionDate =
+                    inspection.InspectionDate,
+
+
+                // ========================================================
+                // INCOMING RECEIVING
+                // ========================================================
+
+                incomingReceivingId =
+                    inspection.IncomingReceivingId,
+
+                incomingNo =
+                    incoming?.IncomingNo ?? "",
+
+                deliveryDate =
+                    incoming?.DeliveryDate,
+
+                siDrNo =
+                    incoming?.SiDrNo,
+
+                currentReceivingStatus =
+                    incoming?.ReceivingStatus ?? "",
+
+
+                // ========================================================
+                // PURCHASE ORDER
+                // ========================================================
+
+                poId =
+                    inspection.PoId,
+
+                poNo =
+                    po?.PoNo ?? "",
+
+                printedPoNo =
+                    po?.PrintedPoNo ?? "",
+
+
+                // ========================================================
+                // SUPPLIER
+                // ========================================================
+
+                supplierId =
+                    inspection.SupplierId,
+
+                supplierName =
+                    supplier?.SupplierName ?? "",
+
+
+                // ========================================================
+                // INSPECTION
+                // ========================================================
+
+                status =
+                    inspection.Status,
+
+                remarks =
+                    inspection.Remarks,
+
+                inspectedBy =
+                    inspection.InspectedBy,
+
+                receivedBy =
+                    inspection.ReceivedBy,
+
+                notedBy =
+                    inspection.NotedBy,
+
+                createdBy =
+                    inspection.CreatedBy,
+
+                createdAt =
+                    inspection.CreatedAt,
+
+
+                // ========================================================
+                // MATERIAL INSPECTIONS
+                // ========================================================
+
+                lines =
+                    detailLines
+            };
+        }
+
+
 
 
     }
