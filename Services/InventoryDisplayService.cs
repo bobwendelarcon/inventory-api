@@ -909,20 +909,30 @@ namespace inventory_api.Services
 
 
         public async Task<List<InventoryPrintSummaryDto>>
-         GetPrintSummaryAsync(
-             string search = "",
-             string warehouse = "",
-             string categories = "",
-             string stockStatus = "",
-             string order = "asc")
+  GetPrintSummaryAsync(
+      string search = "",
+      string warehouse = "",
+      string categories = "",
+      string stockStatus = "",
+      string expiryStatus = "",
+      string months = "",
+      string from = "",
+      string to = "",
+      string sortBy = "lot",
+      string order = "desc")
         {
             var productSummary =
                 await GetProductSummaryAsync(
-                    search,
-                    warehouse,
-                    categories,
-                    stockStatus,
-                    order
+                    search: search,
+                    warehouse: warehouse,
+                    categories: categories,
+                    stockStatus: stockStatus,
+                    from: from,
+                    to: to,
+                    order: order,
+                    expiryStatus: expiryStatus,
+                    months: months,
+                    sortBy: sortBy
                 );
 
             return productSummary
@@ -930,8 +940,7 @@ namespace inventory_api.Services
                 {
                     product_id = x.ProductId,
                     product_name = x.ProductName,
-                    product_description =
-                        x.ProductDescription,
+                    product_description = x.ProductDescription,
 
                     category_name = x.CategoryName,
 
@@ -1073,8 +1082,35 @@ namespace inventory_api.Services
      string warehouse = "",
      string categories = "",
      string stockStatus = "",
-     string order = "asc")
+     string from = "",
+     string to = "",
+     string order = "asc",
+     string expiryStatus = "",
+     string months = "",
+     string sortBy = "lot")
         {
+
+            TimeZoneInfo phTimeZone;
+
+            try
+            {
+                phTimeZone =
+                    TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+            }
+            catch
+            {
+                phTimeZone =
+                    TimeZoneInfo.FindSystemTimeZoneById(
+                        "Singapore Standard Time"
+                    );
+            }
+
+            var todayPh =
+                TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.UtcNow,
+                    phTimeZone
+                ).Date;
+
             var productQuery =
      from product in _context.Products
      where !product.is_deleted
@@ -1128,12 +1164,93 @@ namespace inventory_api.Services
             var products = await productQuery.ToListAsync();
 
             var lotQuery = _context.ProductLotNumbers
-                .Where(x => !x.is_deleted);
+     .Where(x => !x.is_deleted);
 
             if (!string.IsNullOrWhiteSpace(warehouse))
             {
                 lotQuery = lotQuery.Where(x =>
                     x.branch_id == warehouse);
+            }
+
+            // SAME DATE FILTER USED BY INVENTORY LIST
+            if (!string.IsNullOrWhiteSpace(from) &&
+                DateTime.TryParse(from, out var fromDate))
+            {
+                var fromDateOnly = fromDate.Date;
+
+                lotQuery = lotQuery.Where(x =>
+                    x.created_at.Date >= fromDateOnly);
+            }
+
+            if (!string.IsNullOrWhiteSpace(to) &&
+                DateTime.TryParse(to, out var toDate))
+            {
+                var toDateExclusive = toDate.Date.AddDays(1);
+
+                lotQuery = lotQuery.Where(x =>
+                    x.created_at.Date < toDateExclusive);
+            }
+            // EXPIRY STATUS FILTER
+            if (expiryStatus == "expired")
+            {
+                lotQuery = lotQuery.Where(x =>
+                    x.expiration_date.HasValue &&
+                    x.expiration_date.Value.Date < todayPh);
+            }
+            else if (expiryStatus == "notexpired")
+            {
+                lotQuery = lotQuery.Where(x =>
+                    x.expiration_date.HasValue &&
+                    x.expiration_date.Value.Date >= todayPh);
+            }
+            else if (expiryStatus == "available")
+            {
+                lotQuery = lotQuery.Where(x =>
+                    x.quantity > 0 &&
+                    x.expiration_date.HasValue &&
+                    x.expiration_date.Value.Date >= todayPh);
+            }
+            else if (expiryStatus == "near")
+            {
+                lotQuery = lotQuery.Where(x =>
+                    x.expiration_date.HasValue &&
+                    x.expiration_date.Value.Date >= todayPh &&
+                    x.expiration_date.Value.Date <=
+                        todayPh.AddMonths(2));
+            }
+            else if (expiryStatus == "safe")
+            {
+                lotQuery = lotQuery.Where(x =>
+                    x.expiration_date.HasValue &&
+                    x.expiration_date.Value.Date >
+                        todayPh.AddMonths(2));
+            }
+            else if (expiryStatus == "noexp")
+            {
+                lotQuery = lotQuery.Where(x =>
+                    !x.expiration_date.HasValue);
+            }
+
+
+            // REMAINING MONTHS FILTER
+            if (!string.IsNullOrWhiteSpace(months))
+            {
+                if (months == "over12")
+                {
+                    lotQuery = lotQuery.Where(x =>
+                        x.expiration_date.HasValue &&
+                        x.expiration_date.Value.Date >
+                            todayPh.AddMonths(12));
+                }
+                else if (int.TryParse(months, out var m))
+                {
+                    var endDate = todayPh.AddMonths(m);
+
+                    lotQuery = lotQuery.Where(x =>
+                        x.expiration_date.HasValue &&
+                        x.expiration_date.Value.Date >= todayPh &&
+                        x.expiration_date.Value.Date <= endDate);
+                }
             }
 
             var lots = await lotQuery
@@ -1296,18 +1413,42 @@ namespace inventory_api.Services
                 }
             }
 
-            result = string.Equals(
-                order,
-                "desc",
-                StringComparison.OrdinalIgnoreCase)
-                ? result
-                    .OrderByDescending(x => x.CategoryName)
-                    .ThenByDescending(x => x.ProductName)
-                    .ToList()
-                : result
-                    .OrderBy(x => x.CategoryName)
-                    .ThenBy(x => x.ProductName)
-                    .ToList();
+            var normalizedSort =
+    (sortBy ?? "").Trim().ToLower();
+
+            var descending =
+                string.Equals(
+                    order,
+                    "desc",
+                    StringComparison.OrdinalIgnoreCase
+                );
+
+            if (normalizedSort == "brand")
+            {
+                result = descending
+                    ? result
+                        .OrderByDescending(x => x.ProductDescription)
+                        .ThenByDescending(x => x.ProductName)
+                        .ToList()
+                    : result
+                        .OrderBy(x => x.ProductDescription)
+                        .ThenBy(x => x.ProductName)
+                        .ToList();
+            }
+            else
+            {
+                // "generic" and "lot" fall back to product name
+                // because PrintSummary is grouped by product.
+                result = descending
+                    ? result
+                        .OrderByDescending(x => x.ProductName)
+                        .ThenByDescending(x => x.CategoryName)
+                        .ToList()
+                    : result
+                        .OrderBy(x => x.ProductName)
+                        .ThenBy(x => x.CategoryName)
+                        .ToList();
+            }
 
 
             return result;
@@ -1325,11 +1466,14 @@ namespace inventory_api.Services
                 string order = "asc")
         {
             var result = await GetProductSummaryAsync(
-                search,
-                warehouse,
-                categories,
-                stockStatus,
-                order);
+      search: search,
+      warehouse: warehouse,
+      categories: categories,
+      stockStatus: stockStatus,
+      from: "",
+      to: "",
+      order: order
+  );
 
             page = Math.Max(page, 1);
             pageSize = Math.Clamp(pageSize, 10, 100);
