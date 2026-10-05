@@ -676,16 +676,24 @@ namespace inventory_api.Services.Inventory
                             $"Inventory lot for {material.material_name} is no longer available.");
                     }
 
-                    if (lineDto.ActualQuantity >
+                    // Inventory OUT is based on the APPROVED REQUESTED quantity,
+                    // not the actual physical weight/quantity.
+                    var quantityToRelease =
+                        line.RequestedQuantity;
+
+                    if (quantityToRelease >
                         inventoryLot.quantity)
                     {
                         throw new InvalidOperationException(
                             $"Insufficient stock for {material.material_name}. " +
+                            $"Requested: {quantityToRelease:0.####} {inventoryLot.uom}. " +
                             $"Available: {inventoryLot.quantity:0.####} {inventoryLot.uom}.");
                     }
 
                     inventoryLot.quantity -=
-                        lineDto.ActualQuantity;
+                        quantityToRelease;
+
+
 
                     inventoryLot.updated_at =
                         now;
@@ -712,7 +720,7 @@ namespace inventory_api.Services.Inventory
                                 "MATERIAL_RELEASE",
 
                             quantity =
-                                -lineDto.ActualQuantity,
+    -quantityToRelease,
 
                             uom =
                                 inventoryLot.uom,

@@ -229,5 +229,90 @@ namespace inventory_api.Controllers.Inventory
                 });
             }
         }
+
+
+        [HttpPost("existing-stock")]
+        public async Task<IActionResult> AddExistingStock(
+        [FromBody] ExistingStockDto dto)
+        {
+            try
+            {
+                await _service.AddExistingStockAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message =
+                        "Existing raw material inventory saved successfully."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
+        [HttpPost("manual-stock-out")]
+        public async Task<IActionResult> ManualStockOut(
+         [FromBody] ManualStockOutDto dto)
+        {
+            try
+            {
+                await _service.ManualStockOutAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Manual stock out saved successfully."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
     }
 }

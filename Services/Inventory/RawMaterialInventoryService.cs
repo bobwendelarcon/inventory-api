@@ -19,7 +19,13 @@ namespace inventory_api.Services.Inventory
         {
             filter ??= new RawMaterialInventoryFilterDto();
 
-            var today = DateTime.Today;
+            var todayUtc = DateTime.UtcNow;
+
+            var today =
+                TimeZoneInfo.ConvertTimeFromUtc(
+                    todayUtc,
+                    PhilippineTimeZone
+                ).Date;
 
             var query =
                 from lot in _context.MaterialLotNumbers.AsNoTracking()
@@ -87,21 +93,26 @@ namespace inventory_api.Services.Inventory
                     x.Material.material_category_id == filter.CategoryId.Value);
             }
 
-            // Inventory creation date
             if (filter.FromDate.HasValue)
             {
-                var fromDate = filter.FromDate.Value.Date;
+                var fromUtc =
+                    PhilippineDateToUtc(
+                        filter.FromDate.Value
+                    );
 
                 query = query.Where(x =>
-                    x.Lot.created_at >= fromDate);
+                    x.Lot.created_at >= fromUtc);
             }
 
             if (filter.ToDate.HasValue)
             {
-                var toDateExclusive = filter.ToDate.Value.Date.AddDays(1);
+                var toUtcExclusive =
+                    PhilippineDateToUtc(
+                        filter.ToDate.Value.Date.AddDays(1)
+                    );
 
                 query = query.Where(x =>
-                    x.Lot.created_at < toDateExclusive);
+                    x.Lot.created_at < toUtcExclusive);
             }
 
             var records = await query
@@ -708,28 +719,32 @@ x.SupplierName
             }
 
 
-            // Date From
+            // Date From - selected date is Philippine date,
+            // database transaction_date is UTC.
             if (filter.FromDate.HasValue)
             {
-                var from =
-                    filter.FromDate.Value.Date;
+                var fromUtc =
+                    PhilippineDateToUtc(
+                        filter.FromDate.Value
+                    );
 
                 filtered = filtered.Where(x =>
-                    x.TransactionDate >= from);
+                    x.TransactionDate >= fromUtc);
             }
 
 
-            // Date To
+            // Date To - exclusive next Philippine midnight,
+            // converted to UTC.
             if (filter.ToDate.HasValue)
             {
-                var toExclusive =
-                    filter.ToDate.Value.Date
-                        .AddDays(1);
+                var toUtcExclusive =
+                    PhilippineDateToUtc(
+                        filter.ToDate.Value.Date.AddDays(1)
+                    );
 
                 filtered = filtered.Where(x =>
-                    x.TransactionDate < toExclusive);
+                    x.TransactionDate < toUtcExclusive);
             }
-
 
             var result = filtered
                 .OrderByDescending(x =>
@@ -739,8 +754,19 @@ x.SupplierName
                 .ToList();
 
 
-            var today =
-                DateTime.Today;
+            var phToday =
+       TimeZoneInfo.ConvertTimeFromUtc(
+           DateTime.UtcNow,
+           PhilippineTimeZone
+       ).Date;
+
+            var todayStartUtc =
+                PhilippineDateToUtc(phToday);
+
+            var tomorrowStartUtc =
+                PhilippineDateToUtc(
+                    phToday.AddDays(1)
+                );
 
             return new RawMaterialTransactionResponseDto
             {
@@ -759,9 +785,9 @@ x.SupplierName
                                 x.Movement == "OUT"),
 
                         TodayTransactions =
-                            result.Count(x =>
-                                x.TransactionDate.Date ==
-                                today)
+    result.Count(x =>
+        x.TransactionDate >= todayStartUtc &&
+        x.TransactionDate < tomorrowStartUtc)
                     },
 
                 Items = result
@@ -812,7 +838,7 @@ x.SupplierName
             }
 
             var branchId = dto.BranchId.Trim();
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
 
             string lotNo;
 
@@ -1110,7 +1136,7 @@ x.SupplierName
                     $"{inventoryLot.quantity:0.####} {inventoryLot.uom}.");
             }
 
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
 
             await using var dbTransaction =
                 await _context.Database.BeginTransactionAsync();
@@ -1710,6 +1736,479 @@ x.SupplierName
 
             return result;
         }
+
+        public async Task AddExistingStockAsync(
+           ExistingStockDto dto)
+        {
+            if (dto == null)
+                throw new ArgumentNullException(nameof(dto));
+
+            if (dto.MaterialId <= 0)
+                throw new InvalidOperationException(
+                    "Material is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.BranchId))
+                throw new InvalidOperationException(
+                    "Branch is required.");
+
+            if (dto.Quantity <= 0)
+                throw new InvalidOperationException(
+                    "Existing quantity must be greater than zero.");
+
+            if (string.IsNullOrWhiteSpace(dto.EncodedBy))
+                throw new InvalidOperationException(
+                    "Encoded by is required.");
+
+            var material =
+                await _context.Materials
+                    .FirstOrDefaultAsync(x =>
+                        x.material_id == dto.MaterialId &&
+                        x.is_active &&
+                        !x.is_deleted);
+
+            if (material == null)
+                throw new KeyNotFoundException(
+                    $"Material ID {dto.MaterialId} was not found.");
+
+            var branchId = dto.BranchId.Trim();
+
+            var branchExists =
+                await _context.Branches
+                    .AnyAsync(x =>
+                        x.branch_id == branchId);
+
+            if (!branchExists)
+                throw new KeyNotFoundException(
+                    $"Branch '{branchId}' was not found.");
+
+            var now = DateTime.UtcNow;
+
+            string lotNo;
+
+            // =========================================================
+            // DETERMINE LOT
+            // =========================================================
+
+            if (material.is_lot_tracked)
+            {
+                if (string.IsNullOrWhiteSpace(dto.LotNo))
+                {
+                    throw new InvalidOperationException(
+                        "Lot number is required for this material.");
+                }
+
+                lotNo = dto.LotNo.Trim();
+
+                if (dto.ManufacturingDate.HasValue &&
+                    dto.ExpirationDate.HasValue &&
+                    dto.ExpirationDate.Value.Date <
+                    dto.ManufacturingDate.Value.Date)
+                {
+                    throw new InvalidOperationException(
+                        "Expiration date cannot be earlier than manufacturing date.");
+                }
+            }
+            else
+            {
+                lotNo =
+                    $"NON-LOT-MAT-{dto.MaterialId}";
+            }
+
+            await using var dbTransaction =
+                await _context.Database
+                    .BeginTransactionAsync();
+
+            try
+            {
+                // =====================================================
+                // PREVENT DUPLICATE INITIAL INVENTORY
+                // =====================================================
+
+                var initialStockExists =
+                    await _context.MaterialInventoryTransactions
+                        .AnyAsync(x =>
+                            x.material_id == dto.MaterialId &&
+                            x.branch_id == branchId &&
+                            x.lot_no == lotNo &&
+                            x.transaction_type == "INITIAL_STOCK");
+
+                if (initialStockExists)
+                {
+                    throw new InvalidOperationException(
+                        "Existing inventory for this material, " +
+                        "warehouse and lot has already been encoded. " +
+                        "Use Stock Adjustment if the quantity needs correction.");
+                }
+
+                // =====================================================
+                // FIND INVENTORY LOT
+                // =====================================================
+
+                var inventoryLot =
+                    await _context.MaterialLotNumbers
+                        .FirstOrDefaultAsync(x =>
+                            x.material_id == dto.MaterialId &&
+                            x.branch_id == branchId &&
+                            x.lot_no == lotNo);
+
+                // =====================================================
+                // CREATE / UPDATE INVENTORY LOT
+                // =====================================================
+
+                if (inventoryLot == null)
+                {
+                    inventoryLot =
+                        new MaterialLotNumber
+                        {
+                            material_id =
+                                dto.MaterialId,
+
+                            branch_id =
+                                branchId,
+
+                            lot_no =
+                                lotNo,
+
+                            manufacturing_date =
+                                material.is_lot_tracked
+                                    ? dto.ManufacturingDate
+                                    : null,
+
+                            expiration_date =
+                                material.is_lot_tracked
+                                    ? dto.ExpirationDate
+                                    : null,
+
+                            quantity =
+                                dto.Quantity,
+
+                            uom =
+                                material.uom,
+
+                            supplier_id =
+                                material.is_lot_tracked
+                                    ? dto.SupplierId
+                                    : null,
+
+                            remarks =
+                                string.IsNullOrWhiteSpace(dto.Remarks)
+                                    ? "Initial existing inventory."
+                                    : dto.Remarks.Trim(),
+
+                            is_active =
+                                true,
+
+                            created_at =
+                                now
+                        };
+
+                    await _context.MaterialLotNumbers
+                        .AddAsync(inventoryLot);
+                }
+                else
+                {
+                    /*
+                     * A lot may already exist because of another
+                     * transaction. Existing/opening inventory adds
+                     * the physical opening quantity to that lot.
+                     */
+
+                    inventoryLot.quantity +=
+                        dto.Quantity;
+
+                    inventoryLot.is_active =
+                        true;
+
+                    inventoryLot.updated_at =
+                        now;
+
+                    if (material.is_lot_tracked)
+                    {
+                        inventoryLot.manufacturing_date ??=
+                            dto.ManufacturingDate;
+
+                        inventoryLot.expiration_date ??=
+                            dto.ExpirationDate;
+
+                        inventoryLot.supplier_id ??=
+                            dto.SupplierId;
+                    }
+                }
+
+                // =====================================================
+                // INVENTORY TRANSACTION
+                // =====================================================
+
+                var transaction =
+                    new MaterialInventoryTransaction
+                    {
+                        material_id =
+                            dto.MaterialId,
+
+                        branch_id =
+                            branchId,
+
+                        lot_no =
+                            lotNo,
+
+                        transaction_type =
+                            "INITIAL_STOCK",
+
+                        quantity =
+                            dto.Quantity,
+
+                        uom =
+                            material.uom,
+
+                        supplier_id =
+                            material.is_lot_tracked
+                                ? dto.SupplierId
+                                : null,
+
+                        reference_type =
+                            "INITIAL_INVENTORY",
+
+                        reference_id =
+                            null,
+
+                        reference_no =
+                            $"INIT-{now:yyyyMMddHHmmssfff}",
+
+                        remarks =
+                            string.IsNullOrWhiteSpace(dto.Remarks)
+                                ? "Initial existing inventory encoding."
+                                : dto.Remarks.Trim(),
+
+                        encoded_by =
+                            dto.EncodedBy.Trim(),
+
+                        transaction_date =
+                            now,
+
+                        created_at =
+                            now
+                    };
+
+                await _context.MaterialInventoryTransactions
+                    .AddAsync(transaction);
+
+                await _context.SaveChangesAsync();
+
+                await dbTransaction.CommitAsync();
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
+        }
+
+
+        public async Task ManualStockOutAsync(
+    ManualStockOutDto dto)
+        {
+            if (dto == null)
+            {
+                throw new ArgumentNullException(nameof(dto));
+            }
+
+            if (dto.MaterialLotId <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Inventory lot is required.");
+            }
+
+            if (dto.Quantity <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Stock out quantity must be greater than zero.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Reason))
+            {
+                throw new InvalidOperationException(
+                    "Stock out reason is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.EncodedBy))
+            {
+                throw new InvalidOperationException(
+                    "Encoded by is required.");
+            }
+
+            // =========================================================
+            // FIND INVENTORY LOT
+            // =========================================================
+
+            var inventoryLot =
+                await _context.MaterialLotNumbers
+                    .FirstOrDefaultAsync(x =>
+                        x.material_lot_id == dto.MaterialLotId &&
+                        x.is_active);
+
+            if (inventoryLot == null)
+            {
+                throw new KeyNotFoundException(
+                    $"Inventory lot ID {dto.MaterialLotId} was not found.");
+            }
+
+            // =========================================================
+            // FIND MATERIAL
+            // =========================================================
+
+            var material =
+                await _context.Materials
+                    .FirstOrDefaultAsync(x =>
+                        x.material_id == inventoryLot.material_id &&
+                        x.is_active &&
+                        !x.is_deleted);
+
+            if (material == null)
+            {
+                throw new KeyNotFoundException(
+                    "Material was not found.");
+            }
+
+            // =========================================================
+            // CHECK AVAILABLE STOCK
+            // =========================================================
+
+            if (inventoryLot.quantity <= 0)
+            {
+                throw new InvalidOperationException(
+                    "This material has no available stock.");
+            }
+
+            if (dto.Quantity > inventoryLot.quantity)
+            {
+                throw new InvalidOperationException(
+                    $"Stock out quantity cannot exceed available stock of " +
+                    $"{inventoryLot.quantity:0.####} " +
+                    $"{inventoryLot.uom}.");
+            }
+
+            var now = DateTime.UtcNow;
+            await using var dbTransaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                // =====================================================
+                // DEDUCT INVENTORY
+                // =====================================================
+
+                inventoryLot.quantity -= dto.Quantity;
+
+                inventoryLot.updated_at = now;
+
+                // =====================================================
+                // REMARKS
+                // =====================================================
+
+                var remarks =
+                    $"Reason: {dto.Reason.Trim()}";
+
+                if (!string.IsNullOrWhiteSpace(dto.Remarks))
+                {
+                    remarks +=
+                        $" | {dto.Remarks.Trim()}";
+                }
+
+                // =====================================================
+                // INVENTORY TRANSACTION
+                // =====================================================
+
+                var inventoryTransaction =
+                    new MaterialInventoryTransaction
+                    {
+                        material_id =
+                            inventoryLot.material_id,
+
+                        branch_id =
+                            inventoryLot.branch_id,
+
+                        lot_no =
+                            inventoryLot.lot_no,
+
+                        transaction_type =
+                            "MANUAL_STOCK_OUT",
+
+                        // Outbound transactions use negative quantity
+                        quantity =
+                            -dto.Quantity,
+
+                        uom =
+                            string.IsNullOrWhiteSpace(
+                                inventoryLot.uom)
+                                ? material.uom
+                                : inventoryLot.uom,
+
+                        supplier_id =
+                            inventoryLot.supplier_id,
+
+                        reference_type =
+                            "MANUAL",
+
+                        reference_id =
+                            null,
+
+                        reference_no =
+                            $"MSO-{now:yyyyMMddHHmmssfff}",
+
+                        remarks =
+                            remarks,
+
+                        encoded_by =
+                            dto.EncodedBy.Trim(),
+
+                        transaction_date =
+                            now,
+
+                        created_at =
+                            now
+                    };
+
+                await _context
+                    .MaterialInventoryTransactions
+                    .AddAsync(inventoryTransaction);
+
+                // =====================================================
+                // SAVE
+                // =====================================================
+
+                await _context.SaveChangesAsync();
+
+                await dbTransaction.CommitAsync();
+            }
+            catch
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
+        }
+        private static readonly TimeZoneInfo PhilippineTimeZone =
+    TimeZoneInfo.FindSystemTimeZoneById(
+        OperatingSystem.IsWindows()
+            ? "Singapore Standard Time"
+            : "Asia/Manila"
+    );
+
+        private static DateTime PhilippineDateToUtc(
+            DateTime date)
+        {
+            var phDate = DateTime.SpecifyKind(
+                date.Date,
+                DateTimeKind.Unspecified
+            );
+
+            return TimeZoneInfo.ConvertTimeToUtc(
+                phDate,
+                PhilippineTimeZone
+            );
+        }
+
+    
+
 
 
 
