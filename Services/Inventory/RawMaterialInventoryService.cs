@@ -1583,6 +1583,165 @@ x.SupplierName
         }
 
 
+        public async Task<List<RawMaterialLotDto>>
+    GetMaterialLotsAsync(
+        int materialId,
+        string? branchId = null)
+        {
+            // =========================================================
+            // VALIDATE MATERIAL
+            // =========================================================
+
+            var material =
+                await _context.Materials
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.material_id == materialId &&
+                        x.is_active &&
+                        !x.is_deleted);
+
+            if (material == null)
+            {
+                throw new KeyNotFoundException(
+                    $"Material ID {materialId} was not found.");
+            }
+
+
+            // =========================================================
+            // GET INVENTORY LOTS
+            // =========================================================
+
+            var query =
+                from lot in
+                    _context.MaterialLotNumbers.AsNoTracking()
+
+                join branch in
+                    _context.Branches.AsNoTracking()
+                    on lot.branch_id equals branch.branch_id
+                    into branchJoin
+
+                from branch in branchJoin.DefaultIfEmpty()
+
+                join supplier in
+                    _context.Suppliers.AsNoTracking()
+                    on lot.supplier_id equals supplier.SupplierId
+                    into supplierJoin
+
+                from supplier in supplierJoin.DefaultIfEmpty()
+
+                where
+                    lot.material_id == materialId &&
+                    lot.is_active
+
+                select new
+                {
+                    Lot = lot,
+                    Branch = branch,
+                    Supplier = supplier
+                };
+
+
+            // =========================================================
+            // OPTIONAL BRANCH / WAREHOUSE FILTER
+            // =========================================================
+
+            if (!string.IsNullOrWhiteSpace(branchId))
+            {
+                var selectedBranch =
+                    branchId.Trim();
+
+                query =
+                    query.Where(x =>
+                        x.Lot.branch_id == selectedBranch);
+            }
+
+
+            // =========================================================
+            // LOAD RECORDS
+            // =========================================================
+
+            var records =
+                await query
+                    .OrderBy(x =>
+                        x.Lot.expiration_date)
+                    .ThenBy(x =>
+                        x.Lot.lot_no)
+                    .ToListAsync();
+
+
+            // =========================================================
+            // BUILD RESULT
+            // =========================================================
+
+            var result =
+                records.Select(x =>
+                {
+                    var lotNo =
+                        x.Lot.lot_no ?? string.Empty;
+
+                    var isInternalNonLot =
+                        lotNo.StartsWith(
+                            "NON-LOT",
+                            StringComparison.OrdinalIgnoreCase)
+                        ||
+                        lotNo.StartsWith(
+                            "NOLOT",
+                            StringComparison.OrdinalIgnoreCase);
+
+
+                    return new RawMaterialLotDto
+                    {
+                        MaterialLotId =
+                            x.Lot.material_lot_id,
+
+                        MaterialId =
+                            x.Lot.material_id,
+
+                        BranchId =
+                            x.Lot.branch_id,
+
+                        BranchName =
+                            x.Branch?.branch_name
+                            ?? x.Lot.branch_id,
+
+                        LotNo =
+                            lotNo,
+
+                        LotDisplay =
+                            !material.is_lot_tracked ||
+                            isInternalNonLot
+                                ? "Not Lot Tracked"
+                                : lotNo,
+
+                        ManufacturingDate =
+                            x.Lot.manufacturing_date,
+
+                        ExpirationDate =
+                            x.Lot.expiration_date,
+
+                        Quantity =
+                            x.Lot.quantity,
+
+                        Uom =
+                            string.IsNullOrWhiteSpace(
+                                x.Lot.uom)
+                                ? material.uom
+                                : x.Lot.uom,
+
+                        SupplierId =
+                            x.Lot.supplier_id,
+
+                        SupplierName =
+                            x.Supplier?.SupplierName
+                            ?? "Not Specified"
+                    };
+                })
+                .ToList();
+
+
+            return result;
+        }
+
         private static bool IsOutboundTransaction(string? transactionType)
         {
             var type = transactionType?

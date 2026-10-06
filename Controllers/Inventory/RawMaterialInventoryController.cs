@@ -189,6 +189,41 @@ namespace inventory_api.Controllers.Inventory
         }
 
 
+
+        [HttpGet("{materialId:int}/lots")]
+        public async Task<IActionResult> GetMaterialLots(
+    int materialId,
+    [FromQuery] string? branchId = null)
+        {
+            try
+            {
+                var result =
+                    await _service.GetMaterialLotsAsync(
+                        materialId,
+                        branchId
+                    );
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+        }
+
+
         [HttpPost("adjust-stock")]
         public async Task<IActionResult> AdjustStock(
     [FromBody] AdjustRawMaterialStockDto dto)
