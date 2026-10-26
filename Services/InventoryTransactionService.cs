@@ -197,6 +197,7 @@ namespace inventory_api.Services
                     product_id = dto.product_id,
                     branch_id = dto.branch_id,
                     transaction_type = transactionType,
+                    reference_type = dto.reference_type,
                     lot_no = dto.lot_no,
                     quantity = (decimal)dto.quantity,
                     scanned_by = dto.scanned_by ?? "",
@@ -915,6 +916,7 @@ namespace inventory_api.Services
                     lot_no = dto.lot_no,
                     quantity = (double)dto.quantity,
                     transaction_type = "OUT",
+                    reference_type = "TRANSFER_OUT",
                     scanned_by = dto.scanned_by ?? "",
                     remarks = string.IsNullOrWhiteSpace(dto.remarks)
                         ? $"Transfer to {toBranchName}"
@@ -928,6 +930,7 @@ namespace inventory_api.Services
                     lot_no = dto.lot_no,
                     quantity = (double)dto.quantity,
                     transaction_type = "IN",
+                    reference_type = "TRANSFER_IN",
                     scanned_by = dto.scanned_by ?? "",
                     remarks = string.IsNullOrWhiteSpace(dto.remarks)
                         ? $"Transfer from {fromBranchName}"

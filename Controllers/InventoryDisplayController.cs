@@ -223,5 +223,43 @@ namespace inventory_api.Controllers
                 });
             }
         }
+
+
+
+        [HttpGet("daily-inventory-print")]
+        public async Task<IActionResult> GetDailyInventoryPrint(
+            DateTime fromDate,
+            DateTime toDate,
+            string warehouse = "")
+        {
+            try
+            {
+                var result = await _inventoryDisplayService
+                    .GetDailyInventoryPrintAsync(
+                        fromDate,
+                        toDate,
+                        warehouse);
+
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Failed to generate daily inventory report.",
+                    error = ex.Message
+                });
+            }
+        }
+
     }
 }

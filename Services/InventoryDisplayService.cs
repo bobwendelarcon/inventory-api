@@ -1480,6 +1480,284 @@ namespace inventory_api.Services
         }
 
 
+
+
+
+        public async Task<object> GetDailyInventoryPrintAsync(
+            DateTime fromDate,
+            DateTime toDate,
+            string warehouse = "")
+        {
+            if (fromDate.Date > toDate.Date)
+                throw new ArgumentException("From Date cannot exceed To Date.");
+
+            TimeZoneInfo phTimeZone;
+            try
+            {
+                phTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                phTimeZone = TimeZoneInfo.FindSystemTimeZoneById(
+                    "Singapore Standard Time");
+            }
+
+            var todayPh = TimeZoneInfo
+                .ConvertTimeFromUtc(DateTime.UtcNow, phTimeZone).Date;
+
+            if (fromDate.Date > todayPh || toDate.Date > todayPh)
+                throw new ArgumentException("Future dates are not allowed.");
+
+            var fromUtc = TimeZoneInfo.ConvertTimeToUtc(
+                DateTime.SpecifyKind(fromDate.Date, DateTimeKind.Unspecified),
+                phTimeZone);
+
+            var endExclusiveUtc = TimeZoneInfo.ConvertTimeToUtc(
+                DateTime.SpecifyKind(toDate.Date.AddDays(1), DateTimeKind.Unspecified),
+                phTimeZone);
+
+            var lotsQuery = _context.ProductLotNumbers
+                .AsNoTracking()
+                .Where(x => !x.is_deleted);
+
+            var txQuery = _context.InventoryTransactions
+                .AsNoTracking()
+                .Where(x => !x.is_deleted &&
+                    (x.transaction_type == "IN" ||
+                     x.transaction_type == "OUT"));
+
+            if (!string.IsNullOrWhiteSpace(warehouse))
+            {
+                warehouse = warehouse.Trim();
+                lotsQuery = lotsQuery.Where(x => x.branch_id == warehouse);
+                txQuery = txQuery.Where(x => x.branch_id == warehouse);
+            }
+
+            var lots = await lotsQuery
+                .Select(x => new
+                {
+                    x.product_id,
+                    x.branch_id,
+                    x.quantity
+                })
+                .ToListAsync();
+
+            // Include transactions through the current moment.
+            // Future-dated transactions must not affect current balances.
+            var transactions = await txQuery
+                .Where(x => x.created_at <= DateTime.UtcNow)
+                .Select(x => new
+                {
+                    x.transaction_id,
+                    x.product_id,
+                    x.branch_id,
+                    x.lot_no,
+                    x.transaction_type,
+                    x.reference_type,
+                    x.quantity,
+                    x.created_at,
+                    x.tr_no,
+                    x.dr_no,
+                    x.inv_no,
+                    x.po_no,
+                    x.checklist_no,
+                    x.order_no,
+                    x.remarks
+                })
+                .ToListAsync();
+
+            var products = await (
+    from product in _context.Products.AsNoTracking()
+
+    join category in _context.Categories.AsNoTracking()
+        on product.catg_id equals category.catg_id
+        into categoryJoin
+
+    from category in categoryJoin.DefaultIfEmpty()
+
+    select new
+    {
+        product.product_id,
+        product.product_name,
+        product.product_description,
+        product.uom,
+        product.pack_uom,
+        product.pack_qty,
+
+        category_name = category != null
+            ? (category.catg_name ?? "Uncategorized")
+            : "Uncategorized"
+    }
+).ToDictionaryAsync(x => x.product_id);
+
+            var branches = await _context.Branches
+                .AsNoTracking()
+                .ToDictionaryAsync(x => x.branch_id, x => x.branch_name);
+
+            var currentBalances = lots
+                .GroupBy(x => (x.product_id, x.branch_id))
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Sum(x => x.quantity));
+
+            var transactionGroups = transactions
+                .GroupBy(x => (x.product_id, x.branch_id))
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Include products with transactions even when their
+            // current balance is zero.
+            var allKeys = currentBalances.Keys
+                .Union(transactionGroups.Keys)
+                .ToList();
+
+            var report = new List<object>();
+
+            foreach (var key in allKeys)
+            {
+                currentBalances.TryGetValue(key, out decimal currentQty);
+
+                var group = transactionGroups.TryGetValue(key, out var txs)
+                    ? txs
+                    : transactions.Where(x => false).ToList();
+
+                decimal SignedQty(string type, decimal qty)
+                    => type == "IN" ? qty : -qty;
+
+                var movementsAfterEnd = group
+                    .Where(x => x.created_at >= endExclusiveUtc)
+                    .Sum(x => SignedQty(x.transaction_type, x.quantity));
+
+                decimal closing = currentQty - movementsAfterEnd;
+
+                var periodTransactions = group
+                    .Where(x => x.created_at >= fromUtc &&
+                                x.created_at < endExclusiveUtc)
+                    .OrderBy(x => x.created_at)
+                    .ThenBy(x => x.transaction_id)
+                    .ToList();
+
+                string Classify(string type, string? referenceType)
+                {
+                    string reference = (referenceType ?? "")
+                        .Trim()
+                        .ToUpperInvariant();
+
+                    if (reference == "MANUAL_ADJUSTMENT")
+                        return type == "IN"
+                            ? "ADJUSTMENT_IN"
+                            : "ADJUSTMENT_OUT";
+
+                    if (reference == "TRANSFER_IN" && type == "IN")
+                        return "TRANSFER_IN";
+
+                    if (reference == "TRANSFER_OUT" && type == "OUT")
+                        return "TRANSFER_OUT";
+
+                    if (type == "IN" &&
+                        (reference == "TRANSMITTAL_REPORT" ||
+                         reference == "PRODUCTION_IN"))
+                        return "PRODUCTION_IN";
+
+                    if (type == "OUT" &&
+                        (reference == "CHECKLIST_OUT" ||
+                         reference == "STOCK_OUT"))
+                        return "STOCK_OUT";
+
+                    return type == "IN" ? "OTHER_IN" : "OTHER_OUT";
+                }
+
+                decimal Total(string category)
+                    => periodTransactions
+                        .Where(x => Classify(
+                            x.transaction_type,
+                            x.reference_type) == category)
+                        .Sum(x => x.quantity);
+
+                decimal productionIn = Total("PRODUCTION_IN");
+                decimal stockOut = Total("STOCK_OUT");
+                decimal adjustmentIn = Total("ADJUSTMENT_IN");
+                decimal adjustmentOut = Total("ADJUSTMENT_OUT");
+                decimal transferIn = Total("TRANSFER_IN");
+                decimal transferOut = Total("TRANSFER_OUT");
+                decimal otherIn = Total("OTHER_IN");
+                decimal otherOut = Total("OTHER_OUT");
+
+                decimal received = productionIn + adjustmentIn
+                    + transferIn + otherIn;
+
+                decimal released = stockOut + adjustmentOut
+                    + transferOut + otherOut;
+
+                decimal opening = closing - received + released;
+
+                products.TryGetValue(key.product_id, out var product);
+                branches.TryGetValue(key.branch_id, out var branchName);
+
+                var details = periodTransactions.Select(x => new
+                {
+                    transactionId = x.transaction_id,
+                    date = x.created_at,
+                    type = x.transaction_type,
+                    referenceType = x.reference_type ?? "",
+                    category = Classify(
+                        x.transaction_type, x.reference_type),
+                    lotNo = x.lot_no,
+                    quantity = x.quantity,
+                    transmittalNo = x.tr_no,
+                    deliveryReceiptNo = x.dr_no,
+                    invoiceNo = x.inv_no,
+                    purchaseOrderNo = x.po_no,
+                    checklistNo = x.checklist_no,
+                    orderNo = x.order_no,
+                    remarks = x.remarks
+                }).ToList();
+
+                report.Add(new
+                {
+                    productId = key.product_id,
+                    productName = product?.product_name ?? key.product_id,
+                    productDescription = product?.product_description ?? "",
+                    categoryName = product?.category_name ?? "Uncategorized",
+                    branchId = key.branch_id,
+
+                    branchName = branchName ?? key.branch_id,
+                    uom = product?.uom ?? "",
+                    packUom = product?.pack_uom ?? "",
+                    packQty = product?.pack_qty ?? 0,
+
+                    opening,
+
+                    productionIn,
+                    stockOut,
+                    adjustmentIn,
+                    adjustmentOut,
+                    transferIn,
+                    transferOut,
+                    otherIn,
+                    otherOut,
+
+                    // Backward-compatible aggregate fields
+                    received,
+                    released,
+                    closing,
+
+                    transactions = details
+                });
+            }
+
+            return new
+            {
+                fromDate = fromDate.ToString("yyyy-MM-dd"),
+                toDate = toDate.ToString("yyyy-MM-dd"),
+                warehouse,
+
+                data = report
+            };
+        }
+
+
+
+
         public async Task<Dictionary<string, object>>
             GetProductSummaryPagedAsync(
                 int page = 1,
@@ -1519,6 +1797,10 @@ namespace inventory_api.Services
         { "totalPages", (int)Math.Ceiling(total / (double)pageSize) }
     };
         }
+
+
+
+
 
 
 
