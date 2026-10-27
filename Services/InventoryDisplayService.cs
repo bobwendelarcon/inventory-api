@@ -1636,42 +1636,67 @@ namespace inventory_api.Services
                     .ThenBy(x => x.transaction_id)
                     .ToList();
 
-                string Classify(string type, string? referenceType)
+
+
+
+
+                string Classify(
+    string type,
+    string? referenceType,
+    string? checklistNo,
+    string? drNo,
+    string? orderNo)
                 {
                     string reference = (referenceType ?? "")
                         .Trim()
                         .ToUpperInvariant();
 
+                    // ADJUSTMENTS
                     if (reference == "MANUAL_ADJUSTMENT")
                         return type == "IN"
                             ? "ADJUSTMENT_IN"
                             : "ADJUSTMENT_OUT";
 
+                    // TRANSFERS
                     if (reference == "TRANSFER_IN" && type == "IN")
                         return "TRANSFER_IN";
 
                     if (reference == "TRANSFER_OUT" && type == "OUT")
                         return "TRANSFER_OUT";
 
+                    // PRODUCTION STOCK IN
                     if (type == "IN" &&
                         (reference == "TRANSMITTAL_REPORT" ||
                          reference == "PRODUCTION_IN"))
                         return "PRODUCTION_IN";
 
+                    // DISPATCH STOCK OUT
+                    // Recognize historical checklist transactions
+                    // even when reference_type is NULL.
                     if (type == "OUT" &&
-                        (reference == "CHECKLIST_OUT" ||
-                         reference == "STOCK_OUT"))
+                        (
+                            reference == "CHECKLIST_OUT" ||
+                            reference == "STOCK_OUT" ||
+                            !string.IsNullOrWhiteSpace(checklistNo)
+                        ))
+                    {
                         return "STOCK_OUT";
+                    }
 
                     return type == "IN" ? "OTHER_IN" : "OTHER_OUT";
                 }
 
+
+
                 decimal Total(string category)
-                    => periodTransactions
-                        .Where(x => Classify(
-                            x.transaction_type,
-                            x.reference_type) == category)
-                        .Sum(x => x.quantity);
+      => periodTransactions
+          .Where(x => Classify(
+              x.transaction_type,
+              x.reference_type,
+              x.checklist_no,
+              x.dr_no,
+              x.order_no) == category)
+          .Sum(x => x.quantity);
 
                 decimal productionIn = Total("PRODUCTION_IN");
                 decimal stockOut = Total("STOCK_OUT");
@@ -1700,7 +1725,13 @@ namespace inventory_api.Services
                     type = x.transaction_type,
                     referenceType = x.reference_type ?? "",
                     category = Classify(
-                        x.transaction_type, x.reference_type),
+    x.transaction_type,
+    x.reference_type,
+    x.checklist_no,
+    x.dr_no,
+    x.order_no),
+
+
                     lotNo = x.lot_no,
                     quantity = x.quantity,
                     transmittalNo = x.tr_no,
