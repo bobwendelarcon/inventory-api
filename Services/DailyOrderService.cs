@@ -239,13 +239,25 @@ namespace inventory_api.Services
                 //    (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
                 //);
             }
+            //if (!string.IsNullOrWhiteSpace(search))
+            //{
+            //    var keyword = search.Trim().ToLower();
+            //    result = result.Where(x =>
+            //        (x.CustomerName ?? "").ToLower().Contains(keyword) ||
+            //        (x.OrderNo ?? "").ToLower().Contains(keyword) ||
+            //        (x.ProductName ?? "").ToLower().Contains(keyword));
+            //}
+
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var keyword = search.Trim().ToLower();
+
                 result = result.Where(x =>
                     (x.CustomerName ?? "").ToLower().Contains(keyword) ||
                     (x.OrderNo ?? "").ToLower().Contains(keyword) ||
-                    (x.ProductName ?? "").ToLower().Contains(keyword));
+                    (x.ProductName ?? "").ToLower().Contains(keyword) ||
+                    (x.ProductDescription ?? "").ToLower().Contains(keyword)
+                );
             }
 
             var filteredList = result.ToList();
