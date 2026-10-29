@@ -1,6 +1,7 @@
 using inventory_api.Data;
 using inventory_api.Services;
 using inventory_api.Services.Inventory;
+using inventory_api.Services.Laboratory;
 using inventory_api.Services.Manufacturing.Materials;
 using inventory_api.Services.Purchasing;
 using inventory_api.Services.Purchasing.Canvassing;
@@ -121,6 +122,9 @@ builder.Services.AddScoped<RawMaterialReportService>();
 //Purchasing report
 builder.Services
     .AddScoped<PurchasingLeadTimeService>();
+
+//laboratory
+builder.Services.AddScoped<LaboratoryInventoryService>();
 
 var app = builder.Build();
 

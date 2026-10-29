@@ -1,5 +1,6 @@
 ﻿using inventory_api.Data;
 using inventory_api.Models;
+using inventory_api.Models.Laboratory;
 using inventory_api.Models.Manufacturing.Materials;
 using inventory_api.Models.Manufacturing.Materials.Requisitions;
 using inventory_api.Models.Purchasing;
@@ -186,6 +187,29 @@ namespace inventory_api.Data
         public DbSet<SystemUserAccessPoint>
             SystemUserAccessPoints
         { get; set; }
+
+
+
+        //Probiotics laboratory
+
+        public DbSet<LaboratoryCategory> LaboratoryCategories
+            => Set<LaboratoryCategory>();
+
+        public DbSet<LaboratoryBrand> LaboratoryBrands
+            => Set<LaboratoryBrand>();
+
+        public DbSet<LaboratoryLocation> LaboratoryLocations
+            => Set<LaboratoryLocation>();
+
+        public DbSet<LaboratoryItem> LaboratoryItems
+            => Set<LaboratoryItem>();
+
+        public DbSet<LaboratoryInventory> LaboratoryInventories
+            => Set<LaboratoryInventory>();
+
+        public DbSet<LaboratoryInventoryTransaction> LaboratoryInventoryTransactions
+            => Set<LaboratoryInventoryTransaction>();
+
 
 
 
@@ -2346,6 +2370,63 @@ namespace inventory_api.Data
                         x.access_point_id)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+
+
+
+            //Probiotic labo
+
+            modelBuilder.Entity<LaboratoryCategory>(e =>
+            {
+                e.ToTable("laboratory_categories");
+                e.HasKey(x => x.category_id);
+            });
+
+            modelBuilder.Entity<LaboratoryBrand>(e =>
+            {
+                e.ToTable("laboratory_brands");
+                e.HasKey(x => x.brand_id);
+            });
+
+            modelBuilder.Entity<LaboratoryLocation>(e =>
+            {
+                e.ToTable("laboratory_locations");
+                e.HasKey(x => x.location_id);
+            });
+
+            modelBuilder.Entity<LaboratoryItem>(e =>
+            {
+                e.ToTable("laboratory_items");
+                e.HasKey(x => x.item_id);
+
+                e.Property(x => x.minimum_stock)
+                    .HasPrecision(18, 3);
+            });
+
+            modelBuilder.Entity<LaboratoryInventory>(e =>
+            {
+                e.ToTable("laboratory_inventory");
+                e.HasKey(x => x.inventory_id);
+
+                e.Property(x => x.quantity)
+                    .HasPrecision(18, 3);
+            });
+
+            modelBuilder.Entity<LaboratoryInventoryTransaction>(e =>
+            {
+                e.ToTable("laboratory_inventory_transactions");
+                e.HasKey(x => x.transaction_id);
+
+                e.Property(x => x.quantity)
+                    .HasPrecision(18, 3);
+
+                e.Property(x => x.previous_quantity)
+                    .HasPrecision(18, 3);
+
+                e.Property(x => x.new_quantity)
+                    .HasPrecision(18, 3);
+            });
+
+
 
 
 
