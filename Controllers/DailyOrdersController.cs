@@ -234,5 +234,17 @@ namespace inventory_api.Controllers
             }
         }
 
+
+        [HttpGet("overdue-count")]
+        public async Task<IActionResult> GetOverdueCount()
+        {
+            var count = await _service.GetOverdueCountAsync();
+
+            return Ok(new
+            {
+                overdue = count
+            });
+        }
+
     }
 }

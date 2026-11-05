@@ -24,6 +24,27 @@ namespace inventory_api.Services
                 ?? throw new Exception("Connection string not found.");
         }
 
+
+        public async Task<int> GetOverdueCountAsync()
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+
+            var today = TimeZoneInfo
+                .ConvertTimeFromUtc(DateTime.UtcNow, tz)
+                .Date;
+
+            return await _context.DailyOrderHeaders
+                .AsNoTracking()
+                .Where(h =>
+                    !h.is_deleted &&
+                    h.delivery_date.HasValue &&
+                    h.delivery_date.Value < today &&
+                    h.status != null &&
+                    h.status.Trim().ToUpper() != "COMPLETED" &&
+                    h.status.Trim().ToUpper() != "CANCELLED")
+                .CountAsync();
+        }
+
         // =========================================
         // GET ALL (FOR TABLE)
         // =========================================
