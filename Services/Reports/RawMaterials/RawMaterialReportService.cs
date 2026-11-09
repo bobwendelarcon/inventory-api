@@ -1078,15 +1078,17 @@ namespace inventory_api.Services.Reports.RawMaterials
             // Default = last 30 days including today
             // ============================================================
 
+
+            var philippineToday =
+    UtcToPhilippine(DateTime.UtcNow).Date;
+
             var toDate =
                 filter.ToDate?.Date
-                ?? DateTime.Today;
-
+                ?? philippineToday;
 
             var fromDate =
                 filter.FromDate?.Date
                 ?? toDate.AddDays(-29);
-
 
             if (fromDate > toDate)
             {
@@ -1095,13 +1097,41 @@ namespace inventory_api.Services.Reports.RawMaterials
                 );
             }
 
-
-            var toExclusive =
-                toDate.AddDays(1);
-
-
             int totalDays =
                 (toDate - fromDate).Days + 1;
+
+            var fromUtc =
+                PhilippineDateToUtc(fromDate);
+
+            var toUtcExclusive =
+                PhilippineDateToUtc(toDate.AddDays(1));
+
+
+
+            //var toDate =
+            //    filter.ToDate?.Date
+            //    ?? DateTime.Today;
+
+
+            //var fromDate =
+            //    filter.FromDate?.Date
+            //    ?? toDate.AddDays(-29);
+
+
+            //if (fromDate > toDate)
+            //{
+            //    throw new InvalidOperationException(
+            //        "From date cannot be later than To date."
+            //    );
+            //}
+
+
+            //var toExclusive =
+            //    toDate.AddDays(1);
+
+
+            //int totalDays =
+            //    (toDate - fromDate).Days + 1;
 
 
             // ============================================================
@@ -1143,11 +1173,8 @@ namespace inventory_api.Services.Reports.RawMaterials
                     transaction.transaction_type ==
                         "MATERIAL_RELEASE"
                     &&
-                    transaction.transaction_date >=
-                        fromDate
-                    &&
-                    transaction.transaction_date <
-                        toExclusive
+                    transaction.transaction_date >= fromUtc
+&& transaction.transaction_date < toUtcExclusive
                     &&
                     material.is_active
                     &&
@@ -1253,8 +1280,9 @@ namespace inventory_api.Services.Reports.RawMaterials
             var dailyTrend =
                 records
                     .GroupBy(x =>
-                        x.Transaction
-                            .transaction_date.Date)
+    UtcToPhilippine(
+        x.Transaction.transaction_date
+    ).Date)
                     .Select(day =>
                         new RawMaterialUsageTrendDailyDto
                         {
@@ -1322,12 +1350,13 @@ namespace inventory_api.Services.Reports.RawMaterials
 
 
                         int activeUsageDays =
-                            group
-                                .Select(x =>
-                                    x.Transaction
-                                        .transaction_date.Date)
-                                .Distinct()
-                                .Count();
+     group
+         .Select(x =>
+             UtcToPhilippine(
+                 x.Transaction.transaction_date
+             ).Date)
+         .Distinct()
+         .Count();
 
 
                         decimal averageDailyUsage =
@@ -1377,12 +1406,16 @@ namespace inventory_api.Services.Reports.RawMaterials
                                 group.Count(),
 
                             FirstUsageDate =
-                                group.Min(x =>
-                                    x.Transaction.transaction_date),
+    UtcToPhilippine(
+        group.Min(x =>
+            x.Transaction.transaction_date)
+    ),
 
                             LastUsageDate =
-                                group.Max(x =>
-                                    x.Transaction.transaction_date)
+    UtcToPhilippine(
+        group.Max(x =>
+            x.Transaction.transaction_date)
+    )
                         };
                     })
                     .OrderByDescending(x =>
@@ -1419,12 +1452,13 @@ namespace inventory_api.Services.Reports.RawMaterials
                             .Count(),
 
                     ActiveUsageDays =
-                        records
-                            .Select(x =>
-                                x.Transaction
-                                    .transaction_date.Date)
-                            .Distinct()
-                            .Count()
+    records
+        .Select(x =>
+            UtcToPhilippine(
+                x.Transaction.transaction_date
+            ).Date)
+        .Distinct()
+        .Count()
                 };
 
 
@@ -2023,5 +2057,42 @@ namespace inventory_api.Services.Reports.RawMaterials
                     result
             };
         }
+
+
+
+        private static readonly TimeZoneInfo PhilippineTimeZone =
+    TimeZoneInfo.FindSystemTimeZoneById(
+        OperatingSystem.IsWindows()
+            ? "Singapore Standard Time"
+            : "Asia/Manila"
+    );
+
+        private static DateTime PhilippineDateToUtc(DateTime date)
+        {
+            var phDate = DateTime.SpecifyKind(
+                date.Date,
+                DateTimeKind.Unspecified
+            );
+
+            return TimeZoneInfo.ConvertTimeToUtc(
+                phDate,
+                PhilippineTimeZone
+            );
+        }
+
+        private static DateTime UtcToPhilippine(DateTime utcDate)
+        {
+            var utc = DateTime.SpecifyKind(
+                utcDate,
+                DateTimeKind.Utc
+            );
+
+            return TimeZoneInfo.ConvertTimeFromUtc(
+                utc,
+                PhilippineTimeZone
+            );
+        }
+
+
     }
 }
