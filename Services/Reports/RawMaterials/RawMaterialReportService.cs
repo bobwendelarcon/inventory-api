@@ -1273,52 +1273,77 @@ namespace inventory_api.Services.Reports.RawMaterials
                     .ToListAsync();
 
 
+
             // ============================================================
             // DAILY TREND
+            // Include all Philippine calendar days, even with zero usage
             // ============================================================
 
+            // Group actual transactions by Philippine calendar date
+            var usageByDate = records
+                .GroupBy(x =>
+                    UtcToPhilippine(
+                        x.Transaction.transaction_date
+                    ).Date)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.ToList()
+                );
+
+            // Get all UOMs in the selected transactions
+            var allUoms = records
+                .Select(x =>
+                    string.IsNullOrWhiteSpace(x.Transaction.uom)
+                        ? "N/A"
+                        : x.Transaction.uom.Trim().ToUpperInvariant())
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+
             var dailyTrend =
-                records
-                    .GroupBy(x =>
-    UtcToPhilippine(
-        x.Transaction.transaction_date
-    ).Date)
-                    .Select(day =>
-                        new RawMaterialUsageTrendDailyDto
+                new List<RawMaterialUsageTrendDailyDto>();
+
+            // Generate every day within the selected Philippine date range
+            for (var date = fromDate; date <= toDate; date = date.AddDays(1))
+            {
+                var dayRecords = usageByDate.TryGetValue(
+                    date,
+                    out var existingRecords)
+                        ? existingRecords
+                        : null;
+
+                var usageByUom =
+                    new List<RawMaterialUsageTrendByUomDto>();
+
+                foreach (var uom in allUoms)
+                {
+                    decimal quantity = dayRecords == null
+                        ? 0m
+                        : dayRecords
+                            .Where(x =>
+                                (string.IsNullOrWhiteSpace(x.Transaction.uom)
+                                    ? "N/A"
+                                    : x.Transaction.uom.Trim().ToUpperInvariant())
+                                == uom)
+                            .Sum(x =>
+                                Math.Abs(x.Transaction.quantity));
+
+                    usageByUom.Add(
+                        new RawMaterialUsageTrendByUomDto
                         {
-                            Date =
-                                day.Key,
+                            Uom = uom,
+                            Quantity = quantity
+                        });
+                }
 
-                            TransactionCount =
-                                day.Count(),
-
-                            UsageByUom =
-                                day
-                                    .GroupBy(x =>
-                                        string.IsNullOrWhiteSpace(
-                                            x.Transaction.uom)
-                                            ? "N/A"
-                                            : x.Transaction.uom
-                                                .Trim()
-                                                .ToUpperInvariant())
-                                    .Select(uom =>
-                                        new RawMaterialUsageTrendByUomDto
-                                        {
-                                            Uom =
-                                                uom.Key,
-
-                                            Quantity =
-                                                uom.Sum(x =>
-                                                    Math.Abs(
-                                                        x.Transaction.quantity))
-                                        })
-                                    .OrderBy(x =>
-                                        x.Uom)
-                                    .ToList()
-                        })
-                    .OrderBy(x =>
-                        x.Date)
-                    .ToList();
+                dailyTrend.Add(
+                    new RawMaterialUsageTrendDailyDto
+                    {
+                        Date = date,
+                        TransactionCount = dayRecords?.Count ?? 0,
+                        UsageByUom = usageByUom
+                    });
+            }
 
 
             // ============================================================
