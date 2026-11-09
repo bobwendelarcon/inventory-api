@@ -25,16 +25,17 @@ namespace inventory_api.Services.Reports.RawMaterials
             // DEFAULT DATE = TODAY
             // =====================================================
 
-            var fromDate =
-                filter.FromDate?.Date
-                ?? DateTime.Today;
+            var philippineToday = UtcToPhilippine(DateTime.UtcNow).Date;
 
-            var toDate =
-                filter.ToDate?.Date
-                ?? fromDate;
+            var fromDate = filter.FromDate?.Date ?? philippineToday;
+            var toDate = filter.ToDate?.Date ?? fromDate;
 
-            var toExclusive =
-                toDate.AddDays(1);
+            if (fromDate > toDate)
+                throw new InvalidOperationException(
+                    "From date cannot be later than To date.");
+
+            var fromUtc = PhilippineDateToUtc(fromDate);
+            var toUtcExclusive = PhilippineDateToUtc(toDate.AddDays(1));
 
             // =====================================================
             // LOAD MATERIAL RELEASE TRANSACTIONS
@@ -76,10 +77,10 @@ namespace inventory_api.Services.Reports.RawMaterials
                         == "MATERIAL_RELEASE"
 
                     && transaction.transaction_date
-                        >= fromDate
+                        >= fromUtc
 
                     && transaction.transaction_date
-                        < toExclusive
+                        < toUtcExclusive
 
                 select new
                 {
@@ -347,7 +348,7 @@ namespace inventory_api.Services.Reports.RawMaterials
                                 ?? transaction.encoded_by),
 
                         TransactionDate =
-                            transaction.transaction_date,
+                            UtcToPhilippine(transaction.transaction_date),
 
                         TimeServed =
                             requisition?.TimeServed,
@@ -443,7 +444,7 @@ namespace inventory_api.Services.Reports.RawMaterials
                 new RawMaterialAgingReportFilterDto();
 
             var today =
-                DateTime.Today;
+                UtcToPhilippine(DateTime.UtcNow).Date;
 
 
             // ============================================================
@@ -651,11 +652,12 @@ namespace inventory_api.Services.Reports.RawMaterials
                         .FirstOrDefault();
 
 
-                DateTime? dateIn =
-                    firstTransaction
-                        ?.transaction_date
-                    ??
-                    lot.created_at;
+                DateTime? dateInUtc =
+                    firstTransaction?.transaction_date ?? lot.created_at;
+
+                DateTime? dateIn = dateInUtc.HasValue
+                    ? UtcToPhilippine(dateInUtc.Value)
+                    : null;
 
 
                 // ========================================================
@@ -668,8 +670,9 @@ namespace inventory_api.Services.Reports.RawMaterials
 
 
                 DateTime? lastMovementDate =
-                    lastTransaction
-                        ?.transaction_date;
+                    lastTransaction == null
+                        ? null
+                        : UtcToPhilippine(lastTransaction.transaction_date);
 
 
                 string lastMovementType =
@@ -708,8 +711,9 @@ namespace inventory_api.Services.Reports.RawMaterials
 
 
                 DateTime? lastReleaseDate =
-                    lastRelease
-                        ?.transaction_date;
+                    lastRelease == null
+                        ? null
+                        : UtcToPhilippine(lastRelease.transaction_date);
 
 
                 // ========================================================
@@ -1515,13 +1519,29 @@ namespace inventory_api.Services.Reports.RawMaterials
             filter.TargetCoverDays =
                 Math.Clamp(filter.TargetCoverDays, 1, 365);
 
-            var today = DateTime.Today;
 
-            var usageFrom =
-                today.AddDays(-(filter.UsageHistoryDays - 1));
+            // ============================================================
+            // USAGE HISTORY DATE RANGE
+            // Philippine calendar dates converted to UTC for database query
+            // ============================================================
 
-            var usageToExclusive =
-                today.AddDays(1);
+            var philippineToday =
+                UtcToPhilippine(DateTime.UtcNow).Date;
+
+            var usageFromDate =
+                philippineToday.AddDays(
+                    -(filter.UsageHistoryDays - 1)
+                );
+
+            var usageToDateExclusive =
+                philippineToday.AddDays(1);
+
+            var usageFromUtc =
+                PhilippineDateToUtc(usageFromDate);
+
+            var usageToUtcExclusive =
+                PhilippineDateToUtc(usageToDateExclusive);
+
 
 
             // ============================================================
@@ -1608,8 +1628,8 @@ namespace inventory_api.Services.Reports.RawMaterials
                     .Where(x =>
                         materialIds.Contains(x.material_id) &&
                         x.transaction_type == "MATERIAL_RELEASE" &&
-                        x.transaction_date >= usageFrom &&
-                        x.transaction_date < usageToExclusive);
+                       x.transaction_date >= usageFromUtc &&
+x.transaction_date < usageToUtcExclusive);
 
             if (!string.IsNullOrWhiteSpace(filter.BranchId))
             {
@@ -1855,30 +1875,85 @@ namespace inventory_api.Services.Reports.RawMaterials
                     filter.TargetCoverDays;
 
 
-                decimal suggestedOrderQty =
-                    Math.Max(
-                        0m,
-                        targetStockQty -
-                        stockPosition
-                    );
+                // ========================================================
+                // DELIVERY-AWARE REPLENISHMENT
+                // TargetCoverDays INCLUDES SafetyStockDays (no double count).
+                // Only scheduled, non-overdue PO balances within the target
+                // horizon are treated as reliable for suggested-order math.
+                // Unscheduled and overdue POs remain in IncomingPoQty for
+                // visibility but are not assumed to arrive on time.
+                // ========================================================
 
+                var relevantPoLineIds = materialPoLines
+                    .Select(x => x.PoLineId)
+                    .ToHashSet();
 
-                var relevantPoLineIds =
-                    materialPoLines
-                        .Select(x => x.PoLineId)
-                        .ToList();
+                var poBalanceByLine = materialPoLines
+                    .ToDictionary(x => x.PoLineId, x => x.BalanceQty);
 
+                var validSchedules = scheduleLines
+                    .Where(x => relevantPoLineIds.Contains(x.PoLineId))
+                    .Where(x => x.ScheduledDate.Date >= philippineToday)
+                    .GroupBy(x => x.PoLineId)
+                    .SelectMany(group =>
+                    {
+                        // Schedule-line totals must not exceed the PO line's
+                        // actual remaining balance (avoid double counting).
+                        decimal remaining = poBalanceByLine[group.Key];
+                        var entries = new List<(DateTime Date, decimal Qty)>();
+                        foreach (var schedule in group.OrderBy(x => x.ScheduledDate))
+                        {
+                            var qty = Math.Min(remaining, schedule.BalanceQty);
+                            if (qty <= 0) break;
+                            entries.Add((schedule.ScheduledDate.Date, qty));
+                            remaining -= qty;
+                        }
+                        return entries;
+                    })
+                    .OrderBy(x => x.Date)
+                    .ToList();
 
-                DateTime? nextExpectedDelivery =
-                    scheduleLines
-                        .Where(x =>
-                            relevantPoLineIds.Contains(
-                                x.PoLineId))
-                        .Select(x =>
-                            (DateTime?)x.ScheduledDate)
-                        .OrderBy(x => x)
-                        .FirstOrDefault();
+                DateTime? nextExpectedDelivery = validSchedules.Count > 0
+                    ? validSchedules[0].Date
+                    : null;
 
+                var targetDate = philippineToday.AddDays(filter.TargetCoverDays);
+                decimal scheduledWithinTarget = validSchedules
+                    .Where(x => x.Date <= targetDate)
+                    .Sum(x => x.Qty);
+
+                decimal suggestedOrderQty = Math.Max(
+                    0m,
+                    targetStockQty - currentStock - scheduledWithinTarget
+                );
+
+                // Simulate daily demand up to each scheduled delivery.
+                // If available stock cannot bridge to an arrival, the
+                // material is at risk of stockout despite open POs.
+                bool projectedStockoutBeforeDelivery = false;
+                if (averageDailyUsage > 0 && validSchedules.Count > 0)
+                {
+                    decimal projectedStock = currentStock;
+                    var previousDate = philippineToday;
+                    foreach (var delivery in validSchedules)
+                    {
+                        int daysUntilDelivery = (delivery.Date - previousDate).Days;
+                        decimal demandUntilDelivery = averageDailyUsage * daysUntilDelivery;
+                        if (projectedStock < demandUntilDelivery)
+                        {
+                            projectedStockoutBeforeDelivery = true;
+                            break;
+                        }
+                        projectedStock = projectedStock - demandUntilDelivery + delivery.Qty;
+                        previousDate = delivery.Date;
+                    }
+                }
+
+                // Without a scheduled delivery, an established quote lead
+                // time can still identify an impending stockout risk.
+                bool cannotCoverLeadTime = leadTimeDays.HasValue
+                    && averageDailyUsage > 0
+                    && currentStock < averageDailyUsage * leadTimeDays.Value;
 
                 string supplierName = "";
 
@@ -1909,19 +1984,17 @@ namespace inventory_api.Services.Reports.RawMaterials
                 {
                     status = "NO_USAGE_HISTORY";
                 }
-                else if (currentStock <= 0)
+                else if (currentStock <= 0 || projectedStockoutBeforeDelivery ||
+                         (cannotCoverLeadTime && validSchedules.Count == 0))
                 {
-                    status = incomingPoQty > 0
-                        ? "WATCH"
-                        : "CRITICAL";
+                    status = "CRITICAL";
                 }
-                else if (stockPosition <= reorderPoint)
+                else if (currentStock <= reorderPoint &&
+                         currentStock + scheduledWithinTarget <= reorderPoint)
                 {
-                    status = incomingPoQty > 0
-                        ? "WATCH"
-                        : "REORDER";
+                    status = "REORDER";
                 }
-                else if (suggestedOrderQty > 0)
+                else if (currentStock <= reorderPoint || suggestedOrderQty > 0)
                 {
                     status = "WATCH";
                 }
@@ -1929,7 +2002,6 @@ namespace inventory_api.Services.Reports.RawMaterials
                 {
                     status = "HEALTHY";
                 }
-
 
                 result.Add(
                     new RawMaterialForecastItemDto

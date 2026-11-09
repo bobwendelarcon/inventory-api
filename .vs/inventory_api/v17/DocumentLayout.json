@@ -1164,7 +1164,7 @@
               "RelativeDocumentMoniker": "Services\\Reports\\RawMaterials\\RawMaterialReportService.cs",
               "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Reports\\RawMaterials\\RawMaterialReportService.cs",
               "RelativeToolTip": "Services\\Reports\\RawMaterials\\RawMaterialReportService.cs",
-              "ViewState": "AgIAANQFAAAAAAAAAAAgwCkIAAAjAAAAAAAAAA==",
+              "ViewState": "AgIAAGMIAAAAAAAAAAAIwIUIAAArAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-09-02T05:04:38.82Z",
               "EditorCaption": ""
@@ -1179,8 +1179,7 @@
               "RelativeToolTip": "appsettings.json",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-05-28T06:15:13.988Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-28T06:15:13.988Z"
             },
             {
               "$type": "Document",
