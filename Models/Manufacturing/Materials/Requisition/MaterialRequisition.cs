@@ -39,6 +39,27 @@
 
         public string? ApprovalRemarks { get; set; }
 
+        // Warehouse Staff - First Approval
+        public string? StaffApprovedBy { get; set; }
+        public DateTime? StaffApprovedAt { get; set; }
+        public string? StaffApprovalRemarks { get; set; }
+
+
+        
+public string? WarehouseConfirmedBy { get; set; }
+
+public DateTime? WarehouseConfirmedAt { get; set; }
+
+
+        // Warehouse Head - Final Approval
+        public string? HeadApprovedBy { get; set; }
+        public DateTime? HeadApprovedAt { get; set; }
+        public string? HeadApprovalRemarks { get; set; }
+
+
+
+
+
         public string? RejectedBy { get; set; }
 
         public DateTime? RejectedAt { get; set; }

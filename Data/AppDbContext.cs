@@ -74,6 +74,10 @@ namespace inventory_api.Data
         public DbSet<MaterialRequisition> MaterialRequisitions { get; set; }
         public DbSet<MaterialRequisitionLine> MaterialRequisitionLines { get; set; }
 
+        public DbSet<MaterialRequisitionAllocation>
+    MaterialRequisitionAllocations
+        { get; set; }
+
 
         //purchasing
         public DbSet<MprfHeader> PurchasingMprfHeaders { get; set; }
@@ -1194,8 +1198,8 @@ namespace inventory_api.Data
                     .HasColumnName("time_served");
 
                 entity.Property(e => e.Status)
-                    .HasColumnName("status")
-                    .HasMaxLength(20);
+         .HasColumnName("status")
+         .HasMaxLength(40);
 
                 entity.Property(e => e.Remarks)
                     .HasColumnName("remarks")
@@ -1222,6 +1226,40 @@ namespace inventory_api.Data
 
                 entity.Property(e => e.ApprovalRemarks)
                     .HasColumnName("approval_remarks")
+                    .HasMaxLength(500);
+
+                // Warehouse Staff - First Approval
+                entity.Property(e => e.StaffApprovedBy)
+                    .HasColumnName("staff_approved_by")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.StaffApprovedAt)
+                    .HasColumnName("staff_approved_at");
+
+                entity.Property(e => e.StaffApprovalRemarks)
+                    .HasColumnName("staff_approval_remarks")
+                    .HasMaxLength(500);
+
+
+                // Warehouse Allocation Confirmation
+                entity.Property(e => e.WarehouseConfirmedBy)
+                    .HasColumnName("warehouse_confirmed_by")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.WarehouseConfirmedAt)
+                    .HasColumnName("warehouse_confirmed_at");
+
+
+                // Warehouse Head - Final Approval
+                entity.Property(e => e.HeadApprovedBy)
+                    .HasColumnName("head_approved_by")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.HeadApprovedAt)
+                    .HasColumnName("head_approved_at");
+
+                entity.Property(e => e.HeadApprovalRemarks)
+                    .HasColumnName("head_approval_remarks")
                     .HasMaxLength(500);
 
                 entity.Property(e => e.RejectedBy)
@@ -1282,6 +1320,11 @@ namespace inventory_api.Data
                     .HasColumnName("requested_quantity")
                     .HasPrecision(18, 4);
 
+                entity.Property(e => e.AllocationMethod)
+    .HasColumnName("allocation_method")
+    .HasMaxLength(30)
+    .HasDefaultValue("MANUAL");
+
                 entity.Property(e => e.ActualQuantity)
                     .HasColumnName("actual_quantity")
                     .HasPrecision(18, 4);
@@ -1302,6 +1345,74 @@ namespace inventory_api.Data
 
                 entity.Property(e => e.UpdatedAt)
                     .HasColumnName("updated_at");
+
+
+
+
+            });
+
+            // ============================================================
+            // MATERIAL REQUISITION ALLOCATION
+            // Production proposals and Warehouse allocations
+            // ============================================================
+
+            modelBuilder.Entity<MaterialRequisitionAllocation>(entity =>
+            {
+                entity.ToTable("material_requisition_allocation");
+
+                entity.HasKey(e => e.AllocationId);
+
+                entity.Property(e => e.AllocationId)
+                    .HasColumnName("allocation_id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.RequisitionLineId)
+                    .HasColumnName("requisition_line_id");
+
+                entity.Property(e => e.MaterialLotId)
+                    .HasColumnName("material_lot_id");
+
+                entity.Property(e => e.LotNo)
+                    .HasColumnName("lot_no")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.AllocationStage)
+                    .HasColumnName("allocation_stage")
+                    .HasMaxLength(30);
+
+                entity.Property(e => e.AllocationMethod)
+                    .HasColumnName("allocation_method")
+                    .HasMaxLength(30);
+
+                entity.Property(e => e.AllocatedQuantity)
+                    .HasColumnName("allocated_quantity")
+                    .HasPrecision(18, 4);
+
+                entity.Property(e => e.ReleasedQuantity)
+                    .HasColumnName("released_quantity")
+                    .HasPrecision(18, 4)
+                    .HasDefaultValue(0m);
+
+                entity.Property(e => e.AllocatedBy)
+                    .HasColumnName("allocated_by")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.AllocatedAt)
+                    .HasColumnName("allocated_at");
+
+                entity.Property(e => e.Remarks)
+                    .HasColumnName("remarks")
+                    .HasMaxLength(500);
+
+                // One MRS line can have multiple lot allocations
+                entity.HasOne(e => e.RequisitionLine)
+                    .WithMany(e => e.Allocations)
+                    .HasForeignKey(e => e.RequisitionLineId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(e => e.RequisitionLineId);
+
+                entity.HasIndex(e => e.MaterialLotId);
             });
 
 

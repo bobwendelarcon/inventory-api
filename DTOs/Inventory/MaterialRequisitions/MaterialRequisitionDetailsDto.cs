@@ -33,6 +33,11 @@
         public string? SubmittedBy { get; set; }
         public DateTime? SubmittedAt { get; set; }
 
+
+        public string? WarehouseConfirmedBy { get; set; }
+        public DateTime? WarehouseConfirmedAt { get; set; }
+
+
         public string? ApprovedBy { get; set; }
         public DateTime? ApprovedAt { get; set; }
         public string? ApprovalRemarks { get; set; }
@@ -69,7 +74,24 @@
 
         public DateTime? ExpirationDate { get; set; }
 
+        public string AllocationMethod { get; set; } = "MANUAL";
+
+        public List<MaterialRequisitionAllocationDto> Allocations
+        { get; set; } = new();
+
         public decimal RequestedQuantity { get; set; }
+
+        public decimal AllocatedQuantity { get; set; }
+
+
+        public decimal ProductionProposedQuantity { get; set; }
+
+        public decimal WarehouseConfirmedQuantity { get; set; }
+
+
+        public decimal ShortageQuantity { get; set; }
+
+        public decimal ReleasedQuantity { get; set; }
 
         public decimal? ActualQuantity { get; set; }
 
@@ -82,5 +104,24 @@
 
 
         public bool IsLotTracked { get; set; }
+    }
+
+    public class MaterialRequisitionAllocationDto
+    {
+        public int AllocationId { get; set; }
+
+        public int? MaterialLotId { get; set; }
+
+        public string? LotNo { get; set; }
+
+        public string AllocationStage { get; set; }
+            = string.Empty;
+
+        public string AllocationMethod { get; set; }
+            = string.Empty;
+
+        public decimal AllocatedQuantity { get; set; }
+
+        public decimal ReleasedQuantity { get; set; }
     }
 }

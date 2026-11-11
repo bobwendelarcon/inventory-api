@@ -12,6 +12,13 @@
 
         public string? LotNo { get; set; }
 
+        // Allocation method selected by Production
+        public string AllocationMethod { get; set; } = "MANUAL";
+
+        // Navigation to multiple allocations
+        public ICollection<MaterialRequisitionAllocation> Allocations
+        { get; set; } = new List<MaterialRequisitionAllocation>();
+
         public decimal RequestedQuantity { get; set; }
 
         public decimal? ActualQuantity { get; set; }

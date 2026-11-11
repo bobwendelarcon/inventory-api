@@ -63,6 +63,53 @@ namespace inventory_api.Controllers.Inventory
         }
 
 
+
+        // =========================================================
+        // PRODUCTION - PREVIEW AUTO FEFO ALLOCATION
+        // =========================================================
+        [HttpPost("preview-fefo")]
+        public async Task<IActionResult> PreviewFefo(
+            [FromBody] PreviewMaterialFefoDto dto)
+        {
+            try
+            {
+                var result =
+                    await _service.PreviewFefoAllocationAsync(dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    data = result
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Unable to preview material allocation."
+                });
+            }
+        }
+
+
+
         [HttpGet("available-lots")]
         public async Task<IActionResult> GetAvailableLots(
     [FromQuery] int materialId,
@@ -215,9 +262,10 @@ namespace inventory_api.Controllers.Inventory
         // =========================================================
         // APPROVE
         // =========================================================
+        [NonAction]
         [HttpPost("{id:int}/approve")]
         public async Task<IActionResult> Approve(
-            int id,
+             int id,
             [FromBody] ApproveMaterialRequisitionDto dto)
         {
             try
@@ -313,6 +361,7 @@ namespace inventory_api.Controllers.Inventory
         // =========================================================
         // RELEASE / STOCK OUT
         // =========================================================
+     
         [HttpPost("{id:int}/release")]
         public async Task<IActionResult> Release(
             int id,
@@ -356,6 +405,143 @@ namespace inventory_api.Controllers.Inventory
                 });
             }
         }
+
+
+
+        // =========================================================
+        // WAREHOUSE - CONFIRM PHYSICAL ALLOCATION
+        // =========================================================
+        [HttpPost("{id:int}/confirm-warehouse-allocation")]
+        public async Task<IActionResult> ConfirmWarehouseAllocation(
+            int id,
+            [FromBody] ConfirmMaterialAllocationDto dto)
+        {
+            try
+            {
+                await _service.ConfirmWarehouseAllocationAsync(id, dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Warehouse allocation confirmed successfully."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Unable to confirm warehouse allocation."
+                });
+            }
+        }
+
+        // =========================================================
+        // WAREHOUSE STAFF - FIRST APPROVAL
+        // =========================================================
+        [HttpPost("{id:int}/staff-approve")]
+        public async Task<IActionResult> ApproveByStaff(
+            int id,
+            [FromBody] ApproveMaterialRequisitionDto dto)
+        {
+            try
+            {
+                await _service.ApproveByStaffAsync(
+                    id, dto.ApprovedBy, dto.Remarks);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "MRS approved by Warehouse Staff."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Unable to approve MRS by Warehouse Staff."
+                });
+            }
+        }
+
+        // =========================================================
+        // WAREHOUSE HEAD - FINAL APPROVAL
+        // =========================================================
+        [HttpPost("{id:int}/head-approve")]
+        public async Task<IActionResult> ApproveByHead(
+            int id,
+            [FromBody] ApproveMaterialRequisitionDto dto)
+        {
+            try
+            {
+                await _service.ApproveByHeadAsync(
+                    id, dto.ApprovedBy, dto.Remarks);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "MRS approved by Warehouse Head."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Unable to approve MRS by Warehouse Head."
+                });
+            }
+        }
+
 
     }
 }

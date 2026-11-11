@@ -49,326 +49,223 @@ namespace inventory_api.Services
         // GET ALL (FOR TABLE)
         // =========================================
         public async Task<DailyOrderListResponse> GetAllAsync(
-       string? className,
-       int? year,
-       string? month,
-       string? status,
-       string? search,
-       string? sortBy,
-       string? sortDir,
-       int page = 1,
-       int pageSize = 50)
+      string? className, int? year, string? month, string? status,
+      string? search, string? sortBy, string? sortDir,
+      int page = 1, int pageSize = 50)
         {
-            var headers = await _context.DailyOrderHeaders
-     .Where(h => !h.is_deleted)
-     .Include(h => h.Lines)
-     .ToListAsync();
+            page = Math.Max(1, page);
+            pageSize = pageSize <= 0 ? 50 : Math.Min(pageSize, 200);
 
             var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
             var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
 
-            var products = await _context.Products.ToListAsync();
-            var productDict = products.ToDictionary(x => x.product_id, x => x);
-
-            // =========================================
-            // STOCK TOTALS FOR DAILY ORDER LIST
-            // =========================================
-
-            // all active lot stock
-            var lotStocks = await _context.ProductLotNumbers
-                .Where(x => !x.is_deleted)
-                .AsNoTracking()
-                .ToListAsync();
-
-            // all active reservations from non-deleted orders
-            var reservationList = await _context.DailyOrderAllocations
-                .Where(a => a.allocated_qty > 0)
-                .Join(
-                    _context.DailyOrderLines,
-                    a => a.order_line_id,
-                    dl => dl.order_line_id,
-                    (a, dl) => new
-                    {
-                        Allocation = a,
-                        Line = dl
-                    })
-                .Join(
-                    _context.DailyOrderHeaders,
-                    x => x.Line.order_id,
-                    h => h.order_id,
-                    (x, h) => new
-                    {
-                        x.Allocation.product_id,
-                        x.Allocation.branch_id,
-                        x.Allocation.lot_no,
-                        x.Allocation.allocated_qty,
-                        HeaderDeleted = h.is_deleted
-                    })
-                .Where(x => !x.HeaderDeleted)
-                .AsNoTracking()
-                .ToListAsync();
-
-
-
-
-            var users = await _context.Users
-    .AsNoTracking()
-    .ToListAsync();
-
-            var userDict = users
-     .SelectMany(u => new[]
-     {
-        new { Key = (u.user_id ?? "").Trim().ToLower(), Value = u.full_name },
-        new { Key = (u.username ?? "").Trim().ToLower(), Value = u.full_name },
-        new { Key = (u.full_name ?? "").Trim().ToLower(), Value = u.full_name }
-     })
-     .Where(x => !string.IsNullOrWhiteSpace(x.Key))
-     .GroupBy(x => x.Key)
-     .ToDictionary(
-         g => g.Key,
-         g => g.First().Value
-     );
-
-            var result = headers
-      .SelectMany(h => h.Lines.Select(l =>
-      {
-          productDict.TryGetValue(l.product_id, out var p);
-
-          // =========================================
-          // TOTAL STOCK ACROSS ALL LOTS / WAREHOUSES
-          // =========================================
-
-          var productLots = lotStocks
-              .Where(x => x.product_id == l.product_id)
-              .ToList();
-
-          var totalOnHandStock =
-              productLots.Sum(x => x.quantity);
-
-          var totalReservedStock =
-              reservationList
-                  .Where(x => x.product_id == l.product_id)
-                  .Sum(x => x.allocated_qty);
-
-          var totalAvailableStock =
-              Math.Max(
-                  0,
-                  totalOnHandStock - totalReservedStock
-              );
-
-          return new DailyOrderListDto
-          {
-            OrderId = h.order_id,
-            OrderLineId = l.order_line_id,
-            ClassName = h.class_name ?? "",
-            Year = h.date_ordered?.Year ?? 0,
-            Month = h.date_ordered?.ToString("MMMM") ?? "",
-            OrderNo = h.order_no,
-            CustomerName = h.customer_name,
-            ProductName = p?.product_name ?? l.product_name,
-            ProductDescription = p?.product_description ?? "",
-            RequiredQty = l.required_qty,
-            AllocatedQty = l.allocated_qty,
-            RemainingQty = Math.Max(0, l.required_qty - l.dispatched_qty),
-            DispatchedQty = l.dispatched_qty,
-              TotalOnHandStock = totalOnHandStock,
-              TotalReservedStock = totalReservedStock,
-              TotalAvailableStock = totalAvailableStock,
-              CreatedBy = userDict.TryGetValue(
-        (h.created_by ?? "").Trim().ToLower(),
-        out var fullName)
-    ? fullName
-    : h.created_by,
-              CreatedAt = h.created_at,
-
-              // 🔥 ADD THESE
-              Uom = p?.uom ?? "",
-            PackQty = p?.pack_qty ?? 0,
-            PackUom = p?.pack_uom ?? "",
-
-            AllocationStatus = l.allocation_status,
-            DateOrdered = h.date_ordered,
-            DeliveryDate = h.delivery_date,
-            DateDelivered = h.date_delivered,
-            Status = h.status,
-            LineStatus = l.status,
-            SpecialInstructions = h.special_instructions,
-
-            AgingDays =
-                h.delivery_date.HasValue
-                ? (
-                    h.date_delivered.HasValue
-                        ? (h.date_delivered.Value.Date - h.delivery_date.Value.Date).Days
-                        : (today - h.delivery_date.Value.Date).Days
-                  )
-                : 0
-        };
-    }))
-    .AsQueryable();
+            // Build a SQL query over order LINES (the current UI paginates lines).
+            // Left join product master so search/sort uses its current display name.
+            var query =
+                from h in _context.DailyOrderHeaders.AsNoTracking()
+                join l in _context.DailyOrderLines.AsNoTracking()
+                    on h.order_id equals l.order_id
+                join p in _context.Products.AsNoTracking()
+                    on l.product_id equals p.product_id into productJoin
+                from p in productJoin.DefaultIfEmpty()
+                where !h.is_deleted
+                select new
+                {
+                    Header = h,
+                    Line = l,
+                    Product = p,
+                    ProductName = p != null ? p.product_name : l.product_name,
+                    ProductDescription = p != null ? p.product_description : ""
+                };
 
             if (!string.IsNullOrWhiteSpace(className))
-                result = result.Where(x => x.ClassName == className);
+                query = query.Where(x => x.Header.class_name == className);
 
             if (year.HasValue)
-                result = result.Where(x => x.Year == year.Value);
+                query = query.Where(x => x.Header.date_ordered.HasValue &&
+                    x.Header.date_ordered.Value.Year == year.Value);
 
             if (!string.IsNullOrWhiteSpace(month))
-                result = result.Where(x => x.Month == month);
-
-            //if (string.IsNullOrWhiteSpace(status))
-            //{
-            //    result = result.Where(x => (x.Status ?? "").Trim().ToUpper() != "COMPLETED");
-            //}
-            //else
-            //{
-            //    var selectedStatus = status.Trim().ToUpper();
-            //    result = result.Where(x => (x.Status ?? "").Trim().ToUpper() == selectedStatus);
-            //}
-            if (!string.IsNullOrWhiteSpace(status))
             {
-                var selectedStatus = status.Trim().ToUpper();
-
-                if (selectedStatus == "ALL_EXCL_COMPLETED")
-                {
-                    result = result.Where(x =>
-                        (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
-                    );
-                }
-                else if (selectedStatus == "ALL")
-                {
-                    // no filter
-                }
-                else if (selectedStatus == "OVERDUE")
-                {
-                    result = result.Where(x =>
-                        x.DeliveryDate.HasValue &&
-                        x.DeliveryDate.Value.Date < today &&
-                        (x.Status ?? "").Trim().ToUpper() != "COMPLETED" &&
-                        (x.Status ?? "").Trim().ToUpper() != "CANCELLED"
-                    );
-                }
+                var monthNumber = Array.FindIndex(
+                    System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.MonthNames,
+                    m => string.Equals(m, month.Trim(), StringComparison.OrdinalIgnoreCase)) + 1;
+                if (monthNumber is >= 1 and <= 12)
+                    query = query.Where(x => x.Header.date_ordered.HasValue &&
+                        x.Header.date_ordered.Value.Month == monthNumber);
                 else
-                {
-                    result = result.Where(x =>
-                        (x.Status ?? "").Trim().ToUpper() == selectedStatus
-                    );
-                }
+                    query = query.Where(x => false);
             }
-            else
-            {
-                //result = result.Where(x =>
-                //    (x.Status ?? "").Trim().ToUpper() != "COMPLETED"
-                //);
-            }
-            //if (!string.IsNullOrWhiteSpace(search))
-            //{
-            //    var keyword = search.Trim().ToLower();
-            //    result = result.Where(x =>
-            //        (x.CustomerName ?? "").ToLower().Contains(keyword) ||
-            //        (x.OrderNo ?? "").ToLower().Contains(keyword) ||
-            //        (x.ProductName ?? "").ToLower().Contains(keyword));
-            //}
+
+            var selectedStatus = (status ?? "ALL").Trim().ToUpperInvariant();
+            if (selectedStatus == "ALL_EXCL_COMPLETED")
+                query = query.Where(x => x.Header.status == null ||
+                    x.Header.status.Trim().ToUpper() != "COMPLETED");
+            else if (selectedStatus == "OVERDUE")
+                query = query.Where(x => x.Header.delivery_date.HasValue &&
+                    x.Header.delivery_date.Value < today &&
+                    x.Header.status != null &&
+                    x.Header.status.Trim().ToUpper() != "COMPLETED" &&
+                    x.Header.status.Trim().ToUpper() != "CANCELLED");
+            else if (selectedStatus != "ALL" && selectedStatus != "")
+                query = query.Where(x => x.Header.status != null &&
+                    x.Header.status.Trim().ToUpper() == selectedStatus);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var keyword = search.Trim().ToLower();
-
-                result = result.Where(x =>
-                    (x.CustomerName ?? "").ToLower().Contains(keyword) ||
-                    (x.OrderNo ?? "").ToLower().Contains(keyword) ||
+                query = query.Where(x =>
+                    (x.Header.customer_name ?? "").ToLower().Contains(keyword) ||
+                    (x.Header.order_no ?? "").ToLower().Contains(keyword) ||
                     (x.ProductName ?? "").ToLower().Contains(keyword) ||
-                    (x.ProductDescription ?? "").ToLower().Contains(keyword)
-                );
+                    (x.ProductDescription ?? "").ToLower().Contains(keyword));
             }
 
-            var filteredList = result.ToList();
+            // Count matching LINES, not headers, to preserve the scroll API contract.
+            var totalRecords = await query.CountAsync();
 
-            var isDesc = (sortDir ?? "asc").Trim().ToLower() == "desc";
-            var sortKey = (sortBy ?? "dateOrdered").Trim();
+            // Summary counts distinct matching orders, not product lines.
+            // This also preserves search behavior: an order is counted if any line matches.
+            var summaryRows = await query
+                .Select(x => new
+                {
+                    x.Header.order_id,
+                    x.Header.status,
+                    x.Header.delivery_date
+                })
+                .Distinct()
+                .ToListAsync();
 
-            filteredList = sortKey switch
-            {
-                "dateOrdered" => isDesc
-    ? filteredList
-        .OrderByDescending(x => x.DateOrdered)
-        .ThenByDescending(x => x.CreatedAt)
-        .ToList()
-    : filteredList
-        .OrderBy(x => x.DateOrdered)
-        .ThenBy(x => x.CreatedAt)
-        .ToList(),
-
-                "customer" => isDesc
-                    ? filteredList.OrderByDescending(x => x.CustomerName).ToList()
-                    : filteredList.OrderBy(x => x.CustomerName).ToList(),
-
-                "product" => isDesc
-                    ? filteredList.OrderByDescending(x => x.ProductName).ToList()
-                    : filteredList.OrderBy(x => x.ProductName).ToList(),
-
-                "remainingQty" => isDesc
-                    ? filteredList.OrderByDescending(x => x.RemainingQty).ToList()
-                    : filteredList.OrderBy(x => x.RemainingQty).ToList(),
-
-                "requiredQty" => isDesc
-                    ? filteredList.OrderByDescending(x => x.RequiredQty).ToList()
-                    : filteredList.OrderBy(x => x.RequiredQty).ToList(),
-
-                _ => isDesc
-                    ? filteredList.OrderByDescending(x => x.DeliveryDate ?? DateTime.MaxValue).ToList()
-                    : filteredList.OrderBy(x => x.DeliveryDate ?? DateTime.MaxValue).ToList()
-            };
-
-            var grouped = filteredList.GroupBy(x => x.OrderId);
-
+            var grouped = summaryRows.GroupBy(x => x.order_id)
+                .Select(g => g.First()).ToList();
             var summary = new DailyOrderSummaryDto
             {
-                TotalOrders = grouped.Count(),
-
-                ForAllocation = grouped.Count(g =>
-                    (g.First().Status ?? "").Trim().ToUpper() == "FOR ALLOCATION"
-     ),
-
-                Allocated = grouped.Count(g =>
-                    (g.First().Status ?? "").Trim().ToUpper() == "ALLOCATED"
-     ),
-
-                Partial = grouped.Count(g =>
-                    (g.First().Status ?? "").Trim().ToUpper() == "PARTIALLY ALLOCATED"
-     ),
-
-                ReadyDispatch = grouped.Count(g =>
-                    (g.First().Status ?? "").Trim().ToUpper() == "READY FOR DISPATCH"
-     ),
-
-                PartiallyDelivered = grouped.Count(g =>
-                    (g.First().Status ?? "").Trim().ToUpper() == "PARTIALLY DELIVERED"
-     ),
-
-                Completed = grouped.Count(g =>
-                    (g.First().Status ?? "").Trim().ToUpper() == "COMPLETED"
-     ),
-
-                Overdue = grouped.Count(g =>
-    g.Any(x =>
-        x.DeliveryDate.HasValue &&
-        x.DeliveryDate.Value.Date < today &&
-        (g.First().Status ?? "").Trim().ToUpper() != "COMPLETED" &&
-        (g.First().Status ?? "").Trim().ToUpper() != "CANCELLED"
-    )
-)
+                TotalOrders = grouped.Count,
+                ForAllocation = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "FOR ALLOCATION"),
+                Allocated = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "ALLOCATED"),
+                Partial = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "PARTIALLY ALLOCATED"),
+                ReadyDispatch = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "READY FOR DISPATCH"),
+                PartiallyDelivered = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "PARTIALLY DELIVERED"),
+                Completed = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "COMPLETED"),
+                Overdue = grouped.Count(x => x.delivery_date.HasValue &&
+                    x.delivery_date.Value.Date < today &&
+                    (x.status ?? "").Trim().ToUpperInvariant() != "COMPLETED" &&
+                    (x.status ?? "").Trim().ToUpperInvariant() != "CANCELLED")
             };
 
+            var isDesc = string.Equals(sortDir?.Trim(), "desc", StringComparison.OrdinalIgnoreCase);
+            var sortKey = (sortBy ?? "dateOrdered").Trim();
+            // Final order-line ID tie-breaker prevents ambiguous ordering between pages.
+            var ordered = sortKey switch
+            {
+                "dateOrdered" => isDesc
+                    ? query.OrderByDescending(x => x.Header.date_ordered)
+                        .ThenByDescending(x => x.Header.created_at)
+                        .ThenByDescending(x => x.Line.order_line_id)
+                    : query.OrderBy(x => x.Header.date_ordered)
+                        .ThenBy(x => x.Header.created_at)
+                        .ThenBy(x => x.Line.order_line_id),
+                "customer" => isDesc
+                    ? query.OrderByDescending(x => x.Header.customer_name).ThenByDescending(x => x.Line.order_line_id)
+                    : query.OrderBy(x => x.Header.customer_name).ThenBy(x => x.Line.order_line_id),
+                "product" => isDesc
+                    ? query.OrderByDescending(x => x.ProductName).ThenByDescending(x => x.Line.order_line_id)
+                    : query.OrderBy(x => x.ProductName).ThenBy(x => x.Line.order_line_id),
+                "remainingQty" => isDesc
+                    ? query.OrderByDescending(x => x.Line.required_qty - x.Line.dispatched_qty)
+                        .ThenByDescending(x => x.Line.order_line_id)
+                    : query.OrderBy(x => x.Line.required_qty - x.Line.dispatched_qty)
+                        .ThenBy(x => x.Line.order_line_id),
+                "requiredQty" => isDesc
+                    ? query.OrderByDescending(x => x.Line.required_qty).ThenByDescending(x => x.Line.order_line_id)
+                    : query.OrderBy(x => x.Line.required_qty).ThenBy(x => x.Line.order_line_id),
+                _ => isDesc
+                    ? query.OrderByDescending(x => x.Header.delivery_date).ThenByDescending(x => x.Line.order_line_id)
+                    : query.OrderBy(x => x.Header.delivery_date == null)
+                        .ThenBy(x => x.Header.delivery_date).ThenBy(x => x.Line.order_line_id)
+            };
 
-            page = page <= 0 ? 1 : page;
-            pageSize = pageSize <= 0 ? 50 : pageSize;
-
-            var totalRecords = filteredList.Count;
-
-            var pagedData = filteredList
+            var pageRows = await ordered
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToList();
+                .ToListAsync();
+
+            var productIds = pageRows.Select(x => x.Line.product_id).Distinct().ToList();
+            var stockByProduct = await _context.ProductLotNumbers.AsNoTracking()
+                .Where(x => !x.is_deleted && productIds.Contains(x.product_id))
+                .GroupBy(x => x.product_id)
+                .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.quantity) })
+                .ToDictionaryAsync(x => x.ProductId, x => x.Qty);
+
+            var reservedByProduct = await (
+                from a in _context.DailyOrderAllocations.AsNoTracking()
+                join l in _context.DailyOrderLines.AsNoTracking()
+                    on a.order_line_id equals l.order_line_id
+                join h in _context.DailyOrderHeaders.AsNoTracking()
+                    on l.order_id equals h.order_id
+                where !h.is_deleted && a.allocated_qty > 0 && productIds.Contains(a.product_id)
+                group a by a.product_id into g
+                select new { ProductId = g.Key, Qty = g.Sum(a => a.allocated_qty) }
+            ).ToDictionaryAsync(x => x.ProductId, x => x.Qty);
+
+            // User table is generally small; retain the existing flexible ID/username/name lookup.
+            var users = await _context.Users.AsNoTracking().ToListAsync();
+            var userDict = users
+                .SelectMany(u => new[]
+                {
+                    new { Key = (u.user_id ?? "").Trim().ToLowerInvariant(), Value = u.full_name },
+                    new { Key = (u.username ?? "").Trim().ToLowerInvariant(), Value = u.full_name },
+                    new { Key = (u.full_name ?? "").Trim().ToLowerInvariant(), Value = u.full_name }
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key))
+                .GroupBy(x => x.Key)
+                .ToDictionary(g => g.Key, g => g.First().Value);
+
+            var pagedData = pageRows.Select(x =>
+            {
+                stockByProduct.TryGetValue(x.Line.product_id, out var onHand);
+                reservedByProduct.TryGetValue(x.Line.product_id, out var reserved);
+                var h = x.Header;
+                var l = x.Line;
+                var p = x.Product;
+                var creatorKey = (h.created_by ?? "").Trim().ToLowerInvariant();
+                return new DailyOrderListDto
+                {
+                    OrderId = h.order_id,
+                    OrderLineId = l.order_line_id,
+                    ClassName = h.class_name ?? "",
+                    Year = h.date_ordered?.Year ?? 0,
+                    Month = h.date_ordered?.ToString("MMMM") ?? "",
+                    OrderNo = h.order_no,
+                    CustomerName = h.customer_name,
+                    ProductName = p?.product_name ?? l.product_name,
+                    ProductDescription = p?.product_description ?? "",
+                    RequiredQty = l.required_qty,
+                    AllocatedQty = l.allocated_qty,
+                    RemainingQty = Math.Max(0, l.required_qty - l.dispatched_qty),
+                    DispatchedQty = l.dispatched_qty,
+                    TotalOnHandStock = onHand,
+                    TotalReservedStock = reserved,
+                    TotalAvailableStock = Math.Max(0, onHand - reserved),
+                    CreatedBy = userDict.TryGetValue(creatorKey, out var fullName) ? fullName : h.created_by,
+                    CreatedAt = h.created_at,
+                    Uom = p?.uom ?? "",
+                    PackQty = p?.pack_qty ?? 0,
+                    PackUom = p?.pack_uom ?? "",
+                    AllocationStatus = l.allocation_status,
+                    DateOrdered = h.date_ordered,
+                    DeliveryDate = h.delivery_date,
+                    DateDelivered = h.date_delivered,
+                    Status = h.status,
+                    LineStatus = l.status,
+                    SpecialInstructions = h.special_instructions,
+                    AgingDays = h.delivery_date.HasValue
+                        ? (h.date_delivered.HasValue
+                            ? (h.date_delivered.Value.Date - h.delivery_date.Value.Date).Days
+                            : (today - h.delivery_date.Value.Date).Days)
+                        : 0
+                };
+            }).ToList();
 
             return new DailyOrderListResponse
             {
@@ -377,9 +274,12 @@ namespace inventory_api.Services
                 TotalRecords = totalRecords,
                 Page = page,
                 PageSize = pageSize,
-                HasMore = page * pageSize < totalRecords
+                HasMore = (long)page * pageSize < totalRecords
             };
         }
+
+
+
 
 
 
