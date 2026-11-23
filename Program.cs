@@ -19,12 +19,128 @@ using inventory_api.Services.Reports.RawMaterials;
 using inventory_api.Services.Reports.TimeInMotion;
 using Microsoft.EntityFrameworkCore;
 using System;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.OpenApi.Models;
+
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+// JWT Authentication Configuration
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? throw new InvalidOperationException("JWT Issuer missing.");
+
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? throw new InvalidOperationException("JWT Audience missing.");
+
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("JWT signing key missing.");
+
+if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException(
+        "JWT signing key must be at least 32 bytes.");
+}
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters =
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = jwtIssuer,
+
+                ValidateAudience = true,
+                ValidAudience = jwtAudience,
+
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(jwtKey)),
+
+                ClockSkew = TimeSpan.FromMinutes(1)
+            };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userId = context.Principal?
+                    .FindFirstValue(ClaimTypes.NameIdentifier);
+
+                var tokenRole = context.Principal?
+                    .FindFirstValue(ClaimTypes.Role);
+
+                if (string.IsNullOrWhiteSpace(userId) ||
+                    string.IsNullOrWhiteSpace(tokenRole))
+                {
+                    context.Fail("Invalid user identity.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices
+                    .GetRequiredService<AppDbContext>();
+
+                var user = await db.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u =>
+                        u.user_id == userId &&
+                        !u.is_deleted);
+
+                if (user == null)
+                {
+                    context.Fail("User account is inactive.");
+                    return;
+                }
+
+                if (!string.Equals(
+                    user.role_name,
+                    tokenRole,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Fail("User role has changed.");
+                    return;
+                }
+            }
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "Enter your JWT token",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
@@ -60,6 +176,8 @@ builder.Services.AddScoped<InventoryTransactionService>();
 builder.Services.AddScoped<BranchesService>();
 builder.Services.AddScoped<ProductLotNumberService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<MrsPermissionService>();
 builder.Services.AddScoped<PartnerService>();
 builder.Services.AddScoped<InventoryDisplayService>();
 builder.Services.AddScoped<DailyOrderService>();
@@ -134,6 +252,11 @@ app.UseSwaggerUI();
 // app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+
+// JWT Authentication
+app.UseAuthentication();
+
+// Check user permissions
 app.UseAuthorization();
 
 app.MapControllers();

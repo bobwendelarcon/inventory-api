@@ -102,21 +102,24 @@ namespace inventory_api.Services
                 .FirstOrDefaultAsync();
         }
 
-        public async Task UpdateMyAccountAsync(string id, UpdateMyAccountDto dto)
+        public async Task UpdateMyAccountAsync(
+       string id,
+       UpdateMyAccountDto dto)
         {
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.user_id == id && !u.is_deleted);
+                .FirstOrDefaultAsync(u =>
+                    u.user_id == id &&
+                    !u.is_deleted);
 
             if (user == null)
                 throw new Exception("User not found.");
 
+            // Only allow basic profile updates
             user.full_name = dto.full_name;
             user.username = dto.username;
 
-            if (!string.IsNullOrWhiteSpace(dto.password_hash))
-            {
-                user.password_hash = BCrypt.Net.BCrypt.HashPassword(dto.password_hash);
-            }
+            // Password changes must use ChangePasswordAsync()
+            // which verifies the current password.
 
             user.updated_at = DateTime.UtcNow;
 

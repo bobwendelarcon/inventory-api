@@ -409,11 +409,13 @@ namespace inventory_api.Services.Inventory
             var inventoryLots =
                 await _context.MaterialLotNumbers
                     .AsNoTracking()
-                    .Where(x =>
-                        x.material_id == materialId &&
-                        x.branch_id == branchId &&
-                        x.is_active &&
-                        x.quantity > 0)
+                   .Where(x =>
+    x.material_id == materialId &&
+    x.branch_id == branchId &&
+    x.is_active &&
+    x.quantity > 0 &&
+    (isLotTracked ||
+     x.lot_no == $"NON-LOT-MAT-{materialId}"))
                     .OrderBy(x =>
                         x.expiration_date == null)
                     .ThenBy(x =>
@@ -563,20 +565,27 @@ namespace inventory_api.Services.Inventory
                         x.AllocationStage == "WAREHOUSE_CONFIRMED")
                     .ToList();
 
+                var preparedAllocations = lineAllocations
+    .Where(x =>
+        x.AllocationStage == "WAREHOUSE_PREPARED")
+    .ToList();
+
                 // A completed Warehouse confirmation may have
                 // zero allocation rows when stock is unavailable.
                 var requisitionConfirmed =
                     requisition.WarehouseConfirmedAt.HasValue;
 
-                var effectiveAllocations = requisitionConfirmed
-                    ? warehouseAllocations
-                    : productionAllocations;
+                var effectiveAllocations = preparedAllocations.Count > 0
+      ? preparedAllocations
+      : requisitionConfirmed
+          ? warehouseAllocations
+          : productionAllocations;
 
                 var allocatedQty = effectiveAllocations
                     .Sum(x => x.AllocatedQuantity);
 
-                var releasedQty = warehouseAllocations
-                    .Sum(x => x.ReleasedQuantity);
+                var releasedQty = lineAllocations
+     .Sum(x => x.ReleasedQuantity);
 
                 var availableQty = effectiveAllocations
                     .Where(x => x.MaterialLotId.HasValue)
@@ -730,8 +739,14 @@ namespace inventory_api.Services.Inventory
                     .MaterialRequisitionAllocations
                     .Where(x =>
                         lineIds.Contains(x.RequisitionLineId) &&
-                        x.AllocationStage == "WAREHOUSE_CONFIRMED")
+                        x.AllocationStage == "WAREHOUSE_PREPARED")
                     .ToListAsync();
+
+                if (allocations.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        "Warehouse physical preparation is required before release.");
+                }
 
                 if (allocations.Any(x => x.ReleasedQuantity > 0))
                     throw new InvalidOperationException(
@@ -782,23 +797,34 @@ namespace inventory_api.Services.Inventory
                     var confirmedQuantity = lineAllocations
                         .Sum(x => x.AllocatedQuantity);
 
-                    if (confirmedQuantity > line.RequestedQuantity)
+
+                    if (confirmedQuantity != line.RequestedQuantity)
+                    {
                         throw new InvalidOperationException(
-                            $"Confirmed quantity exceeds requested quantity for {material.material_name}.");
+                            $"Full preparation is required before releasing {material.material_name}. " +
+                            $"Requested: {line.RequestedQuantity:0.####}, " +
+                            $"Prepared: {confirmedQuantity:0.####}, " +
+                            $"Remaining: {(line.RequestedQuantity - confirmedQuantity):0.####}. " +
+                            "Please complete the allocation using another available lot.");
+                    }
 
                     if (lineDto.ActualQuantity < 0)
                         throw new InvalidOperationException(
                             "Actual quantity cannot be negative.");
 
-                    if (confirmedQuantity == 0 &&
-                        lineDto.ActualQuantity != 0)
+                    if (lineDto.ActualQuantity != confirmedQuantity)
                     {
                         throw new InvalidOperationException(
-                            $"Actual quantity must be zero when no stock is confirmed for {material.material_name}.");
+                            $"Actual released quantity must match the physically prepared " +
+                            $"quantity for {material.material_name}. " +
+                            $"Prepared: {confirmedQuantity:0.####}, " +
+                            $"Actual: {lineDto.ActualQuantity:0.####}.");
                     }
 
-                    // Actual quantity is recorded separately.
-                    // Inventory OUT uses confirmed allocation quantities.
+
+
+                    // Actual quantity must match the final physically prepared quantity.
+                    // Inventory OUT deducts WAREHOUSE_PREPARED allocations.
                     line.ActualQuantity = lineDto.ActualQuantity;
                     line.UpdatedAt = now;
 
@@ -1111,6 +1137,257 @@ namespace inventory_api.Services.Inventory
             await transaction.CommitAsync();
 
         }
+
+
+        public async Task PrepareWarehouseAllocationAsync(
+            int requisitionId,
+            ConfirmMaterialAllocationDto dto)
+        {
+            if (dto == null ||
+                string.IsNullOrWhiteSpace(dto.ConfirmedBy))
+                throw new InvalidOperationException(
+                    "Prepared By is required.");
+
+            if (dto.Lines == null || dto.Lines.Count == 0)
+                throw new InvalidOperationException(
+                    "At least one requisition line is required.");
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
+
+            var requisition = await _context.MaterialRequisitions
+                .Include(x => x.Lines)
+                .FirstOrDefaultAsync(x =>
+                    x.RequisitionId == requisitionId);
+
+            if (requisition == null)
+                throw new KeyNotFoundException(
+                    "Material requisition was not found.");
+
+            if (requisition.Status != "APPROVED")
+                throw new InvalidOperationException(
+                    "Only APPROVED requisitions can be prepared.");
+
+            if (!requisition.WarehouseConfirmedAt.HasValue)
+                throw new InvalidOperationException(
+                    "Warehouse allocation must be confirmed first.");
+
+            if (dto.Lines.Count != requisition.Lines.Count ||
+                dto.Lines.Select(x => x.RequisitionLineId)
+                    .Distinct().Count() != dto.Lines.Count)
+                throw new InvalidOperationException(
+                    "All requisition lines must be included exactly once.");
+
+            var now = DateTime.UtcNow;
+            var totalsByLot = new Dictionary<int, decimal>();
+            var stockByLot = new Dictionary<int, decimal>();
+
+
+            var requisitionLineIds = requisition.Lines
+                .Select(x => x.RequisitionLineId)
+                .ToList();
+
+            var confirmedAllocations = await _context
+                .MaterialRequisitionAllocations
+                .AsNoTracking()
+                .Where(x =>
+                    requisitionLineIds.Contains(x.RequisitionLineId) &&
+                    x.AllocationStage == "WAREHOUSE_CONFIRMED")
+                .ToListAsync();
+
+
+            var newAllocations =
+                new List<MaterialRequisitionAllocation>();
+
+            foreach (var lineDto in dto.Lines)
+            {
+                var line = requisition.Lines.FirstOrDefault(x =>
+                    x.RequisitionLineId == lineDto.RequisitionLineId);
+
+                if (line == null)
+                    throw new InvalidOperationException(
+                        "Invalid requisition line.");
+
+                var material = await _context.Materials
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.material_id == line.MaterialId);
+
+                if (material == null) 
+                    throw new KeyNotFoundException(
+                        "Material was not found.");
+
+                if (lineDto.Allocations == null)
+                    throw new InvalidOperationException(
+                        "Allocations are required.");
+
+                if (material.is_lot_tracked)
+                {
+                    var duplicateLot = lineDto.Allocations
+                        .Where(x => x.MaterialLotId.HasValue)
+                        .GroupBy(x => x.MaterialLotId.Value)
+                        .Any(g => g.Count() > 1);
+
+                    if (duplicateLot)
+                    {
+                        throw new InvalidOperationException(
+                            $"Duplicate lot allocation detected for {material.material_name}.");
+                    }
+                }
+                else
+                {
+                    if (lineDto.Allocations.Count != 1)
+                    {
+                        throw new InvalidOperationException(
+                            $"Non-lot-tracked material {material.material_name} " +
+                            "must have exactly one quantity allocation.");
+                    }
+                }
+
+
+                if (lineDto.Allocations.Any(x => x.Quantity <= 0))
+                    throw new InvalidOperationException(
+                        "Allocation quantity must be positive.");
+
+                var total = lineDto.Allocations.Sum(x => x.Quantity);
+
+
+                var confirmedForLine = confirmedAllocations
+                    .Where(x =>
+                        x.RequisitionLineId == line.RequisitionLineId)
+                    .GroupBy(x => x.MaterialLotId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Sum(x => x.AllocatedQuantity));
+
+                var preparedForLine = lineDto.Allocations
+                    .GroupBy(x => x.MaterialLotId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Sum(x => x.Quantity));
+
+                var allocationChanged =
+                    confirmedForLine.Count != preparedForLine.Count ||
+                    confirmedForLine.Any(x =>
+                        !preparedForLine.TryGetValue(
+                            x.Key, out var preparedQty) ||
+                        preparedQty != x.Value);
+
+                if (allocationChanged &&
+                    !lineDto.Allocations.Any(x =>
+                        !string.IsNullOrWhiteSpace(x.Remarks)))
+                {
+                    throw new InvalidOperationException(
+                        $"A reason is required when changing the " +
+                        $"confirmed allocation for {material.material_name}. " +
+                        "Please enter an override reason.");
+                }
+
+
+
+                if (total != line.RequestedQuantity)
+                {
+                    throw new InvalidOperationException(
+                        $"Full preparation is required for {material.material_name}. " +
+                        $"Requested: {line.RequestedQuantity:0.####}, " +
+                        $"Prepared: {total:0.####}, " +
+                        $"Remaining: {(line.RequestedQuantity - total):0.####}. " +
+                        "Please allocate another available lot to complete the quantity.");
+                }
+
+                foreach (var item in lineDto.Allocations)
+                {
+                    if (material.is_lot_tracked &&
+                        !item.MaterialLotId.HasValue)
+                        throw new InvalidOperationException(
+                            "Lot number is required.");
+
+                    var lot = await _context.MaterialLotNumbers
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x =>
+                            x.material_id == line.MaterialId &&
+                            x.branch_id == requisition.BranchId &&
+                            x.is_active &&
+                            (material.is_lot_tracked
+                                ? x.material_lot_id == item.MaterialLotId
+                                : x.lot_no ==
+                                  $"NON-LOT-MAT-{line.MaterialId}"));
+
+                    if (lot == null)
+                        throw new InvalidOperationException(
+                            "Invalid or unavailable material lot.");
+
+                    if (material.is_lot_tracked &&
+                        lot.expiration_date.HasValue &&
+                        lot.expiration_date.Value.Date < now.Date)
+                        throw new InvalidOperationException(
+                            $"Lot {lot.lot_no} is expired.");
+
+                    if (!stockByLot.ContainsKey(lot.material_lot_id))
+                        stockByLot[lot.material_lot_id] = lot.quantity;
+
+                    totalsByLot.TryGetValue(
+                        lot.material_lot_id, out var existing);
+
+                    var totalForLot = existing + item.Quantity;
+
+                    if (totalForLot > stockByLot[lot.material_lot_id])
+                        throw new InvalidOperationException(
+                            $"Insufficient stock for lot {lot.lot_no}.");
+
+                    totalsByLot[lot.material_lot_id] = totalForLot;
+
+                    newAllocations.Add(
+                        new MaterialRequisitionAllocation
+                        {
+                            RequisitionLineId = line.RequisitionLineId,
+                            MaterialLotId = lot.material_lot_id,
+                            LotNo = material.is_lot_tracked
+                                ? lot.lot_no
+                                : null,
+                            AllocationStage = "WAREHOUSE_PREPARED",
+                            AllocationMethod = material.is_lot_tracked
+                                ? "MANUAL"
+                                : "QUANTITY_ONLY",
+                            AllocatedQuantity = item.Quantity,
+                            ReleasedQuantity = 0,
+                            AllocatedBy = dto.ConfirmedBy.Trim(),
+                            AllocatedAt = now,
+                            Remarks = item.Remarks?.Trim()
+                        });
+                }
+            }
+
+            var lineIds = requisition.Lines
+                .Select(x => x.RequisitionLineId)
+                .ToList();
+
+
+            var previousPrepared = await _context
+                .MaterialRequisitionAllocations
+                .AnyAsync(x =>
+                    lineIds.Contains(x.RequisitionLineId) &&
+                    x.AllocationStage == "WAREHOUSE_PREPARED");
+
+            if (previousPrepared)
+            {
+                throw new InvalidOperationException(
+                    "This MRS has already been physically prepared. " +
+                    "Preparation changes require an authorized revision.");
+            }
+
+            // Save the final physically prepared allocations.
+            _context.MaterialRequisitionAllocations
+                .AddRange(newAllocations);
+
+            requisition.UpdatedAt = now;
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+        }
+
 
 
         public async Task SubmitForApprovalAsync(

@@ -1,19 +1,27 @@
 ﻿using inventory_api.DTOs.Inventory.MaterialRequisitions;
+using inventory_api.Services;
 using inventory_api.Services.Inventory;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+
 
 namespace inventory_api.Controllers.Inventory
 {
     [ApiController]
+    [Authorize]
     [Route("api/inventory/material-requisitions")]
     public class MaterialRequisitionController : ControllerBase
     {
         private readonly MaterialRequisitionService _service;
+        private readonly MrsPermissionService _permissionService;
 
         public MaterialRequisitionController(
-            MaterialRequisitionService service)
+            MaterialRequisitionService service,
+            MrsPermissionService permissionService)
         {
             _service = service;
+            _permissionService = permissionService;
         }
 
         // =========================================================
@@ -25,8 +33,27 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+                if (!await _permissionService.HasPermissionAsync(
+        User, "MRS_CREATE"))
+                {
+                    return Forbid();
+                }
+
+                var loggedInUserId =
+                    User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
+                // Use the authenticated Production user's ID.
+                dto.CreatedBy = loggedInUserId;
+
                 var requisitionId =
                     await _service.CreateDraftAsync(dto);
+
 
                 return Ok(new
                 {
@@ -73,6 +100,12 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+                if (!await _permissionService.HasPermissionAsync(
+        User, "MRS_CREATE"))
+                {
+                    return Forbid();
+                }
                 var result =
                     await _service.PreviewFefoAllocationAsync(dto);
 
@@ -117,6 +150,18 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+                bool canViewLots =
+                    await _permissionService.HasPermissionAsync(
+                        User, "MRS_CREATE")
+                    ||
+                    await _permissionService.HasPermissionAsync(
+                        User, "MRS_ALLOCATE");
+
+                if (!canViewLots)
+                {
+                    return Forbid();
+                }
                 var result =
                     await _service.GetAvailableLotsAsync(
                         materialId,
@@ -163,6 +208,12 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+                if (!await _permissionService.HasPermissionAsync(
+        User, "INV_MATERIAL_REQUISITION"))
+                {
+                    return Forbid();
+                }
                 var result =
                     await _service.GetAllAsync();
 
@@ -184,6 +235,12 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+                if (!await _permissionService.HasPermissionAsync(
+        User, "INV_MATERIAL_REQUISITION"))
+                {
+                    return Forbid();
+                }
                 var result =
                     await _service.GetByIdAsync(id);
 
@@ -216,14 +273,28 @@ namespace inventory_api.Controllers.Inventory
         // =========================================================
         [HttpPost("{id:int}/submit")]
         public async Task<IActionResult> SubmitForApproval(
-            int id,
-            [FromBody] SubmitMaterialRequisitionDto dto)
+     int id,
+     [FromBody] SubmitMaterialRequisitionDto dto)
         {
             try
             {
+                if (!await _permissionService.HasPermissionAsync(
+                        User, "MRS_CREATE"))
+                {
+                    return Forbid();
+                }
+
+                var loggedInUserId =
+     User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
                 await _service.SubmitForApprovalAsync(
                     id,
-                    dto.SubmittedBy);
+                    loggedInUserId);
 
                 return Ok(new
                 {
@@ -319,10 +390,60 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+
+                var requisition = await _service.GetByIdAsync(id);
+
+                if (requisition == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Material requisition was not found."
+                    });
+                }
+
+                string requiredPermission;
+
+                if (requisition.Status == "FOR_STAFF_APPROVAL")
+                {
+                    requiredPermission = "MRS_STAFF_APPROVE";
+                }
+                else if (requisition.Status == "FOR_HEAD_APPROVAL")
+                {
+                    requiredPermission = "MRS_HEAD_APPROVE";
+                }
+                else
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "MRS is not awaiting approval."
+                    });
+                }
+
+                if (!await _permissionService.HasPermissionAsync(
+                        User, requiredPermission))
+                {
+                    return Forbid();
+                }
+
+
+
+
+                var loggedInUserId =
+                    User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
                 await _service.RejectAsync(
                     id,
-                    dto.RejectedBy,
+                    loggedInUserId,
                     dto.Reason);
+
 
                 return Ok(new
                 {
@@ -369,9 +490,32 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+
+
+                if (!await _permissionService.HasPermissionAsync(
+                        User, "MRS_RELEASE"))
+                {
+                    return Forbid();
+                }
+
+
+                var loggedInUserId =
+                    User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
+                // Use the authenticated warehouse user.
+                dto.ReleasedBy = loggedInUserId;
+                dto.PostedBy = loggedInUserId;
+
                 await _service.ReleaseAsync(
                     id,
                     dto);
+
 
                 return Ok(new
                 {
@@ -418,7 +562,26 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+
+                if (!await _permissionService.HasPermissionAsync(
+        User, "MRS_ALLOCATE"))
+                {
+                    return Forbid();
+                }
+
+                var loggedInUserId =
+                    User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
+                // Always use the authenticated warehouse user's ID.
+                dto.ConfirmedBy = loggedInUserId;
+
                 await _service.ConfirmWarehouseAllocationAsync(id, dto);
+
 
                 return Ok(new
                 {
@@ -462,8 +625,22 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+                if (!await _permissionService.HasPermissionAsync(
+        User, "MRS_STAFF_APPROVE"))
+                {
+                    return Forbid();
+                }
+
+                var loggedInUserId =
+     User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
                 await _service.ApproveByStaffAsync(
-                    id, dto.ApprovedBy, dto.Remarks);
+                    id, loggedInUserId, dto.Remarks);
 
                 return Ok(new
                 {
@@ -507,8 +684,22 @@ namespace inventory_api.Controllers.Inventory
         {
             try
             {
+                if (!await _permissionService.HasPermissionAsync(
+        User, "MRS_HEAD_APPROVE"))
+                {
+                    return Forbid();
+                }
+
+                var loggedInUserId =
+                    User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
                 await _service.ApproveByHeadAsync(
-                    id, dto.ApprovedBy, dto.Remarks);
+                    id, loggedInUserId, dto.Remarks);
 
                 return Ok(new
                 {
@@ -541,6 +732,70 @@ namespace inventory_api.Controllers.Inventory
                 });
             }
         }
+
+
+
+
+        // =========================================================
+        // WAREHOUSE - FINAL PHYSICAL PREPARATION
+        // =========================================================
+        [HttpPost("{id:int}/prepare")]
+        public async Task<IActionResult> PrepareWarehouseAllocation(
+            int id,
+            [FromBody] ConfirmMaterialAllocationDto dto)
+        {
+            try
+            {
+                if (!await _permissionService.HasPermissionAsync(
+                    User, "MRS_RELEASE"))
+                {
+                    return Forbid();
+                }
+
+                var loggedInUserId =
+                    User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrWhiteSpace(loggedInUserId))
+                {
+                    return Unauthorized();
+                }
+
+                dto.ConfirmedBy = loggedInUserId;
+
+                await _service.PrepareWarehouseAllocationAsync(id, dto);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Warehouse materials prepared successfully."
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Unable to prepare warehouse materials."
+                });
+            }
+        }
+
 
 
     }

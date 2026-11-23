@@ -11,7 +11,9 @@
 
         public string? LotNo { get; set; }
 
-        // PRODUCTION_PROPOSAL or WAREHOUSE
+        // PRODUCTION_PROPOSAL
+        // WAREHOUSE_CONFIRMED
+        // WAREHOUSE_PREPARED
         public string AllocationStage { get; set; }
             = "PRODUCTION_PROPOSAL";
 

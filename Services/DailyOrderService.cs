@@ -196,7 +196,7 @@ namespace inventory_api.Services
                 .GroupBy(x => x.product_id)
                 .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.quantity) })
                 .ToDictionaryAsync(x => x.ProductId, x => x.Qty);
-
+     
             var reservedByProduct = await (
                 from a in _context.DailyOrderAllocations.AsNoTracking()
                 join l in _context.DailyOrderLines.AsNoTracking()
