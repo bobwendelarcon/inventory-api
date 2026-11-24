@@ -3,10 +3,6 @@
   "WorkspaceRootPath": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
     },
@@ -15,12 +11,20 @@
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\inventory\\materialrequisitionservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\dtos\\inventory\\materialrequisitions\\confirmmaterialallocationdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:dtos\\inventory\\materialrequisitions\\confirmmaterialallocationdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\controllers\\inventory\\materialrequisitioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:controllers\\inventory\\materialrequisitioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\services\\inventory\\rawmaterialinventoryservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\inventory\\rawmaterialinventoryservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\dtos\\inventory\\materialrequisitions\\confirmmaterialallocationdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:dtos\\inventory\\materialrequisitions\\confirmmaterialallocationdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\models\\manufacturing\\materials\\requisition\\materialrequisitionallocation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -104,10 +108,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\dtos\\inventory\\materialrequisitions\\submitmaterialrequisitiondto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:dtos\\inventory\\materialrequisitions\\submitmaterialrequisitiondto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\services\\inventory\\rawmaterialinventoryservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|solutionrelative:services\\inventory\\rawmaterialinventoryservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{109C588E-DCB7-E5D2-AC49-56AE76771B4D}|inventory_api.csproj|c:\\users\\user\\desktop\\bnpi server\\source_code\\api\\services\\reports\\rawmaterials\\rawmaterialreportservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -1153,11 +1153,97 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\appsettings.json",
+              "RelativeDocumentMoniker": "appsettings.json",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\appsettings.json",
+              "RelativeToolTip": "appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-05-28T06:15:13.988Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAA4AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-29T03:24:15.719Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "MaterialRequisitionController.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\MaterialRequisitionController.cs",
+              "RelativeDocumentMoniker": "Controllers\\Inventory\\MaterialRequisitionController.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\MaterialRequisitionController.cs",
+              "RelativeToolTip": "Controllers\\Inventory\\MaterialRequisitionController.cs",
+              "ViewState": "AgIAAH0AAAAAAAAAAAAtwJIAAAA6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-13T01:17:14.615Z"
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 3,
+              "Title": "RawMaterialInventoryService.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\RawMaterialInventoryService.cs",
+              "RelativeDocumentMoniker": "Services\\Inventory\\RawMaterialInventoryService.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\RawMaterialInventoryService.cs",
+              "RelativeToolTip": "Services\\Inventory\\RawMaterialInventoryService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEcJAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-28T01:28:35.575Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MaterialRequisitionService.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\MaterialRequisitionService.cs",
+              "RelativeDocumentMoniker": "Services\\Inventory\\MaterialRequisitionService.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\MaterialRequisitionService.cs",
+              "RelativeToolTip": "Services\\Inventory\\MaterialRequisitionService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-13T01:10:12.136Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "RawMaterialInventoryController.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\RawMaterialInventoryController.cs",
+              "RelativeDocumentMoniker": "Controllers\\Inventory\\RawMaterialInventoryController.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\RawMaterialInventoryController.cs",
+              "RelativeToolTip": "Controllers\\Inventory\\RawMaterialInventoryController.cs",
+              "ViewState": "AgIAAAIBAAAAAAAAAAAcwGABAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-28T01:36:35.415Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "PostMaterialRequisitionDto.cs",
+              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
+              "RelativeDocumentMoniker": "DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
+              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
+              "RelativeToolTip": "DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-14T00:27:13.049Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
               "Title": "ConfirmMaterialAllocationDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\ConfirmMaterialAllocationDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Inventory\\MaterialRequisitions\\ConfirmMaterialAllocationDto.cs",
@@ -1170,81 +1256,6 @@
             {
               "$type": "Document",
               "DocumentIndex": 6,
-              "Title": "PostMaterialRequisitionDto.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
-              "RelativeDocumentMoniker": "DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
-              "RelativeToolTip": "DTOs\\Inventory\\MaterialRequisitions\\PostMaterialRequisitionDto.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABgAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-14T00:27:13.049Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "RawMaterialInventoryController.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\RawMaterialInventoryController.cs",
-              "RelativeDocumentMoniker": "Controllers\\Inventory\\RawMaterialInventoryController.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\RawMaterialInventoryController.cs",
-              "RelativeToolTip": "Controllers\\Inventory\\RawMaterialInventoryController.cs",
-              "ViewState": "AgIAAAIBAAAAAAAAAAAcwGABAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-28T01:36:35.415Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "appsettings.json",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\appsettings.json",
-              "RelativeDocumentMoniker": "appsettings.json",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\appsettings.json",
-              "RelativeToolTip": "appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAAnAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-05-28T06:15:13.988Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "Program.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Program.cs",
-              "RelativeDocumentMoniker": "Program.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Program.cs",
-              "RelativeToolTip": "Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAA4AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T03:24:15.719Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "MaterialRequisitionService.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\MaterialRequisitionService.cs",
-              "RelativeDocumentMoniker": "Services\\Inventory\\MaterialRequisitionService.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\MaterialRequisitionService.cs",
-              "RelativeToolTip": "Services\\Inventory\\MaterialRequisitionService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-13T01:10:12.136Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "MaterialRequisitionController.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\MaterialRequisitionController.cs",
-              "RelativeDocumentMoniker": "Controllers\\Inventory\\MaterialRequisitionController.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\Inventory\\MaterialRequisitionController.cs",
-              "RelativeToolTip": "Controllers\\Inventory\\MaterialRequisitionController.cs",
-              "ViewState": "AgIAAOkCAAAAAAAAAAAIwAkDAAAoAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-13T01:17:14.615Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
               "Title": "MaterialRequisitionAllocation.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Manufacturing\\Materials\\Requisition\\MaterialRequisitionAllocation.cs",
               "RelativeDocumentMoniker": "Models\\Manufacturing\\Materials\\Requisition\\MaterialRequisitionAllocation.cs",
@@ -1256,7 +1267,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "InventoryController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryController.cs",
               "RelativeDocumentMoniker": "Controllers\\InventoryController.cs",
@@ -1268,7 +1279,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "InventoryDisplayController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\InventoryDisplayController.cs",
               "RelativeDocumentMoniker": "Controllers\\InventoryDisplayController.cs",
@@ -1280,7 +1291,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "SupplierMaterialService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Purchasing\\Suppliers\\SupplierMaterialService.cs",
               "RelativeDocumentMoniker": "Services\\Purchasing\\Suppliers\\SupplierMaterialService.cs",
@@ -1292,7 +1303,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 14,
               "Title": "UserService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\UserService.cs",
               "RelativeDocumentMoniker": "Services\\UserService.cs",
@@ -1304,7 +1315,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "JwtTokenService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\JwtTokenService.cs",
               "RelativeDocumentMoniker": "Services\\JwtTokenService.cs",
@@ -1316,7 +1327,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 12,
               "Title": "UserController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\UserController.cs",
               "RelativeDocumentMoniker": "Controllers\\UserController.cs",
@@ -1328,7 +1339,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 15,
               "Title": "MrsPermissionService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\MrsPermissionService.cs",
               "RelativeDocumentMoniker": "Services\\MrsPermissionService.cs",
@@ -1340,7 +1351,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 16,
               "Title": "secrets.json",
               "DocumentMoniker": "C:\\Users\\USER\\AppData\\Roaming\\Microsoft\\UserSecrets\\22b267bf-aaa8-4d04-9420-37def5ab5655\\secrets.json",
               "RelativeDocumentMoniker": "..\\..\\..\\..\\AppData\\Roaming\\Microsoft\\UserSecrets\\22b267bf-aaa8-4d04-9420-37def5ab5655\\secrets.json",
@@ -1352,7 +1363,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 17,
               "Title": "DailyOrderService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\DailyOrderService.cs",
               "RelativeDocumentMoniker": "Services\\DailyOrderService.cs",
@@ -1364,7 +1375,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 21,
               "Title": "MaterialRequisition.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Manufacturing\\Materials\\Requisition\\MaterialRequisition.cs",
               "RelativeDocumentMoniker": "Models\\Manufacturing\\Materials\\Requisition\\MaterialRequisition.cs",
@@ -1376,7 +1387,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 18,
               "Title": "DailyOrdersController.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Controllers\\DailyOrdersController.cs",
               "RelativeDocumentMoniker": "Controllers\\DailyOrdersController.cs",
@@ -1388,7 +1399,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 19,
               "Title": "MaterialRequisitionDetailsDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\MaterialRequisitionDetailsDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Inventory\\MaterialRequisitions\\MaterialRequisitionDetailsDto.cs",
@@ -1400,7 +1411,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 20,
               "Title": "AppDbContext.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Data\\AppDbContext.cs",
               "RelativeDocumentMoniker": "Data\\AppDbContext.cs",
@@ -1412,7 +1423,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
+              "DocumentIndex": 22,
               "Title": "DashboardService.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\DashboardService.cs",
               "RelativeDocumentMoniker": "Services\\DashboardService.cs",
@@ -1424,7 +1435,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 22,
+              "DocumentIndex": 23,
               "Title": "CreateMaterialRequisitionDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\CreateMaterialRequisitionDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Inventory\\MaterialRequisitions\\CreateMaterialRequisitionDto.cs",
@@ -1436,7 +1447,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 23,
+              "DocumentIndex": 24,
               "Title": "MaterialRequisitionLine.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Models\\Manufacturing\\Materials\\Requisition\\MaterialRequisitionLine.cs",
               "RelativeDocumentMoniker": "Models\\Manufacturing\\Materials\\Requisition\\MaterialRequisitionLine.cs",
@@ -1448,7 +1459,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 24,
+              "DocumentIndex": 25,
               "Title": "PreviewMaterialFefoDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\PreviewMaterialFefoDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Inventory\\MaterialRequisitions\\PreviewMaterialFefoDto.cs",
@@ -1460,7 +1471,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 26,
               "Title": "SubmitMaterialRequisitionDto.cs",
               "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\DTOs\\Inventory\\MaterialRequisitions\\SubmitMaterialRequisitionDto.cs",
               "RelativeDocumentMoniker": "DTOs\\Inventory\\MaterialRequisitions\\SubmitMaterialRequisitionDto.cs",
@@ -1469,18 +1480,6 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-08-14T00:52:04.329Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 26,
-              "Title": "RawMaterialInventoryService.cs",
-              "DocumentMoniker": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\RawMaterialInventoryService.cs",
-              "RelativeDocumentMoniker": "Services\\Inventory\\RawMaterialInventoryService.cs",
-              "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\Services\\Inventory\\RawMaterialInventoryService.cs",
-              "RelativeToolTip": "Services\\Inventory\\RawMaterialInventoryService.cs",
-              "ViewState": "AgIAABIJAAAAAAAAAAAcwEcJAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-28T01:28:35.575Z"
             },
             {
               "$type": "Document",

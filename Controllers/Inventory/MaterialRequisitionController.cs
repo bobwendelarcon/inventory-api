@@ -151,12 +151,17 @@ namespace inventory_api.Controllers.Inventory
             try
             {
 
+
                 bool canViewLots =
                     await _permissionService.HasPermissionAsync(
                         User, "MRS_CREATE")
                     ||
                     await _permissionService.HasPermissionAsync(
-                        User, "MRS_ALLOCATE");
+                        User, "MRS_ALLOCATE")
+                    ||
+                    await _permissionService.HasPermissionAsync(
+                        User, "MRS_RELEASE");
+
 
                 if (!canViewLots)
                 {
