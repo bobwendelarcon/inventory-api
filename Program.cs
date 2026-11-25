@@ -23,7 +23,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
-
+using inventory_api.Hubs;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 
@@ -111,6 +111,9 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+// SignalR real-time notifications
+builder.Services.AddSignalR();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -228,6 +231,9 @@ builder.Services.AddScoped<SupplierEvaluationService>();
 builder.Services.AddScoped<
     MaterialRequisitionService>();
 
+// MRS real-time notifications
+builder.Services.AddScoped<
+    MaterialRequisitionNotificationService>();
 //rmw processing
 builder.Services.AddScoped<RmwProcessingService>();
 //RR final commit
@@ -260,5 +266,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// SignalR MRS notification endpoint
+app.MapHub<MaterialRequisitionHub>(
+    "/hubs/material-requisitions",
+    options =>
+    {
+        options.CloseOnAuthenticationExpiration = true;
+    })
+    .RequireAuthorization();
 
 app.Run();

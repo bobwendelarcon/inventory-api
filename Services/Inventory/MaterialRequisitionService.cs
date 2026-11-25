@@ -10,11 +10,77 @@ namespace inventory_api.Services.Inventory
     {
         private readonly AppDbContext _context;
 
+        private readonly MaterialRequisitionNotificationService
+            _notificationService;
+
+        private readonly ILogger<MaterialRequisitionService>
+            _logger;
+
         public MaterialRequisitionService(
-            AppDbContext context)
+            AppDbContext context,
+            MaterialRequisitionNotificationService notificationService,
+            ILogger<MaterialRequisitionService> logger)
         {
             _context = context;
+            _notificationService = notificationService;
+            _logger = logger;
         }
+
+
+        private async Task NotifyMrsAsync(
+            MaterialRequisition requisition,
+            string notificationType,
+            string title,
+            string message)
+        {
+            try
+            {
+                var branchName = await _context.Branches
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.branch_id == requisition.BranchId)
+                    .Select(x => x.branch_name)
+                    .FirstOrDefaultAsync();
+
+                var notification =
+                    new MaterialRequisitionNotificationDto
+                    {
+                        NotificationId =
+                            $"{notificationType}-{requisition.RequisitionId}",
+
+                        NotificationType = notificationType,
+
+                        RequisitionId =
+                            requisition.RequisitionId,
+
+                        RequisitionNo =
+                            requisition.RequisitionNo,
+
+                        BranchId =
+                            requisition.BranchId,
+
+                        BranchName =
+                            branchName ?? requisition.BranchId,
+
+                        Title = title,
+
+                        Message = message,
+
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                await _notificationService
+                    .NotifyWarehouseUsersAsync(notification);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to generate MRS notification for {RequisitionNo}",
+                    requisition.RequisitionNo);
+            }
+        }
+
 
 
         public async Task<int> CreateDraftAsync(
@@ -491,6 +557,9 @@ namespace inventory_api.Services.Inventory
                 TimeServed = requisition.TimeServed,
                 Status = requisition.Status,
                 Remarks = requisition.Remarks,
+
+            
+
                 CreatedBy = requisition.CreatedBy,
                 SubmittedBy = requisition.SubmittedBy,
                 SubmittedAt = requisition.SubmittedAt,
@@ -1378,6 +1447,8 @@ namespace inventory_api.Services.Inventory
             }
 
             // Save the final physically prepared allocations.
+
+            // Save the final physically prepared allocations.
             _context.MaterialRequisitionAllocations
                 .AddRange(newAllocations);
 
@@ -1385,6 +1456,18 @@ namespace inventory_api.Services.Inventory
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Dispose the completed transaction before
+            // performing notification database queries.
+            await transaction.DisposeAsync();
+
+            // Send notification after successful preparation.
+            await NotifyMrsAsync(
+                requisition,
+                "MRS_READY_FOR_RELEASE",
+                "MRS Ready for Release",
+                $"{requisition.RequisitionNo} has been physically " +
+                "prepared and is ready for release.");
 
         }
 
@@ -1455,12 +1538,12 @@ namespace inventory_api.Services.Inventory
                 throw new InvalidOperationException(
                     "Warehouse Staff approval is required first.");
 
-            if (string.Equals(
-                requisition.StaffApprovedBy,
-                approvedBy.Trim(),
-                StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(
-                    "Staff and Head approvals must use different users.");
+            //if (string.Equals(
+            //    requisition.StaffApprovedBy,
+            //    approvedBy.Trim(),
+            //    StringComparison.OrdinalIgnoreCase))
+            //    throw new InvalidOperationException(
+            //        "Staff and Head approvals must use different users.");
 
             var now = DateTime.UtcNow;
 
@@ -1477,6 +1560,14 @@ namespace inventory_api.Services.Inventory
             requisition.UpdatedAt = now;
 
             await _context.SaveChangesAsync();
+
+            // Send notification after successful approval.
+            await NotifyMrsAsync(
+                requisition,
+                "MRS_READY_FOR_PREPARATION",
+                "New MRS Ready for Preparation",
+                $"{requisition.RequisitionNo} has been approved " +
+                "and is ready for warehouse preparation.");
         }
 
 
@@ -1609,10 +1700,200 @@ namespace inventory_api.Services.Inventory
 
             await _context.SaveChangesAsync();
         }
+        // =========================================================
+        // RECOVER PENDING MRS NOTIFICATIONS
+        // =========================================================
+
+        public async Task<List<MaterialRequisitionNotificationDto>>
+            GetPendingNotificationsAsync()
+        {
+            var requisitions = await (
+                from requisition in
+                    _context.MaterialRequisitions.AsNoTracking()
+
+                join branch in
+                    _context.Branches.AsNoTracking()
+
+                    on requisition.BranchId
+                    equals branch.branch_id
+                    into branchJoin
+
+                from branch in branchJoin.DefaultIfEmpty()
+
+                where requisition.Status == "APPROVED"
+                    && requisition.WarehouseConfirmedAt != null
+                    && requisition.Lines.Any()
+
+                orderby requisition.RequisitionId descending
+
+                select new
+                {
+                    requisition.RequisitionId,
+
+                    requisition.RequisitionNo,
+
+                    requisition.BranchId,
+
+                    BranchName = branch != null
+                        ? branch.branch_name
+                        : requisition.BranchId,
+
+                    requisition.ApprovedAt,
+
+                    requisition.UpdatedAt,
+
+                    requisition.CreatedAt,
+
+                    IsWarehousePrepared =
+
+                        requisition.Lines.All(line =>
+
+                            line.RequestedQuantity > 0 &&
+
+                            _context.MaterialRequisitionAllocations
+                                .Any(a =>
+                                    a.RequisitionLineId ==
+                                        line.RequisitionLineId &&
+                                    a.AllocationStage ==
+                                        "WAREHOUSE_PREPARED") &&
+
+                            _context.MaterialRequisitionAllocations
+                                .Where(a =>
+                                    a.RequisitionLineId ==
+                                        line.RequisitionLineId &&
+                                    a.AllocationStage ==
+                                        "WAREHOUSE_PREPARED")
+                                .Sum(a => a.AllocatedQuantity)
+                                    == line.RequestedQuantity
+                        )
+                }
+            ).ToListAsync();
+
+            var notifications =
+                new List<MaterialRequisitionNotificationDto>();
+
+            foreach (var requisition in requisitions)
+            {
+                var notificationType =
+                    requisition.IsWarehousePrepared
+                        ? "MRS_READY_FOR_RELEASE"
+                        : "MRS_READY_FOR_PREPARATION";
+
+                notifications.Add(
+                    new MaterialRequisitionNotificationDto
+                    {
+                        NotificationId =
+                            $"{notificationType}-{requisition.RequisitionId}",
+
+                        NotificationType = notificationType,
+
+                        RequisitionId =
+                            requisition.RequisitionId,
+
+                        RequisitionNo =
+                            requisition.RequisitionNo,
+
+                        BranchId =
+                            requisition.BranchId,
+
+                        BranchName =
+                            requisition.BranchName
+                                ?? requisition.BranchId,
+
+                        Title =
+                            requisition.IsWarehousePrepared
+                                ? "MRS Ready for Release"
+                                : "New MRS Ready for Preparation",
+
+                        Message =
+                            requisition.IsWarehousePrepared
+
+                                ? $"{requisition.RequisitionNo} " +
+                                  "has been physically prepared " +
+                                  "and is ready for release."
+
+                                : $"{requisition.RequisitionNo} " +
+                                  "has been approved and is ready " +
+                                  "for warehouse preparation.",
+
+                        CreatedAt =
+                            requisition.IsWarehousePrepared
+
+                                ? (requisition.UpdatedAt
+                                    ?? requisition.CreatedAt)
+
+                                : (requisition.ApprovedAt
+                                    ?? requisition.CreatedAt)
+                    });
+            }
+
+            return notifications;
+        }
+
+        public async Task<MaterialRequisitionNotificationCountDto>
+            GetNotificationCountsAsync(
+                bool canAllocate,
+                bool canStaffApprove,
+                bool canHeadApprove)
+        {
+            var result = new MaterialRequisitionNotificationCountDto();
+
+            if (!canAllocate &&
+                !canStaffApprove &&
+                !canHeadApprove)
+            {
+                return result;
+            }
+
+            var counts = await _context.MaterialRequisitions
+                .AsNoTracking()
+                .Where(x =>
+                    x.Status == "FOR_STAFF_APPROVAL" ||
+                    x.Status == "FOR_HEAD_APPROVAL")
+                .GroupBy(x => 1)
+                .Select(g => new
+                {
+                    PendingAllocation = g.Count(x =>
+                        x.Status == "FOR_STAFF_APPROVAL" &&
+                        x.WarehouseConfirmedAt == null),
+
+                    PendingStaffApproval = g.Count(x =>
+                        x.Status == "FOR_STAFF_APPROVAL" &&
+                        x.WarehouseConfirmedAt != null),
+
+                    PendingHeadApproval = g.Count(x =>
+                        x.Status == "FOR_HEAD_APPROVAL" &&
+                        x.StaffApprovedBy != null &&
+                        x.StaffApprovedBy != "")
+                })
+                .FirstOrDefaultAsync();
+
+            if (counts == null)
+                return result;
+
+            result.PendingAllocation =
+                canAllocate
+                    ? counts.PendingAllocation
+                    : 0;
+
+            result.PendingStaffApproval =
+                canStaffApprove
+                    ? counts.PendingStaffApproval
+                    : 0;
+
+            result.PendingHeadApproval =
+                canHeadApprove
+                    ? counts.PendingHeadApproval
+                    : 0;
+
+            return result;
+        }
 
 
-
-        public async Task<object> GetAllAsync()
+        public async Task<object> GetAllAsync(
+        bool canAllocate,
+        bool canStaffApprove,
+        bool canHeadApprove)
         {
             var requisitions =
                 await (
@@ -1682,12 +1963,99 @@ namespace inventory_api.Services.Inventory
                         timeRequested =
                             requisition.TimeRequested,
 
+
                         status =
-                            requisition.Status,
+    requisition.Status,
+
+                        // Paper requisition number
+                        remarks =
+    requisition.Remarks,
+
+                        // Warehouse allocation confirmation
+                        warehouseConfirmedBy =
+    requisition.WarehouseConfirmedBy,
+
+                        warehouseConfirmedAt =
+    requisition.WarehouseConfirmedAt,
+
+                        // Warehouse Staff approval
+                        staffApprovedBy =
+    requisition.StaffApprovedBy,
+
+                        staffApprovedAt =
+    requisition.StaffApprovedAt,
+
+
+                        // Determine the current pending workflow action.
+                        pendingAction =
+    requisition.Status == "FOR_STAFF_APPROVAL"
+        ? (requisition.WarehouseConfirmedAt == null
+            ? "ALLOCATION"
+            : "STAFF_APPROVAL")
+        : requisition.Status == "FOR_HEAD_APPROVAL" &&
+          requisition.StaffApprovedBy != null &&
+          requisition.StaffApprovedBy != ""
+            ? "HEAD_APPROVAL"
+            : null,
+
+                        // Determine whether the current user can perform
+                        // the pending workflow action.
+                        canAct =
+    (
+        canAllocate &&
+        requisition.Status == "FOR_STAFF_APPROVAL" &&
+        requisition.WarehouseConfirmedAt == null
+    )
+    ||
+    (
+        canStaffApprove &&
+        requisition.Status == "FOR_STAFF_APPROVAL" &&
+        requisition.WarehouseConfirmedAt != null
+    )
+    ||
+    (
+        canHeadApprove &&
+        requisition.Status == "FOR_HEAD_APPROVAL" &&
+        requisition.StaffApprovedBy != null &&
+        requisition.StaffApprovedBy != ""
+    ),
+
+
+                        // Warehouse physical preparation status
+                        isWarehousePrepared =
+
+    requisition.Status == "APPROVED" &&
+
+    requisition.Lines.Any() &&
+
+    requisition.Lines.All(line =>
+
+        line.RequestedQuantity > 0 &&
+
+        _context.MaterialRequisitionAllocations
+            .Any(a =>
+                a.RequisitionLineId ==
+                    line.RequisitionLineId &&
+                a.AllocationStage ==
+                    "WAREHOUSE_PREPARED") &&
+
+        _context.MaterialRequisitionAllocations
+            .Where(a =>
+                a.RequisitionLineId ==
+                    line.RequisitionLineId &&
+                a.AllocationStage ==
+                    "WAREHOUSE_PREPARED")
+            .Sum(a => a.AllocatedQuantity)
+                == line.RequestedQuantity
+    ),
 
                         // Keep ID
                         createdBy =
-                            requisition.CreatedBy,
+    requisition.CreatedBy,
+
+
+
+
 
                         // Display name
                         createdByName =

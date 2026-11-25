@@ -208,19 +208,35 @@ namespace inventory_api.Controllers.Inventory
         // =========================================================
         // GET ALL REQUISITIONS
         // =========================================================
+
+
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
             try
             {
-
                 if (!await _permissionService.HasPermissionAsync(
-        User, "INV_MATERIAL_REQUISITION"))
+                    User, "INV_MATERIAL_REQUISITION"))
                 {
                     return Forbid();
                 }
-                var result =
-                    await _service.GetAllAsync();
+
+                var canAllocate =
+                    await _permissionService.HasPermissionAsync(
+                        User, "MRS_ALLOCATE");
+
+                var canStaffApprove =
+                    await _permissionService.HasPermissionAsync(
+                        User, "MRS_STAFF_APPROVE");
+
+                var canHeadApprove =
+                    await _permissionService.HasPermissionAsync(
+                        User, "MRS_HEAD_APPROVE");
+
+                var result = await _service.GetAllAsync(
+                    canAllocate,
+                    canStaffApprove,
+                    canHeadApprove);
 
                 return Ok(result);
             }
@@ -233,6 +249,8 @@ namespace inventory_api.Controllers.Inventory
                 });
             }
         }
+
+
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(
@@ -270,6 +288,83 @@ namespace inventory_api.Controllers.Inventory
                 });
             }
         }
+
+
+
+
+
+        [HttpGet("notification-counts")]
+        public async Task<IActionResult> GetNotificationCounts()
+        {
+            // Require access to the Material Requisition module.
+            if (!await _permissionService.HasPermissionAsync(
+                User, "INV_MATERIAL_REQUISITION"))
+            {
+                return Forbid();
+            }
+
+            // Determine the user's actionable permissions.
+            var canAllocate =
+                await _permissionService.HasPermissionAsync(
+                    User, "MRS_ALLOCATE");
+
+            var canStaffApprove =
+                await _permissionService.HasPermissionAsync(
+                    User, "MRS_STAFF_APPROVE");
+
+            var canHeadApprove =
+                await _permissionService.HasPermissionAsync(
+                    User, "MRS_HEAD_APPROVE");
+
+            var result = await _service.GetNotificationCountsAsync(
+                canAllocate,
+                canStaffApprove,
+                canHeadApprove);
+
+            return Ok(result);
+        }
+
+
+        // =========================================================
+        // RECOVER PENDING MRS NOTIFICATIONS
+        // =========================================================
+
+        [HttpGet("pending-notifications")]
+        [ResponseCache(
+            NoStore = true,
+            Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> GetPendingNotifications()
+        {
+            try
+            {
+                if (!await _permissionService.HasPermissionAsync(
+                    User, "INV_MATERIAL_REQUISITION"))
+                {
+                    return Forbid();
+                }
+
+                if (!await _permissionService.HasPermissionAsync(
+                    User, "MRS_RELEASE"))
+                {
+                    return Forbid();
+                }
+
+                var result =
+                    await _service.GetPendingNotificationsAsync();
+
+                return Ok(result);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message =
+                        "Unable to retrieve pending MRS notifications."
+                });
+            }
+        }
+
 
 
 
