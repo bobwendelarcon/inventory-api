@@ -1181,8 +1181,7 @@
               "RelativeToolTip": "Controllers\\Inventory\\RawMaterialInventoryController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAEUBAAANAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-28T01:36:35.415Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-07-28T01:36:35.415Z"
             },
             {
               "$type": "Document",
@@ -1194,8 +1193,7 @@
               "RelativeToolTip": "Services\\MrsPermissionService.cs",
               "ViewState": "AgIAAAgAAAAAAAAAAAAQwCQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-16T01:13:23.595Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-16T01:13:23.595Z"
             },
             {
               "$type": "Document",
@@ -1207,8 +1205,7 @@
               "RelativeToolTip": "Services\\UserService.cs",
               "ViewState": "AgIAAEgBAAAAAAAAAAAowH8BAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-01T01:10:21.651Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-01T01:10:21.651Z"
             },
             {
               "$type": "Document",
@@ -1220,8 +1217,7 @@
               "RelativeToolTip": "Program.cs",
               "ViewState": "AgIAAMsAAAAAAAAAAAD4v/QAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T03:24:15.719Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-29T03:24:15.719Z"
             },
             {
               "$type": "Document",
@@ -1246,8 +1242,7 @@
               "RelativeToolTip": "Controllers\\Inventory\\MaterialRequisitionController.cs",
               "ViewState": "AgIAAPcAAAAAAAAAAAAcwPwAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-13T01:17:14.615Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-13T01:17:14.615Z"
             },
             {
               "$type": "Document",
@@ -1259,8 +1254,7 @@
               "RelativeToolTip": "Hubs\\MaterialRequisitionHub.cs",
               "ViewState": "AgIAAAsAAAAAAAAAAAAQwBUAAAA7AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-25T02:11:22.893Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-25T02:11:22.893Z"
             },
             {
               "$type": "Document",
@@ -1272,8 +1266,7 @@
               "RelativeToolTip": "Services\\Inventory\\MaterialRequisitionService.cs",
               "ViewState": "AgIAAMcGAAAAAAAAAAAuwOIGAABBAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-13T01:10:12.136Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-13T01:10:12.136Z"
             },
             {
               "$type": "Document",
@@ -1285,8 +1278,7 @@
               "RelativeToolTip": "Services\\Inventory\\MaterialRequisitionNotificationService.cs",
               "ViewState": "AgIAAGkAAAAAAAAAAAAcwIcAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-25T02:14:52.11Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-25T02:14:52.11Z"
             },
             {
               "$type": "Document",
@@ -1298,8 +1290,7 @@
               "RelativeToolTip": "DTOs\\Inventory\\MaterialRequisitions\\MaterialRequisitionNotificationDto.cs",
               "ViewState": "AgIAAAMAAAAAAAAAAAAAABoAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-25T02:14:02.242Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-25T02:14:02.242Z"
             },
             {
               "$type": "Document",
@@ -1323,8 +1314,7 @@
               "RelativeToolTip": "Models\\User.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-29T07:05:52.87Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-05-29T07:05:52.87Z"
             },
             {
               "$type": "Document",
