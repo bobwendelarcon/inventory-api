@@ -1181,8 +1181,7 @@
               "RelativeToolTip": "Services\\UserService.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-01T01:10:21.651Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-01T01:10:21.651Z"
             },
             {
               "$type": "Document",
@@ -1194,8 +1193,7 @@
               "RelativeToolTip": "Controllers\\DailyOrdersController.cs",
               "ViewState": "AgIAAMoAAAAAAAAAAAAAAOYAAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-11T06:17:26.123Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-11T06:17:26.123Z"
             },
             {
               "$type": "Document",
@@ -1207,8 +1205,7 @@
               "RelativeToolTip": "Services\\DailyOrderService.cs",
               "ViewState": "AgIAAHgHAAAAAAAAAAAYwJYHAAA/AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-11T06:01:40.559Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-11T06:01:40.559Z"
             },
             {
               "$type": "Document",
@@ -1220,8 +1217,7 @@
               "RelativeToolTip": "DTOs\\DailyOrderListResponse.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-18T23:53:29.775Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-18T23:53:29.775Z"
             },
             {
               "$type": "Document",
@@ -1231,7 +1227,7 @@
               "RelativeDocumentMoniker": "appsettings.json",
               "ToolTip": "C:\\Users\\USER\\Desktop\\BNPI SERVER\\source_code\\API\\appsettings.json",
               "RelativeToolTip": "appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAEAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
               "WhenOpened": "2026-05-28T06:15:13.988Z",
               "EditorCaption": ""
@@ -1306,8 +1302,7 @@
               "RelativeToolTip": "Services\\Inventory\\MaterialRequisitionService.cs",
               "ViewState": "AgIAAMcGAAAAAAAAAAAuwOIGAABBAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-13T01:10:12.136Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-13T01:10:12.136Z"
             },
             {
               "$type": "Document",
