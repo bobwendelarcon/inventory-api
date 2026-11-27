@@ -21,5 +21,6 @@
         public int Overdue { get; set; }
         public int Completed { get; set; }
         public int PartiallyDelivered { get; set; }
+        public int DueToday { get; set; }
     }
 }

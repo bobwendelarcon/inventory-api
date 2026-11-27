@@ -57,7 +57,12 @@ namespace inventory_api.Services
             pageSize = pageSize <= 0 ? 50 : Math.Min(pageSize, 200);
 
             var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
-            var today = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
+
+            var today = TimeZoneInfo
+                .ConvertTimeFromUtc(DateTime.UtcNow, tz)
+                .Date;
+
+            var tomorrow = today.AddDays(1);
 
             // Build a SQL query over order LINES (the current UI paginates lines).
             // Left join product master so search/sort uses its current display name.
@@ -97,23 +102,14 @@ namespace inventory_api.Services
                     query = query.Where(x => false);
             }
 
-            var selectedStatus = (status ?? "ALL").Trim().ToUpperInvariant();
-            if (selectedStatus == "ALL_EXCL_COMPLETED")
-                query = query.Where(x => x.Header.status == null ||
-                    x.Header.status.Trim().ToUpper() != "COMPLETED");
-            else if (selectedStatus == "OVERDUE")
-                query = query.Where(x => x.Header.delivery_date.HasValue &&
-                    x.Header.delivery_date.Value < today &&
-                    x.Header.status != null &&
-                    x.Header.status.Trim().ToUpper() != "COMPLETED" &&
-                    x.Header.status.Trim().ToUpper() != "CANCELLED");
-            else if (selectedStatus != "ALL" && selectedStatus != "")
-                query = query.Where(x => x.Header.status != null &&
-                    x.Header.status.Trim().ToUpper() == selectedStatus);
+            // =========================================
+            // SEARCH FILTER
+            // =========================================
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var keyword = search.Trim().ToLower();
+
                 query = query.Where(x =>
                     (x.Header.customer_name ?? "").ToLower().Contains(keyword) ||
                     (x.Header.order_no ?? "").ToLower().Contains(keyword) ||
@@ -121,11 +117,10 @@ namespace inventory_api.Services
                     (x.ProductDescription ?? "").ToLower().Contains(keyword));
             }
 
-            // Count matching LINES, not headers, to preserve the scroll API contract.
-            var totalRecords = await query.CountAsync();
+            // =========================================
+            // SUMMARY BEFORE STATUS FILTER
+            // =========================================
 
-            // Summary counts distinct matching orders, not product lines.
-            // This also preserves search behavior: an order is counted if any line matches.
             var summaryRows = await query
                 .Select(x => new
                 {
@@ -136,23 +131,100 @@ namespace inventory_api.Services
                 .Distinct()
                 .ToListAsync();
 
-            var grouped = summaryRows.GroupBy(x => x.order_id)
-                .Select(g => g.First()).ToList();
+            var grouped = summaryRows
+                .GroupBy(x => x.order_id)
+                .Select(g => g.First())
+                .ToList();
+
             var summary = new DailyOrderSummaryDto
             {
                 TotalOrders = grouped.Count,
-                ForAllocation = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "FOR ALLOCATION"),
-                Allocated = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "ALLOCATED"),
-                Partial = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "PARTIALLY ALLOCATED"),
-                ReadyDispatch = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "READY FOR DISPATCH"),
-                PartiallyDelivered = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "PARTIALLY DELIVERED"),
-                Completed = grouped.Count(x => (x.status ?? "").Trim().ToUpperInvariant() == "COMPLETED"),
-                Overdue = grouped.Count(x => x.delivery_date.HasValue &&
-                    x.delivery_date.Value.Date < today &&
-                    (x.status ?? "").Trim().ToUpperInvariant() != "COMPLETED" &&
-                    (x.status ?? "").Trim().ToUpperInvariant() != "CANCELLED")
+
+                ForAllocation = grouped.Count(x =>
+                    (x.status ?? "").Trim().ToUpperInvariant()
+                    == "FOR ALLOCATION"),
+
+                Allocated = grouped.Count(x =>
+                    (x.status ?? "").Trim().ToUpperInvariant()
+                    == "ALLOCATED"),
+
+                Partial = grouped.Count(x =>
+                    (x.status ?? "").Trim().ToUpperInvariant()
+                    == "PARTIALLY ALLOCATED"),
+
+                ReadyDispatch = grouped.Count(x =>
+                    (x.status ?? "").Trim().ToUpperInvariant()
+                    == "READY FOR DISPATCH"),
+
+                PartiallyDelivered = grouped.Count(x =>
+                    (x.status ?? "").Trim().ToUpperInvariant()
+                    == "PARTIALLY DELIVERED"),
+
+                Completed = grouped.Count(x =>
+                    (x.status ?? "").Trim().ToUpperInvariant()
+                    == "COMPLETED"),
+
+                DueToday = grouped.Count(x =>
+                    x.delivery_date.HasValue &&
+                    x.delivery_date.Value >= today &&
+                    x.delivery_date.Value < tomorrow &&
+                    x.status != null &&
+                    x.status.Trim().ToUpperInvariant() != "COMPLETED" &&
+                    x.status.Trim().ToUpperInvariant() != "CANCELLED"),
+
+                Overdue = grouped.Count(x =>
+                    x.delivery_date.HasValue &&
+                    x.delivery_date.Value < today &&
+                    x.status != null &&
+                    x.status.Trim().ToUpperInvariant() != "COMPLETED" &&
+                    x.status.Trim().ToUpperInvariant() != "CANCELLED")
             };
 
+            // =========================================
+            // STATUS FILTER FOR TABLE ONLY
+            // =========================================
+
+            var selectedStatus = (status ?? "ALL")
+                .Trim()
+                .ToUpperInvariant();
+
+            if (selectedStatus == "ALL_EXCL_COMPLETED")
+            {
+                query = query.Where(x =>
+                    x.Header.status == null ||
+                    x.Header.status.Trim().ToUpper() != "COMPLETED");
+            }
+            else if (selectedStatus == "DUE TODAY")
+            {
+                query = query.Where(x =>
+                    x.Header.delivery_date.HasValue &&
+                    x.Header.delivery_date.Value >= today &&
+                    x.Header.delivery_date.Value < tomorrow &&
+                    x.Header.status != null &&
+                    x.Header.status.Trim().ToUpper() != "COMPLETED" &&
+                    x.Header.status.Trim().ToUpper() != "CANCELLED");
+            }
+            else if (selectedStatus == "OVERDUE")
+            {
+                query = query.Where(x =>
+                    x.Header.delivery_date.HasValue &&
+                    x.Header.delivery_date.Value < today &&
+                    x.Header.status != null &&
+                    x.Header.status.Trim().ToUpper() != "COMPLETED" &&
+                    x.Header.status.Trim().ToUpper() != "CANCELLED");
+            }
+            else if (selectedStatus != "ALL" && selectedStatus != "")
+            {
+                query = query.Where(x =>
+                    x.Header.status != null &&
+                    x.Header.status.Trim().ToUpper() == selectedStatus);
+            }
+
+            // =========================================
+            // COUNT FILTERED ORDER LINES FOR PAGINATION
+            // =========================================
+
+            var totalRecords = await query.CountAsync();
             var isDesc = string.Equals(sortDir?.Trim(), "desc", StringComparison.OrdinalIgnoreCase);
             var sortKey = (sortBy ?? "dateOrdered").Trim();
             // Final order-line ID tie-breaker prevents ambiguous ordering between pages.
